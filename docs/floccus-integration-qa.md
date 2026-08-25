@@ -30,9 +30,11 @@
 
 | 浏览器 | 版本 | 测试配置文件 | Floccus 版本 | 侧边栏构建 | 结果 |
 | --- | --- | --- | --- | --- | --- |
-| Chrome Stable | 待填写 | `bookmark-vault-qa-chrome` | 待填写 | Chrome MV3 | `BLOCKED`（当前环境未安装） |
-| Edge Stable | 待填写 | `bookmark-vault-qa-edge` | 待填写 | Chrome/Edge MV3 | `BLOCKED`（当前环境未安装） |
-| Firefox Stable | 待填写 | `bookmark-vault-qa-firefox` | 待填写 | Firefox MV2 `sidebar_action` | `BLOCKED`（当前环境未安装） |
+| Chrome Stable | 未安装 | `bookmark-vault-qa-chrome` | 不可用 | Chrome MV3 | `BLOCKED`（2026-08-25 环境无浏览器） |
+| Edge Stable | 未安装 | `bookmark-vault-qa-edge` | 不可用 | Chrome/Edge MV3 | `BLOCKED`（2026-08-25 环境无浏览器） |
+| Firefox Stable | 未安装 | `bookmark-vault-qa-firefox` | 不可用 | Firefox MV2 `sidebar_action` | `BLOCKED`（2026-08-25 环境无浏览器） |
+
+环境探测结果：`google-chrome`、`chromium`、`microsoft-edge`、`firefox` 命令均不可用，系统包也未安装；未发现可用的 Floccus 客户端或浏览器扩展运行实例。因此本次不能执行真实浏览器黑盒验收，也不能将 FL-01～FL-05 标记为通过。
 
 侧边栏生产构建命令：
 
@@ -92,7 +94,7 @@ pnpm --filter @bookmark-vault/sidebar-extension build:firefox
 
 预期：撤销后旧凭据立即返回 `401`，新凭据可用；账户主密码不能替代 WebDAV 应用密码。
 
-当前状态：`BUG-001` 未修复前该项为 `BLOCKED`。本地烟测观察到撤销路由返回空 `404`，没有达到预期 `204`。
+当前状态：浏览器级 FL-05 因环境缺少 Chrome、Edge、Firefox 和 Floccus 保持 `BLOCKED`。服务端撤销链路已在提交 `2bc91c6` 的本地 Compose 验证中通过：管理 API 返回 `204`，旧凭据随后访问 WebDAV 返回 `401`；真实三浏览器同步和新凭据恢复仍待具备浏览器环境后执行。
 
 ### FL-06：密文和恢复边界
 
@@ -116,17 +118,17 @@ pnpm --filter @bookmark-vault/sidebar-extension build:firefox
 | DAV-05 | 临时 PUT + MOVE | 首次 `201`，正式文件可读 | `PASS` |
 | DAV-06 | HEAD/文件 PROPFIND | `200` / `207` + ETag | `PASS` |
 | DAV-07 | 用户路径隔离 | 跨用户 `404` | `PASS` |
-| DAV-08 | 撤销应用密码 | `204`，后续 WebDAV `401` | `FAIL`，见 `BUG-001` |
+| DAV-08 | 撤销应用密码 | `204`，后续 WebDAV `401` | `PASS`（提交 `2bc91c6`，Compose 验证） |
 
 ## 7. 缺陷和后续任务
 
-### BUG-001：应用密码撤销路由返回空 404
+### BUG-001：应用密码撤销路由返回空 404（已修复）
 
 - 复现：注册账户 → 创建应用密码 → `DELETE /api/v1/app-passwords/<uuid>`，携带有效 Bearer session token。
 - 实际：`404 Not Found`，空响应体；不是 handler 返回的 JSON `not_found`。
 - 预期：当前用户拥有且未撤销的应用密码返回 `204 No Content`，之后同一 Basic 凭据访问 WebDAV 返回 `401`。
-- 影响：无法证明撤销应用密码立即阻断 Floccus，阻塞 FL-05 和 MVP 发布门槛。
-- 处理：由后端窗口补充路由级集成测试并修复；修复后重跑 `DAV-08` 和 FL-05。
+- 影响：修复前无法证明撤销应用密码立即阻断 Floccus，曾阻塞 FL-05 和 MVP 发布门槛。
+- 处理：Axum 0.7 使用 `:id` 路由参数语法，原 `{id}` 被当作字面路径；后端已修复并增加 Router 级回归测试。提交 `2bc91c6` 的 Compose 验证确认撤销返回 `204`，旧 WebDAV 凭据返回 `401`。浏览器级 FL-05 仍受环境阻塞。
 
 ### GAP-002：历史版本恢复未形成可验收闭环
 

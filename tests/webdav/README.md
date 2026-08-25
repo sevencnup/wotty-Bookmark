@@ -112,9 +112,9 @@ curl --silent --show-error -X DELETE -u "$QA_USER:$APP_SECRET" \
 
 ## 当前结果
 
-2026-08-25 本地 Compose 烟测已覆盖健康检查、显式 CORS 预检、未认证拒绝、集合/文件 PROPFIND、应用密码锁冲突、临时 PUT、MOVE、HEAD、GET、路径隔离和锁释放。上述检查通过。
+2026-08-25 本地 Compose 烟测已覆盖健康检查、显式 CORS 预检、未认证拒绝、集合/文件 PROPFIND、应用密码锁冲突、临时 PUT、MOVE、HEAD、GET、路径隔离、锁释放和应用密码撤销。上述检查通过；提交 `2bc91c6` 中 `DELETE /api/v1/app-passwords/<uuid>` 返回 `204`，撤销后同一 WebDAV 凭据返回 `401`。
 
-应用密码撤销检查未通过：`DELETE /api/v1/app-passwords/<uuid>` 返回空响应 `404`，未进入预期的 `204` 成功分支；该问题记录为 `BUG-001`，修复后必须重新执行撤销和 WebDAV 认证失效检查。
+真实 Chrome、Edge、Firefox 和 Floccus 黑盒验收仍需在具备浏览器的环境中执行，不能以本地 Compose 烟测替代。
 
 ## 清理
 
