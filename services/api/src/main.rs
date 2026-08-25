@@ -17,6 +17,8 @@ use tower_http::{
 
 use state::{AppState, AuthRateLimiter};
 
+const APP_PASSWORD_BY_ID_ROUTE: &str = "/api/v1/app-passwords/:id";
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt()
@@ -48,7 +50,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         auth_rate_limiter: Arc::new(AuthRateLimiter::default()),
     };
 
-    let app = Router::new()
+    let app = app_router(state);
+
+    let listener = TcpListener::bind(bind_addr).await?;
+    tracing::info!(%bind_addr, "bookmark-vault-api started");
+    axum::serve(listener, app).await?;
+    Ok(())
+}
+
+fn app_router(state: AppState) -> Router {
+    Router::new()
         .route("/health/live", get(auth::health_live))
         .route("/api/v1/auth/register", post(auth::register))
         .route("/api/v1/auth/login", post(auth::login))
@@ -58,20 +69,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             "/api/v1/app-passwords",
             get(auth::list_app_passwords).post(auth::create_app_password),
         )
-        .route(
-            "/api/v1/app-passwords/{id}",
-            delete(auth::revoke_app_password),
-        )
+        .route(APP_PASSWORD_BY_ID_ROUTE, delete(auth::revoke_app_password))
         .route("/api/v1/storage/status", get(auth::storage_status))
         .route("/dav/*path", any(webdav::handle))
         .layer(cors_layer())
         .layer(TraceLayer::new_for_http())
-        .with_state(state);
-
-    let listener = TcpListener::bind(bind_addr).await?;
-    tracing::info!(%bind_addr, "bookmark-vault-api started");
-    axum::serve(listener, app).await?;
-    Ok(())
+        .with_state(state)
 }
 
 fn cors_layer() -> CorsLayer {
@@ -129,7 +132,15 @@ fn cors_layer_for_origins(configured_origins: &str) -> CorsLayer {
 
 #[cfg(test)]
 mod tests {
-    use super::cors_layer_for_origins;
+    use super::{app_router, cors_layer_for_origins};
+    use crate::state::{AppState, AuthRateLimiter};
+    use axum::{
+        body::Body,
+        http::{Method, Request, StatusCode},
+    };
+    use sqlx::postgres::PgPoolOptions;
+    use std::{path::PathBuf, sync::Arc};
+    use tower::ServiceExt;
     use tower_http::cors::CorsLayer;
 
     #[test]
@@ -142,5 +153,29 @@ mod tests {
         let _layer: CorsLayer = cors_layer_for_origins(
             "http://localhost:5173, chrome-extension://extension-id, invalid origin",
         );
+    }
+
+    #[tokio::test]
+    async fn app_password_id_route_matches_axum_07_parameter_syntax() {
+        let state = AppState {
+            db: PgPoolOptions::new()
+                .connect_lazy("postgres://bookmark_vault:change-me-in-production@127.0.0.1:5433/bookmark_vault")
+                .expect("lazy database pool should be constructible"),
+            data_dir: PathBuf::from("/tmp/bookmark-vault-route-test"),
+            version: "test".into(),
+            auth_rate_limiter: Arc::new(AuthRateLimiter::default()),
+        };
+        let response = app_router(state)
+            .oneshot(
+                Request::builder()
+                    .method(Method::DELETE)
+                    .uri("/api/v1/app-passwords/not-a-uuid")
+                    .body(Body::empty())
+                    .expect("request should build"),
+            )
+            .await
+            .expect("router should respond");
+
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
     }
 }
