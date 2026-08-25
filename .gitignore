@@ -8,4 +8,5 @@ coverage/
 .vite/
 .wxt/
 .output/
+.ai/
 *.log
