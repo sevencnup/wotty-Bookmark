@@ -101,10 +101,18 @@ docker compose -p "$RECOVERY_PROJECT" down -v
 
 ## 历史版本清理状态
 
-当前实现只有 `dav_files.version` 计数和当前文件，migration 尚未提供 `file_versions` 表，WebDAV 覆盖也没有保存历史快照。因此：
+历史版本能力已通过 `migrations/0002_file_versions.sql` 补齐。正式 `bookmarks.xbel` 被 PUT 覆盖、被 MOVE 覆盖或执行恢复前，API 会将当前 opaque blob 保存到 `DATA_DIR/.versions/<user-id>/<dav-file-id>/<version-id>.blob`，并在 PostgreSQL `file_versions` 中记录快照元数据。服务端不解析或记录书签明文。
 
-- 当前不能执行或宣称通过“保留最近 10～30 个历史版本”的清理演练。
-- `dav_files.version` 不能代替可恢复的历史文件。
-- 需要后续任务补齐快照写入、恢复 API/权限、审计记录和按保留周期清理，再重新执行恢复验收。
+管理 API 使用登录会话鉴权：
 
-本次已验证可恢复当前 PostgreSQL 元数据和当前加密文件；历史版本保留/清理标记为 `BLOCKED (GAP-002)`。
+- `GET /api/v1/storage/versions`：列出当前用户的历史版本元数据。
+- `POST /api/v1/storage/versions/{id}/restore`：恢复指定版本；当前 WebDAV 锁存在时返回 `423`，恢复前先保存当前文件。
+- `POST /api/v1/storage/versions/cleanup`：清理每个文件超过最近 30 条的旧版本；每次新快照也会自动执行同一保留策略。
+
+当前实现已覆盖快照写入、恢复和清理，因此：
+
+- `dav_files.version` 仅作为当前文件变更计数，实际恢复数据来自 `file_versions` 快照。
+- 删除当前 WebDAV 文件会按现有协议移除其 `dav_files` 元数据，关联历史快照随外键级联删除；恢复能力针对正式文件的覆盖和恢复操作。
+- 快照目录属于数据卷内部路径，不会通过 `/dav/` 资源路由直接暴露。
+
+本次后续验收已验证：首次写入返回 `201`，覆盖前生成快照，版本列表可读，恢复返回 `200` 且内容回到旧版本，连续产生 31 个快照后保留最近 30 条；历史版本恢复缺口 `GAP-002` 已关闭。

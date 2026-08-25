@@ -2,11 +2,15 @@ use crate::{auth, state::AppState};
 use axum::{
     body::{to_bytes, Body},
     extract::{Path, Request, State},
-    http::{header, HeaderName, HeaderValue, Method, StatusCode},
+    http::{header, HeaderMap, HeaderName, HeaderValue, Method, StatusCode},
     response::{IntoResponse, Response},
+    Json,
 };
 use httpdate::fmt_http_date;
+use serde::Serialize;
+use serde_json::json;
 use sha2::{Digest, Sha256};
+use sqlx::Row;
 use std::{
     path::{Path as FsPath, PathBuf},
     time::Duration,
@@ -16,6 +20,7 @@ use url::Url;
 
 const MAX_FILE_BYTES: usize = 10 * 1024 * 1024;
 const LOCK_TIMEOUT: Duration = Duration::from_secs(15 * 60);
+const MAX_HISTORY_VERSIONS: i64 = 30;
 
 pub async fn handle(
     State(state): State<AppState>,
@@ -64,6 +69,183 @@ pub async fn handle(
             _ => method_not_allowed(),
         },
     }
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct FileVersionResponse {
+    id: uuid::Uuid,
+    file_path: String,
+    etag: String,
+    byte_size: i64,
+    created_at: String,
+}
+
+pub async fn list_versions(State(state): State<AppState>, headers: HeaderMap) -> Response {
+    let Some(user) = auth::authenticate_session(&state, &headers).await else {
+        return auth::error(StatusCode::UNAUTHORIZED, "unauthorized", "请先登录");
+    };
+    let rows = sqlx::query(
+        "SELECT fv.id, df.path, fv.etag, fv.byte_size, fv.created_at
+         FROM file_versions fv
+         JOIN dav_files df ON df.id = fv.dav_file_id
+         WHERE df.user_id = $1
+         ORDER BY fv.created_at DESC, fv.id DESC",
+    )
+    .bind(user.id)
+    .fetch_all(&state.db)
+    .await;
+    match rows {
+        Ok(rows) => Json(
+            rows.into_iter()
+                .map(|row| FileVersionResponse {
+                    id: row.get("id"),
+                    file_path: row.get("path"),
+                    etag: row.get("etag"),
+                    byte_size: row.get("byte_size"),
+                    created_at: row
+                        .get::<chrono::DateTime<chrono::Utc>, _>("created_at")
+                        .to_rfc3339(),
+                })
+                .collect::<Vec<_>>(),
+        )
+        .into_response(),
+        Err(error) => {
+            tracing::error!(?error, "list file versions failed");
+            auth::error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "versions_list_failed",
+                "历史版本读取失败",
+            )
+        }
+    }
+}
+
+pub async fn restore_version(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Path(version_id): Path<uuid::Uuid>,
+) -> Response {
+    let Some(user) = auth::authenticate_session(&state, &headers).await else {
+        return auth::error(StatusCode::UNAUTHORIZED, "unauthorized", "请先登录");
+    };
+    let row = sqlx::query(
+        "SELECT fv.storage_key, df.path
+         FROM file_versions fv
+         JOIN dav_files df ON df.id = fv.dav_file_id
+         WHERE fv.id = $1 AND df.user_id = $2",
+    )
+    .bind(version_id)
+    .bind(user.id)
+    .fetch_optional(&state.db)
+    .await;
+    let Some(row) = (match row {
+        Ok(row) => row,
+        Err(error) => {
+            tracing::error!(?error, "load file version failed");
+            return auth::error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "version_load_failed",
+                "历史版本读取失败",
+            );
+        }
+    }) else {
+        return auth::error(StatusCode::NOT_FOUND, "version_not_found", "历史版本不存在");
+    };
+    let path: String = row.get("path");
+    let Some(DavResource::File(target)) =
+        DavResource::parse(&path, &user.login_identifier, &state.data_dir, user.id)
+    else {
+        return auth::error(StatusCode::NOT_FOUND, "version_not_found", "历史版本不存在");
+    };
+    if let Err(response) = ensure_unlocked(&target).await {
+        return response;
+    }
+    let snapshot_path: String = row.get("storage_key");
+    let body = match fs::read(&snapshot_path).await {
+        Ok(body) => body,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            return auth::error(
+                StatusCode::GONE,
+                "version_data_missing",
+                "历史版本文件已不存在",
+            )
+        }
+        Err(error) => {
+            tracing::error!(?error, "read file version failed");
+            return auth::error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "version_read_failed",
+                "历史版本读取失败",
+            );
+        }
+    };
+    if fs::try_exists(&target.file_path).await.unwrap_or(false) && is_versioned_file(&target) {
+        if let Err(error) = snapshot_existing_file(&state.db, &target).await {
+            tracing::error!(?error, path = %target.relative_path, "snapshot current file before restore failed");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    }
+    if let Err(error) = replace_file(&target.file_path, &body).await {
+        tracing::error!(?error, path = %target.relative_path, "restore file version failed");
+        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+    }
+    if let Err(error) = record_file(&state.db, &target, &body).await {
+        tracing::error!(?error, path = %target.relative_path, "record restored file metadata failed");
+        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+    }
+    Json(json!({
+        "restored": true,
+        "versionId": version_id,
+        "filePath": target.relative_path,
+    }))
+    .into_response()
+}
+
+pub async fn cleanup_versions(State(state): State<AppState>, headers: HeaderMap) -> Response {
+    let Some(user) = auth::authenticate_session(&state, &headers).await else {
+        return auth::error(StatusCode::UNAUTHORIZED, "unauthorized", "请先登录");
+    };
+    match cleanup_versions_for_user(&state.db, user.id).await {
+        Ok(removed) => Json(json!({
+            "removed": removed,
+            "retainedPerFile": MAX_HISTORY_VERSIONS,
+        }))
+        .into_response(),
+        Err(error) => {
+            tracing::error!(?error, "cleanup file versions failed");
+            auth::error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "versions_cleanup_failed",
+                "历史版本清理失败",
+            )
+        }
+    }
+}
+
+async fn ensure_unlocked(target: &DavTarget) -> Result<(), Response> {
+    let Some(parent) = target.file_path.parent() else {
+        return Ok(());
+    };
+    let lock_path = parent.join("bookmarks.xbel.lock");
+    let metadata = match fs::metadata(&lock_path).await {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => {
+            tracing::error!(?error, "inspect restore lock failed");
+            return Err(StatusCode::INTERNAL_SERVER_ERROR.into_response());
+        }
+    };
+    if metadata
+        .modified()
+        .ok()
+        .and_then(|modified| modified.elapsed().ok())
+        .is_some_and(|elapsed| elapsed > LOCK_TIMEOUT)
+    {
+        let _ = fs::remove_file(&lock_path).await;
+        return Ok(());
+    }
+    Err(StatusCode::LOCKED.into_response())
 }
 
 #[derive(Clone)]
@@ -184,33 +366,19 @@ async fn write_file(
         }
     }
     let existed = fs::try_exists(&target.file_path).await.unwrap_or(false);
-    let temp_path = target.file_path.with_file_name(format!(
-        ".{}.uploading-{}",
-        target
-            .file_path
-            .file_name()
-            .and_then(|value| value.to_str())
-            .unwrap_or("webdav-file"),
-        uuid::Uuid::new_v4()
-    ));
-    match fs::File::create(&temp_path).await {
-        Ok(mut file) => {
-            if file.write_all(&body).await.is_err() || file.flush().await.is_err() {
-                let _ = fs::remove_file(&temp_path).await;
-                return StatusCode::INTERNAL_SERVER_ERROR.into_response();
-            }
-        }
-        Err(error) => {
-            tracing::error!(?error, "create WebDAV file failed");
+    if existed && is_versioned_file(target) {
+        if let Err(error) = snapshot_existing_file(db, target).await {
+            tracing::error!(?error, path = %target.relative_path, "snapshot WebDAV file failed");
             return StatusCode::INTERNAL_SERVER_ERROR.into_response();
         }
     }
-    if let Err(error) = fs::rename(&temp_path, &target.file_path).await {
+    if let Err(error) = replace_file(&target.file_path, &body).await {
         tracing::error!(?error, "replace WebDAV file failed");
-        let _ = fs::remove_file(&temp_path).await;
         return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     }
-    record_file(db, target, &body).await;
+    if let Err(error) = record_file(db, target, &body).await {
+        tracing::error!(?error, path = %target.relative_path, "record WebDAV file metadata failed");
+    }
     if existed {
         StatusCode::NO_CONTENT.into_response()
     } else {
@@ -383,12 +551,20 @@ async fn move_file(
             return StatusCode::INTERNAL_SERVER_ERROR.into_response();
         }
     }
+    if destination_exists && is_versioned_file(&target) {
+        if let Err(error) = snapshot_existing_file(db, &target).await {
+            tracing::error!(?error, path = %target.relative_path, "snapshot WebDAV MOVE destination failed");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    }
     match fs::rename(&source.file_path, &target.file_path).await {
         Ok(()) => {
             let body = fs::read(&target.file_path).await.ok();
             remove_file_metadata(db, source).await;
             if let Some(body) = body {
-                record_file(db, &target, &body).await;
+                if let Err(error) = record_file(db, &target, &body).await {
+                    tracing::error!(?error, path = %target.relative_path, "record WebDAV MOVE metadata failed");
+                }
             }
             if destination_exists {
                 StatusCode::NO_CONTENT.into_response()
@@ -406,11 +582,15 @@ async fn move_file(
     }
 }
 
-async fn record_file(db: &sqlx::PgPool, target: &DavTarget, body: &[u8]) {
+async fn record_file(
+    db: &sqlx::PgPool,
+    target: &DavTarget,
+    body: &[u8],
+) -> Result<(), sqlx::Error> {
     let mut digest = Sha256::new();
     digest.update(body);
     let etag = format!("\"{:x}\"", digest.finalize());
-    let result = sqlx::query(
+    sqlx::query(
         "INSERT INTO dav_files (id, user_id, path, storage_key, etag, byte_size, version, last_modified_at, updated_at)
          VALUES ($1, $2, $3, $4, $5, $6, 1, NOW(), NOW())
          ON CONFLICT (user_id, path) DO UPDATE SET
@@ -428,10 +608,140 @@ async fn record_file(db: &sqlx::PgPool, target: &DavTarget, body: &[u8]) {
     .bind(etag)
     .bind(body.len() as i64)
     .execute(db)
-    .await;
-    if let Err(error) = result {
-        tracing::error!(?error, path = %target.relative_path, "record WebDAV file metadata failed");
+    .await
+    .map(|_| ())
+}
+
+fn is_versioned_file(target: &DavTarget) -> bool {
+    target
+        .file_path
+        .file_name()
+        .and_then(|value| value.to_str())
+        == Some("bookmarks.xbel")
+}
+
+async fn replace_file(path: &FsPath, body: &[u8]) -> Result<(), std::io::Error> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).await?;
     }
+    let file_name = path
+        .file_name()
+        .and_then(|value| value.to_str())
+        .unwrap_or("webdav-file");
+    let temp_path = path.with_file_name(format!(".{file_name}.uploading-{}", uuid::Uuid::new_v4()));
+    let result = async {
+        let mut file = fs::File::create(&temp_path).await?;
+        file.write_all(body).await?;
+        file.flush().await?;
+        fs::rename(&temp_path, path).await
+    }
+    .await;
+    if result.is_err() {
+        let _ = fs::remove_file(&temp_path).await;
+    }
+    result
+}
+
+async fn snapshot_existing_file(db: &sqlx::PgPool, target: &DavTarget) -> Result<(), String> {
+    let body = fs::read(&target.file_path)
+        .await
+        .map_err(|error| format!("read current file: {error}"))?;
+    let current = sqlx::query("SELECT id FROM dav_files WHERE user_id = $1 AND path = $2")
+        .bind(target.user_id)
+        .bind(&target.relative_path)
+        .fetch_optional(db)
+        .await
+        .map_err(|error| format!("load current metadata: {error}"))?;
+    let dav_file_id: uuid::Uuid = if let Some(row) = current {
+        row.get("id")
+    } else {
+        record_file(db, target, &body)
+            .await
+            .map_err(|error| format!("create current metadata: {error}"))?;
+        sqlx::query("SELECT id FROM dav_files WHERE user_id = $1 AND path = $2")
+            .bind(target.user_id)
+            .bind(&target.relative_path)
+            .fetch_one(db)
+            .await
+            .map_err(|error| format!("reload current metadata: {error}"))?
+            .get("id")
+    };
+    let version_id = uuid::Uuid::new_v4();
+    let snapshot_path = target
+        .data_root
+        .join(".versions")
+        .join(target.user_id.to_string())
+        .join(dav_file_id.to_string())
+        .join(format!("{version_id}.blob"));
+    replace_file(&snapshot_path, &body)
+        .await
+        .map_err(|error| format!("write snapshot: {error}"))?;
+    let mut digest = Sha256::new();
+    digest.update(&body);
+    let etag = format!("\"{:x}\"", digest.finalize());
+    if let Err(error) = sqlx::query(
+        "INSERT INTO file_versions (id, dav_file_id, storage_key, etag, byte_size)
+         VALUES ($1, $2, $3, $4, $5)",
+    )
+    .bind(version_id)
+    .bind(dav_file_id)
+    .bind(snapshot_path.to_string_lossy().as_ref())
+    .bind(etag)
+    .bind(body.len() as i64)
+    .execute(db)
+    .await
+    {
+        let _ = fs::remove_file(&snapshot_path).await;
+        return Err(format!("record snapshot: {error}"));
+    }
+    cleanup_versions_for_user(db, target.user_id)
+        .await
+        .map_err(|error| format!("clean old snapshots: {error}"))?;
+    Ok(())
+}
+
+async fn cleanup_versions_for_user(
+    db: &sqlx::PgPool,
+    user_id: uuid::Uuid,
+) -> Result<usize, sqlx::Error> {
+    let rows = sqlx::query(
+        "SELECT id, storage_key
+         FROM (
+           SELECT fv.id, fv.storage_key,
+                  ROW_NUMBER() OVER (
+                    PARTITION BY fv.dav_file_id
+                    ORDER BY fv.created_at DESC, fv.id DESC
+                  ) AS version_number
+           FROM file_versions fv
+           JOIN dav_files df ON df.id = fv.dav_file_id
+           WHERE df.user_id = $1
+         ) versions
+         WHERE version_number > $2",
+    )
+    .bind(user_id)
+    .bind(MAX_HISTORY_VERSIONS)
+    .fetch_all(db)
+    .await?;
+    let mut removed = 0;
+    for row in rows {
+        let id: uuid::Uuid = row.get("id");
+        let storage_key: String = row.get("storage_key");
+        let result = sqlx::query("DELETE FROM file_versions WHERE id = $1")
+            .bind(id)
+            .execute(db)
+            .await?;
+        if result.rows_affected() == 0 {
+            continue;
+        }
+        removed += 1;
+        let path = PathBuf::from(storage_key);
+        if let Err(error) = fs::remove_file(&path).await {
+            if error.kind() != std::io::ErrorKind::NotFound {
+                tracing::warn!(?error, ?path, "remove old WebDAV snapshot failed");
+            }
+        }
+    }
+    Ok(removed)
 }
 
 async fn remove_file_metadata(db: &sqlx::PgPool, target: &DavTarget) {

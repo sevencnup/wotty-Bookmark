@@ -71,6 +71,15 @@ fn app_router(state: AppState) -> Router {
         )
         .route(APP_PASSWORD_BY_ID_ROUTE, delete(auth::revoke_app_password))
         .route("/api/v1/storage/status", get(auth::storage_status))
+        .route("/api/v1/storage/versions", get(webdav::list_versions))
+        .route(
+            "/api/v1/storage/versions/cleanup",
+            post(webdav::cleanup_versions),
+        )
+        .route(
+            "/api/v1/storage/versions/:id/restore",
+            post(webdav::restore_version),
+        )
         .route("/dav/*path", any(webdav::handle))
         .layer(cors_layer())
         .layer(TraceLayer::new_for_http())
