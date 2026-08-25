@@ -1,8 +1,8 @@
 # MVP 发布封板清单
 
 审计日期：2026-08-25  
-审计任务：`release-readiness-audit`  
-当前结论：`NO-GO / NOT READY`
+审计任务：`final-release-recheck`
+当前结论：`NO-GO / EXTERNAL QA BLOCKED`
 
 本清单汇总当前已经产生的验证证据、未完成任务和发布前的关闭顺序。只有所有 `BLOCKED` 项关闭并重新执行对应验收，才能创建正式发布包或推送 GitHub。
 
@@ -15,39 +15,40 @@
 | 管理后台 API 链路 | `PASS` | 注册、登录、存储状态、应用密码创建/列表/撤销通过；lint、3 项测试和生产构建通过。 |
 | 管理后台浏览器级 E2E | `BLOCKED` | 当前环境没有 Chrome、Edge、Firefox；账户删除按钮仍是展示控件，未纳入通过项。 |
 | 侧边栏生产构建 | `PASS` | TypeScript、3 项单测、Chrome MV3 和 Firefox MV2 构建通过。 |
-| 侧边栏真实浏览器回归 | `BLOCKED` | 三浏览器和 Floccus 不可用；且 `frontend-bookmark-management-ui` 仍在进行中，需完成后重新构建和回归。 |
+| 侧边栏真实浏览器回归 | `BLOCKED` | 前端代码和生产构建已完成，但三浏览器和 Floccus 不可用，仍需执行真实交互回归。 |
 | Floccus 三浏览器同步 | `BLOCKED` | FL-01～FL-05 因缺少浏览器/Floccus 保持阻塞，不能用服务端 curl 烟测替代。 |
-| 历史版本恢复与清理 | `BLOCKED` | `GAP-002`：当前缺少 `file_versions` 快照表、恢复 API/权限、审计和清理机制；`history-version-recovery` 正在处理。 |
+| 历史版本恢复与清理 | `PASS` | `history-version-recovery` 已增加快照、会话鉴权恢复和 30 条保留清理；Cargo、Clippy 和 Compose 流程均通过，提交 `5096c8c`。 |
 | 自部署和当前文件恢复 | `PASS` | 生产 Compose/Caddy 校验通过；隔离项目完成 PostgreSQL 与加密 opaque 文件备份恢复，SHA-256 一致。 |
-| 干净环境依赖安装 | `BLOCKED` | 根目录缺少 `pnpm-workspace.yaml`，不满足统一 workspace 和 `workspace:*` 依赖的封板要求；需先补齐并重新执行根级安装/测试。 |
+| 干净环境依赖安装 | `PASS` | 根 workspace 和锁文件已恢复；4 个项目被识别，根 `pnpm test`、`pnpm lint`、构建和扩展 typecheck/test/build 均通过，提交 `4ff780e`。 |
 | 扩展商店资料 | `BLOCKED` | Firefox 仍使用占位 ID；缺少正式图标、截图、公开 HTTPS 隐私政策 URL、支持页和主页。详情见扩展 [`RELEASE_AUDIT.md`](../apps/sidebar-extension/RELEASE_AUDIT.md)。 |
+
+前端管理界面代码已由 `frontend-bookmark-management-ui` 完成，admin-web lint/test/build 与 sidebar typecheck/test/Chrome/Firefox build 均通过；管理后台和侧边栏点击级 E2E 仍受浏览器环境阻塞。
 
 ## 阻塞项关闭顺序
 
-### R-001：完成历史版本快照和恢复闭环
+### R-001：历史版本快照和恢复闭环（已关闭）
 
-负责人：`worker-e04a`（任务 `history-version-recovery`）
+负责人：`worker-e04a`（任务 `history-version-recovery`，提交 `5096c8c`）
 
 - 增加 `file_versions` 数据结构和迁移。
 - 在正式文件覆盖前保存可恢复快照。
 - 提供受权限保护的恢复入口、审计记录和保留周期清理。
-- 补充 API/存储测试，并重新执行 FL-06 和部署恢复演练。
+- API/存储测试、Compose 恢复流程和 30 条保留策略已通过；真实浏览器 FL-06 仍需在 R-004 环境中执行。
 
-### R-002：完成前端管理界面收敛
+### R-002：前端管理界面收敛（代码已关闭，浏览器回归待执行）
 
-负责人：`worker-a66f`（任务 `frontend-bookmark-management-ui`）
+负责人：`worker-a66f`（任务 `frontend-bookmark-management-ui`，提交 `295fb40`）
 
-- 完成当前进行中的管理后台/书签管理界面变更。
-- 在提交前执行 admin-web 和 sidebar-extension 的类型检查、测试、生产构建。
+- 已完成管理后台/书签管理界面变更。
+- admin-web 和 sidebar-extension 的类型检查、测试、生产构建已通过。
 - 重新核对不引入 WebDAV 或第二套同步逻辑。
-- 由具备浏览器的环境执行管理后台和侧边栏点击级回归。
+- 由具备浏览器的环境执行管理后台和侧边栏点击级回归，作为 R-004 的一部分。
 
-### R-003：恢复根 workspace 封板条件
+### R-003：根 workspace 封板条件（已关闭）
 
-- 补齐根 `pnpm-workspace.yaml`，覆盖 `apps/*` 和 `packages/*` Node 项目。
-- 在根目录执行一次 `pnpm install`，不得在子项目单独安装依赖。
-- 在干净环境执行根级 `pnpm test`、`pnpm lint` 以及各项目构建。
-- 确认锁文件、workspace 依赖和构建产物没有污染正式包。
+- 已补齐根 `pnpm-workspace.yaml`，覆盖 `apps/*` 和 `packages/*` Node 项目，并在根目录执行一次 `pnpm install`。
+- 根 `pnpm test`、`pnpm lint`、管理后台构建、侧边栏 typecheck/test/Chrome/Firefox 构建已通过。
+- 锁文件和 workspace 依赖已提交为 `4ff780e`；未在子项目单独安装依赖。
 
 ### R-004：完成真实浏览器和 Floccus 验收
 
@@ -71,7 +72,7 @@
 ## 封板前命令顺序
 
 ```text
-# 根 workspace 修复后
+# 根 workspace 与锁文件已恢复
 pnpm install
 pnpm test
 pnpm lint
@@ -95,4 +96,4 @@ docker compose --env-file infra/.env \
   -f infra/docker-compose.production.yml config --quiet
 ```
 
-所有窗口完成各自任务后，由协调窗口再次运行协同 `status`、`lead-cycle` 和最终 `check`，确认工作区只包含已认领范围，并先本地提交。未经明确命令不推送 GitHub。
+当前只剩真实浏览器/Floccus 验收和扩展商店正式素材两类外部阻塞；两者关闭后，由协调窗口再次运行协同 `status`、`lead-cycle` 和最终 `check`，确认工作区只包含已认领范围，并先本地提交。未经明确命令不推送 GitHub。

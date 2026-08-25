@@ -618,12 +618,10 @@ MVP 发布前必须满足：
 
 ### 7.1 2026-08-25 封板审计状态
 
-当前封板结论为 `NO-GO / NOT READY`。后端认证、WebDAV 协议、管理 API、扩展生产构建和自部署当前文件恢复已有验证证据；以下条件仍阻塞发布：
+当前封板结论为 `NO-GO / EXTERNAL QA BLOCKED`。后端认证、WebDAV 协议、管理 API、历史版本恢复、扩展生产构建、根 workspace 和自部署恢复已有验证证据；以下条件仍阻塞发布：
 
-- 根目录缺少 `pnpm-workspace.yaml`，必须补齐统一依赖入口并在干净环境重新执行安装、测试和构建。
 - Chrome、Edge、Firefox 和官方 Floccus 在当前环境不可用，FL-01～FL-05 真实同步验收保持 `BLOCKED`。
-- 历史版本恢复与清理缺少 `file_versions` 快照、恢复 API/权限和清理机制，记录为 `GAP-002`，由独立任务处理。
-- 管理后台/书签管理界面仍在收敛；浏览器点击级 E2E 尚未执行，账户删除按钮也未纳入通过项。
+- 管理后台和侧边栏的浏览器点击级 E2E 尚未执行；账户删除按钮也未纳入通过项。
 - 扩展商店仍需正式 Firefox ID、图标、截图、公开 HTTPS 隐私政策 URL、支持页和干净打包证据。
 
 具体责任、顺序和命令见 [`docs/release-readiness.md`](docs/release-readiness.md)。在这些条件关闭并复验前，不得宣称 MVP 达到本节发布门槛。

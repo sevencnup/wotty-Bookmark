@@ -22,13 +22,13 @@ MVP 的最终目标是：用户可以在管理后台注册并创建 WebDAV 应�
 | 阶段 | 任务 ID | 目标 | 依赖 | 当前状态 | 主要交付物 |
 | --- | --- | --- | --- | --- | --- |
 | P0 | `scope-protocol` | 冻结 MVP 范围和 Floccus/WebDAV 协议边界 | 无 | 已完成 | 架构边界、MVP 验收清单、配置说明初稿 |
-| P1 | `repo-foundation` | 建立可测试、可部署的 monorepo 骨架 | P0 | 基础完成，workspace 待补齐 | workspace、前后端骨架、Compose、质量检查配置 |
-| P2 | `identity-storage` | 完成账户、应用密码和文件元数据存储 | P1 | API 链路已验收，历史恢复待补齐 | 认证 API、应用密码、文件版本和审计边界 |
+| P1 | `repo-foundation` | 建立可测试、可部署的 monorepo 骨架 | P0 | 已完成 | workspace、前后端骨架、Compose、质量检查配置 |
+| P2 | `identity-storage` | 完成账户、应用密码和文件元数据存储 | P1 | API 与历史版本恢复已验收 | 认证 API、应用密码、文件版本和审计边界 |
 | P3 | `webdav-compatibility` | 让官方 Floccus 稳定使用 WebDAV 服务 | P2 | 协议烟测通过，真实 Floccus 待验收 | WebDAV 方法、锁、临时文件、MOVE、CORS |
 | P4 | `admin-console` | 提供账户和 Floccus 配置管理界面 | P2、P3 | API/构建通过，浏览器 E2E 待执行 | 登录、应用密码、配置向导和存储状态页 |
 | P5 | `floccus-qa` | 完成三浏览器 WebDAV/Floccus 黑盒验收 | P3、P4、P6 | 环境阻塞 | 可重复验收记录和问题清单 |
-| P6 | `sidebar-extension` | 完成三浏览器书签侧边栏体验 | P1、P3 | 构建通过，前端收敛和浏览器回归待完成 | Chrome/Edge/Firefox 生产构建和交互回归 |
-| P7 | `release-hardening` | 完成安全加固、自部署和发布准备 | P2、P3、P4、P5、P6 | 部署恢复通过，历史版本和发布素材待完成 | 限流、CORS、备份恢复、部署文档和发布包 |
+| P6 | `sidebar-extension` | 完成三浏览器书签侧边栏体验 | P1、P3 | 代码与构建完成，浏览器回归待执行 | Chrome/Edge/Firefox 生产构建和交互回归 |
+| P7 | `release-hardening` | 完成安全加固、自部署和发布准备 | P2、P3、P4、P5、P6 | 历史恢复与 workspace 完成，浏览器/商店发布待完成 | 限流、CORS、备份恢复、部署文档和发布包 |
 
 ## 4. 依赖关系
 
@@ -177,15 +177,13 @@ P4 与 P6 在 P3 的协议边界稳定后可以并行开发。P5 必须等待侧
 
 截至 2026-08-25，后续优先级和封板条件见 [`docs/release-readiness.md`](docs/release-readiness.md)：
 
-1. 完成 `history-version-recovery`，关闭 GAP-002 并重新执行恢复验收。
-2. 完成 `frontend-bookmark-management-ui`，重新执行管理后台和侧边栏构建回归。
-3. 补齐根 `pnpm-workspace.yaml`，在干净环境执行根级依赖、测试和构建检查。
-4. 在具备浏览器和 Floccus 的环境执行 P5 三浏览器黑盒验收。
-5. 补齐扩展商店图标、截图、正式 Firefox ID、隐私政策 URL 和支持资料后，再进行 P7 发布封板。
+1. 在具备浏览器和 Floccus 的环境执行 P4/P5 管理后台、侧边栏和三浏览器黑盒验收。
+2. 补齐扩展商店图标、截图、正式 Firefox ID、隐私政策 URL 和支持资料。
+3. 关闭外部阻塞后重新执行根级测试、生产构建、部署配置和最终发布包审计。
 
 ## 8. 当前发布封板状态
 
-截至 2026-08-25，后端协议、管理 API、扩展构建和部署/当前文件恢复已有通过证据；真实浏览器/Floccus、历史版本恢复、根 workspace、前端界面收敛和商店提交素材仍未完成。当前结论为 `NO-GO`，不得创建正式发布或推送 GitHub。
+截至 2026-08-25，后端协议、管理 API、历史版本恢复、扩展构建、前端界面、根 workspace 和部署恢复已有通过证据；真实浏览器/Floccus验收与商店提交素材仍未完成。当前结论为 `NO-GO`，不得创建正式发布或推送 GitHub。
 
 ## 9. 跨窗口交接提示
 

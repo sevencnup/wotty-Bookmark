@@ -18,3 +18,10 @@
 - 建立最终发布封板清单，明确当前结论为 `NO-GO / NOT READY`，并记录根 workspace、历史版本恢复、真实浏览器验收、前端界面收敛和商店资料阻塞项。
 - 更新分阶段开发任务与执行计划的当前状态，安排历史恢复、前端收敛、workspace 修复、三浏览器验收和商店资料的关闭顺序。
 - 未修改业务代码；具体封板步骤见 [`docs/release-readiness.md`](docs/release-readiness.md)。
+
+## 2026-08-25：`final-release-recheck`
+
+- 复核历史版本快照/恢复/清理、前端管理界面和根 pnpm workspace 的完成证据。
+- 关闭内部实现阻塞：历史版本恢复已通过 30 条保留策略验证，前端构建和根级 workspace 验证通过。
+- 保留真实 Chrome、Edge、Firefox/Floccus 验收和扩展商店正式素材为外部发布阻塞，最终结论仍为 `NO-GO`。
+- 更新封板清单、分阶段计划和执行计划；未修改业务代码。
