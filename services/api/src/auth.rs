@@ -15,7 +15,13 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use sha2::{Digest, Sha256};
 use sqlx::Row;
+use std::time::Duration;
 use uuid::Uuid;
+
+const LOGIN_RATE_LIMIT: u32 = 5;
+const LOGIN_RATE_WINDOW: Duration = Duration::from_secs(15 * 60);
+const WEBDAV_RATE_LIMIT: u32 = 20;
+const WEBDAV_RATE_WINDOW: Duration = Duration::from_secs(15 * 60);
 
 #[derive(Serialize)]
 pub struct HealthResponse {
@@ -144,10 +150,20 @@ pub async fn register(
 }
 
 pub async fn login(State(state): State<AppState>, Json(payload): Json<LoginPayload>) -> Response {
+    let login_identifier = payload.login_identifier.trim().to_owned();
+    let rate_limit_key = format!("login:{login_identifier}");
+    if let Err(retry_after) =
+        state
+            .auth_rate_limiter
+            .try_acquire(&rate_limit_key, LOGIN_RATE_LIMIT, LOGIN_RATE_WINDOW)
+    {
+        return rate_limited(retry_after);
+    }
+
     let row = sqlx::query(
         "SELECT id, login_identifier, password_hash, status FROM users WHERE login_identifier = $1",
     )
-    .bind(payload.login_identifier.trim())
+    .bind(&login_identifier)
     .fetch_optional(&state.db)
     .await;
     let Some(row) = (match row {
@@ -187,6 +203,8 @@ pub async fn login(State(state): State<AppState>, Json(payload): Json<LoginPaylo
             "用户名或密码错误",
         );
     }
+
+    state.auth_rate_limiter.reset(&rate_limit_key);
 
     match create_session(&state, user_id).await {
         Ok(token) => Json(TokenResponse {
@@ -386,6 +404,7 @@ pub async fn storage_status(State(state): State<AppState>, headers: HeaderMap) -
 pub struct AuthenticatedUser {
     pub id: Uuid,
     pub login_identifier: String,
+    pub app_password_id: Option<Uuid>,
 }
 
 pub async fn authenticate_session(
@@ -398,37 +417,54 @@ pub async fn authenticate_session(
         .fetch_optional(&state.db)
         .await
         .ok()?
-        .map(|row| AuthenticatedUser { id: row.get("id"), login_identifier: row.get("login_identifier") })
+        .map(|row| AuthenticatedUser {
+            id: row.get("id"),
+            login_identifier: row.get("login_identifier"),
+            app_password_id: None,
+        })
 }
 
 pub async fn authenticate_webdav(
     state: &AppState,
     headers: &HeaderMap,
-) -> Option<AuthenticatedUser> {
-    let value = headers.get(header::AUTHORIZATION)?.to_str().ok()?;
-    let encoded = value.strip_prefix("Basic ")?;
-    let decoded = base64::engine::general_purpose::STANDARD
-        .decode(encoded)
-        .ok()?;
-    let credentials = String::from_utf8(decoded).ok()?;
-    let (login_identifier, secret) = credentials.split_once(':')?;
-    sqlx::query("SELECT u.id, u.login_identifier, ap.id AS app_password_id FROM app_passwords ap JOIN users u ON u.id = ap.user_id WHERE u.login_identifier = $1 AND ap.secret_hash = $2 AND ap.revoked_at IS NULL AND (ap.expires_at IS NULL OR ap.expires_at > NOW()) AND u.status = 'active'")
+) -> Result<Option<AuthenticatedUser>, Duration> {
+    let Some((login_identifier, secret)) = basic_credentials(headers) else {
+        return Ok(None);
+    };
+    let rate_limit_key = format!("webdav:{login_identifier}");
+    state
+        .auth_rate_limiter
+        .try_acquire(&rate_limit_key, WEBDAV_RATE_LIMIT, WEBDAV_RATE_WINDOW)?;
+
+    let row = sqlx::query("SELECT u.id, u.login_identifier, ap.id AS app_password_id FROM app_passwords ap JOIN users u ON u.id = ap.user_id WHERE u.login_identifier = $1 AND ap.secret_hash = $2 AND ap.revoked_at IS NULL AND (ap.expires_at IS NULL OR ap.expires_at > NOW()) AND u.status = 'active'")
         .bind(login_identifier)
-        .bind(hash_token(secret))
+        .bind(hash_token(&secret))
         .fetch_optional(&state.db)
         .await
-        .ok()?
-        .map(|row| {
-            let app_password_id: Uuid = row.get("app_password_id");
-            let db = state.db.clone();
-            tokio::spawn(async move {
-                let _ = sqlx::query("UPDATE app_passwords SET last_used_at = NOW() WHERE id = $1")
-                    .bind(app_password_id)
-                    .execute(&db)
-                    .await;
-            });
-            AuthenticatedUser { id: row.get("id"), login_identifier: row.get("login_identifier") }
-        })
+        .map_err(|error| {
+            tracing::error!(?error, "WebDAV authentication lookup failed");
+            error
+        });
+    let row = match row {
+        Ok(row) => row,
+        Err(_) => return Ok(None),
+    };
+    Ok(row.map(|row| {
+        state.auth_rate_limiter.reset(&rate_limit_key);
+        let app_password_id: Uuid = row.get("app_password_id");
+        let db = state.db.clone();
+        tokio::spawn(async move {
+            let _ = sqlx::query("UPDATE app_passwords SET last_used_at = NOW() WHERE id = $1")
+                .bind(app_password_id)
+                .execute(&db)
+                .await;
+        });
+        AuthenticatedUser {
+            id: row.get("id"),
+            login_identifier: row.get("login_identifier"),
+            app_password_id: Some(app_password_id),
+        }
+    }))
 }
 
 fn hash_password(password: &str) -> Result<String, argon2::password_hash::Error> {
@@ -463,7 +499,28 @@ fn hash_token(value: &str) -> String {
 
 fn bearer_token(headers: &HeaderMap) -> Option<String> {
     let value = headers.get(header::AUTHORIZATION)?.to_str().ok()?;
-    Some(value.strip_prefix("Bearer ")?.to_string())
+    let (scheme, token) = value.split_once(' ')?;
+    if !scheme.eq_ignore_ascii_case("Bearer") || token.trim().is_empty() {
+        return None;
+    }
+    Some(token.trim().to_string())
+}
+
+fn basic_credentials(headers: &HeaderMap) -> Option<(String, String)> {
+    let value = headers.get(header::AUTHORIZATION)?.to_str().ok()?;
+    let (scheme, encoded) = value.split_once(' ')?;
+    if !scheme.eq_ignore_ascii_case("Basic") || encoded.trim().is_empty() {
+        return None;
+    }
+    let decoded = base64::engine::general_purpose::STANDARD
+        .decode(encoded.trim())
+        .ok()?;
+    let credentials = String::from_utf8(decoded).ok()?;
+    let (login_identifier, secret) = credentials.split_once(':')?;
+    if login_identifier.is_empty() || secret.is_empty() {
+        return None;
+    }
+    Some((login_identifier.to_owned(), secret.to_owned()))
 }
 
 pub fn error(status: StatusCode, code: &str, message: &str) -> Response {
@@ -481,4 +538,57 @@ pub fn unauthorized_basic() -> Response {
         HeaderValue::from_static("Basic realm=\"Bookmark Vault WebDAV\""),
     );
     response
+}
+
+pub fn rate_limited(retry_after: Duration) -> Response {
+    let retry_after = retry_after.as_secs().max(1).to_string();
+    let mut response = error(
+        StatusCode::TOO_MANY_REQUESTS,
+        "rate_limited",
+        "请求过于频繁，请稍后再试",
+    );
+    response.headers_mut().insert(
+        header::RETRY_AFTER,
+        HeaderValue::from_str(&retry_after).expect("retry-after is numeric"),
+    );
+    response
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{basic_credentials, bearer_token};
+    use axum::http::{header, HeaderMap, HeaderValue};
+
+    #[test]
+    fn basic_credentials_accepts_case_insensitive_scheme_and_password_colons() {
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            header::AUTHORIZATION,
+            HeaderValue::from_static("bAsIc dXNlcjpzZWNyZXQ6cGFydA=="),
+        );
+        assert_eq!(
+            basic_credentials(&headers),
+            Some(("user".to_owned(), "secret:part".to_owned()))
+        );
+    }
+
+    #[test]
+    fn malformed_basic_credentials_are_rejected() {
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            header::AUTHORIZATION,
+            HeaderValue::from_static("Basic bm9jbG9u"),
+        );
+        assert!(basic_credentials(&headers).is_none());
+    }
+
+    #[test]
+    fn bearer_scheme_is_case_insensitive_and_trims_token() {
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            header::AUTHORIZATION,
+            HeaderValue::from_static("bEaReR token"),
+        );
+        assert_eq!(bearer_token(&headers), Some("token".to_owned()));
+    }
 }

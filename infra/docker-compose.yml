@@ -21,6 +21,7 @@ services:
       RUST_LOG: bookmark_vault_api=info,tower_http=info
       DATABASE_URL: postgres://bookmark_vault:change-me-in-production@postgres:5432/bookmark_vault
       DATA_DIR: /var/lib/bookmark-vault
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-}
     volumes:
       - bookmark-data:/var/lib/bookmark-vault
     ports:
