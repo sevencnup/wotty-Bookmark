@@ -1,5 +1,29 @@
 # 管理后台开发记录
 
+## 2026-08-25：`frontend-bookmark-management-ui`
+
+### 任务
+
+按产品参考图完成独立的管理后台书签工作区。管理后台与浏览器侧边栏保持两个独立入口，不共享页面状态，也不让后台读取 Floccus 密文中的书签内容。
+
+### 进度
+
+- 新增截图对应的管理后台布局：侧边导航、书签管理顶部栏、统计卡片、工具栏、列表/网格视图和分页区域。
+- 增加搜索、分类筛选、全选、创建、编辑、移入回收站和操作提示等前端交互。
+- 保留现有登录、概览、应用密码、Floccus 配置和账户安全页面。
+- 书签工作区使用前端本地示例状态承载视觉和交互验收；服务端仍只保存 Floccus 加密数据，后续接入真实书签来源需单独设计 API 边界。
+- 复核 `apps/sidebar-extension` 仍为独立浏览器原生书签侧边栏，不接入 WebDAV。
+
+### 验证
+
+- `pnpm --filter @bookmark-vault/admin-web lint`：通过。
+- `pnpm --filter @bookmark-vault/admin-web test`：3 项通过。
+- `pnpm --filter @bookmark-vault/admin-web build`：通过。
+- `pnpm --filter @bookmark-vault/sidebar-extension typecheck`：通过。
+- `pnpm --filter @bookmark-vault/sidebar-extension test`：3 项通过。
+- `pnpm --filter @bookmark-vault/sidebar-extension build`：通过。
+- `pnpm --filter @bookmark-vault/sidebar-extension build:firefox`：通过。
+
 ## 2026-08-25
 
 ### 任务
