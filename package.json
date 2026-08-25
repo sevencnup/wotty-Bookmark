@@ -1,0 +1,13 @@
+{
+  "name": "@bookmark-vault/workspace",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@11.23.0",
+  "scripts": {
+    "dev:admin": "pnpm --filter @bookmark-vault/admin-web dev",
+    "build:admin": "pnpm --filter @bookmark-vault/admin-web build",
+    "build:sidebar": "pnpm --filter @bookmark-vault/sidebar-extension build",
+    "test": "pnpm -r --if-present test",
+    "lint": "pnpm -r --if-present lint"
+  }
+}

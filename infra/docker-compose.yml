@@ -1,0 +1,33 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: bookmark_vault
+      POSTGRES_USER: bookmark_vault
+      POSTGRES_PASSWORD: change-me-in-production
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+
+  api:
+    build:
+      context: ..
+      dockerfile: services/api/Dockerfile
+    restart: unless-stopped
+    environment:
+      BIND_ADDR: 0.0.0.0:8080
+      RUST_LOG: bookmark_vault_api=info,tower_http=info
+      DATABASE_URL: postgres://bookmark_vault:change-me-in-production@postgres:5432/bookmark_vault
+      DATA_DIR: /var/lib/bookmark-vault
+    volumes:
+      - bookmark-data:/var/lib/bookmark-vault
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+
+volumes:
+  postgres-data:
+  bookmark-data:
