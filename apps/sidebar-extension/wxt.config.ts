@@ -11,6 +11,14 @@ export default defineConfig({
     action: {
       default_title: '打开书签侧边栏',
     },
+    browser_specific_settings: {
+      gecko: {
+        id: 'bookmark-vault-sidebar@example.com',
+        data_collection_permissions: {
+          required: ['none'],
+        },
+      },
+    },
     side_panel: {
       default_path: 'sidepanel.html',
     },

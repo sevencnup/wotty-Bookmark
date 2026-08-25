@@ -5,9 +5,10 @@
   "type": "module",
   "scripts": {
     "build": "wxt build",
+    "build:firefox": "wxt build --browser firefox",
     "dev": "wxt",
-    "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "test": "wxt prepare && vitest run",
+    "typecheck": "wxt prepare && tsc --noEmit"
   },
   "dependencies": {
     "@wxt-dev/module-react": "^1.1.3",
