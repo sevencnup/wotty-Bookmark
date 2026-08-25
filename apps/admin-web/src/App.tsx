@@ -42,48 +42,85 @@ const initialBookmarks: Bookmark[] = [
   { id: 'taobao', title: '淘宝网', url: 'https://www.taobao.com', category: '购物', tags: ['购物', '生活'], updatedAt: '2024-05-17 11:08' },
 ]
 
-type NavItem = { id: AdminSection; label: string; icon: string }
+type NavIconName =
+  | 'overview'
+  | 'bookmark-management'
+  | 'categories'
+  | 'tags'
+  | 'trash'
+  | 'passwords'
+  | 'backup'
+  | 'devices'
+  | 'audit-log'
+  | 'account'
+  | 'preferences'
+  | 'import-export'
+  | 'help'
+  | 'about'
+
+type NavItem = { id: AdminSection; label: string; icon: NavIconName }
 type NavGroup = { label?: string; items: NavItem[] }
 
 const navGroups: NavGroup[] = [
-  { items: [{ id: 'overview', label: '概览', icon: '⌂' }] },
+  { items: [{ id: 'overview', label: '概览', icon: 'overview' }] },
   {
     label: '数据管理',
     items: [
-      { id: 'bookmark-management', label: '书签管理', icon: '▱' },
-      { id: 'categories', label: '分类管理', icon: '□' },
-      { id: 'tags', label: '标签管理', icon: '◇' },
-      { id: 'trash', label: '回收站', icon: '♲' },
+      { id: 'bookmark-management', label: '书签管理', icon: 'bookmark-management' },
+      { id: 'categories', label: '分类管理', icon: 'categories' },
+      { id: 'tags', label: '标签管理', icon: 'tags' },
+      { id: 'trash', label: '回收站', icon: 'trash' },
     ],
   },
   {
     label: '安全管理',
     items: [
-      { id: 'app-passwords', label: '密码管理', icon: '▣' },
-      { id: 'backup', label: '数据备份', icon: '☁' },
-      { id: 'devices', label: '设备管理', icon: '▤' },
-      { id: 'audit-log', label: '操作日志', icon: '▧' },
+      { id: 'app-passwords', label: '密码管理', icon: 'passwords' },
+      { id: 'backup', label: '数据备份', icon: 'backup' },
+      { id: 'devices', label: '设备管理', icon: 'devices' },
+      { id: 'audit-log', label: '操作日志', icon: 'audit-log' },
     ],
   },
   {
     label: '系统设置',
     items: [
-      { id: 'account', label: '账号设置', icon: '♙' },
-      { id: 'preferences', label: '偏好设置', icon: '⚙' },
-      { id: 'import-export', label: '导入/导出', icon: '⇩' },
+      { id: 'account', label: '账号设置', icon: 'account' },
+      { id: 'preferences', label: '偏好设置', icon: 'preferences' },
+      { id: 'import-export', label: '导入/导出', icon: 'import-export' },
     ],
   },
   {
     label: '帮助与支持',
     items: [
-      { id: 'help', label: '帮助中心', icon: '?' },
-      { id: 'about', label: '关于项目', icon: 'ⓘ' },
+      { id: 'help', label: '帮助中心', icon: 'help' },
+      { id: 'about', label: '关于项目', icon: 'about' },
     ],
   },
 ]
 
 function allNavItems() {
   return navGroups.flatMap((group) => group.items)
+}
+
+const navIconPaths: Record<NavIconName, string> = {
+  overview: 'M3 10.5 12 3l9 7.5M5.5 9.5V21h13V9.5M9 21v-6h6v6',
+  'bookmark-management': 'M6 4h12v17l-6-3.5L6 21V4Z',
+  categories: 'M3 6h7l2 2h9v11H3V6Z',
+  tags: 'M4 5h7l8 8-6 6-8-8V5ZM7.5 8.5h.01',
+  trash: 'M5 7h14M10 11v5M14 11v5M9 7V4h6v3m-9 0 1 14h10l1-14',
+  passwords: 'M7 10V7a5 5 0 0 1 10 0v3M5 10h14v10H5V10Zm7 4v2',
+  backup: 'M6 18.5h11.5a3.5 3.5 0 0 0 .5-7A6 6 0 0 0 6.5 10 4.5 4.5 0 0 0 6 18.5ZM12 9v8m0 0-3-3m3 3 3-3',
+  devices: 'M4 5h16v11H4V5Zm-2 14h20M9 19l1-3h4l1 3',
+  'audit-log': 'M6 3h9l3 3v15H6V3Zm9 0v4h3M9 12h6M9 16h4',
+  account: 'M19 21a7 7 0 0 0-14 0M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z',
+  preferences: 'M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Zm0-5v2M12 18.5v2M3.5 12h2M18.5 12h2M6 6l1.5 1.5M16.5 16.5 18 18M18 6l-1.5 1.5M7.5 16.5 6 18',
+  'import-export': 'M12 3v12m0 0-4-4m4 4 4-4M5 18v3h14v-3',
+  help: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm0-5h.01M9.8 9a2.3 2.3 0 1 1 3.7 1.8c-.9.7-1.5 1.1-1.5 2.2',
+  about: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm0-10v5m0-8h.01',
+}
+
+function NavIcon({ name }: { name: NavIconName }) {
+  return <svg aria-hidden="true" className="nav-svg-icon" fill="none" height="18" viewBox="0 0 24 24" width="18" xmlns="http://www.w3.org/2000/svg"><path d={navIconPaths[name]} stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.7" /></svg>
 }
 
 function App() {
@@ -102,7 +139,7 @@ function App() {
       <aside className="sidebar">
         <div className="brand">
           <span className="brand-mark">⬡</span>
-          <span>输钱管理</span>
+          <span>书签管理</span>
         </div>
         <nav className="nav-list" aria-label="管理后台导航">
           {navGroups.map((group, index) => (
@@ -115,7 +152,7 @@ function App() {
                   onClick={() => setActiveSection(item.id)}
                   type="button"
                 >
-                  <span className="nav-icon">{item.icon}</span>
+                  <span className="nav-icon"><NavIcon name={item.icon} /></span>
                   {item.label}
                 </button>
               ))}
@@ -172,7 +209,7 @@ function LoginCard({ onLogin }: { onLogin: (session: api.Session) => void }) {
   return (
     <main className="auth-page">
       <section className="auth-card">
-        <div className="brand auth-brand"><span className="brand-mark">⬡</span> 输钱管理</div>
+        <div className="brand auth-brand"><span className="brand-mark">⬡</span> 书签管理</div>
         <p className="eyebrow">SELF-HOSTED BOOKMARK SYNC</p>
         <h1>管理你的同步服务</h1>
         <p className="muted">登录后台创建 WebDAV 应用密码，然后使用官方 Floccus 同步浏览器书签。</p>
@@ -288,7 +325,7 @@ function BookmarkManagement() {
         </div>
 
         <div className="bookmark-footer-row"><span>共 {totalCount} 条</span><div className="pagination"><button disabled type="button">‹</button><button className="current" type="button">1</button><button type="button">2</button><button type="button">3</button><button type="button">4</button><button type="button">5</button><span>…</span><button type="button">15</button><button type="button">›</button></div><button className="page-size" type="button">10 条/页⌄</button></div>
-        <p className="workspace-note">输钱管理系统 © 2024 · 服务端只保存 Floccus 加密数据，书签内容由浏览器和 Floccus 管理</p>
+        <p className="workspace-note">书签管理系统 © 2024 · 服务端只保存 Floccus 加密数据，书签内容由浏览器和 Floccus 管理</p>
       </div>
 
       {notice && <div className="admin-toast" role="status">✓ {notice}</div>}

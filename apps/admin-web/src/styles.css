@@ -33,7 +33,8 @@ button:disabled { cursor: not-allowed; opacity: .52; }
 .nav-item { display: flex; align-items: center; gap: 13px; width: 100%; padding: 10px 12px; border: 0; border-radius: 8px; color: #6e7c90; background: transparent; font-size: 14px; text-align: left; transition: background .15s, color .15s; }
 .nav-item:hover { color: var(--blue); background: #f5f8fd; }
 .nav-item.active { color: var(--blue); background: #edf4ff; font-weight: 700; box-shadow: inset 3px 0 var(--blue); }
-.nav-icon { display: inline-grid; place-items: center; width: 18px; color: currentColor; font-size: 18px; line-height: 1; }
+.nav-icon { display: inline-grid; place-items: center; width: 18px; color: currentColor; line-height: 1; }
+.nav-svg-icon { display: block; }
 
 .main-content { flex: 1; min-width: 0; padding: 42px clamp(24px, 5vw, 72px); }
 .bookmark-main-content { padding: 0; background: var(--canvas); }

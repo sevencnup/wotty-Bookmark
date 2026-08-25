@@ -1,5 +1,22 @@
 # 管理后台开发记录
 
+## 2026-08-25：`frontend-admin-navigation-icons`
+
+### 任务
+
+统一管理后台侧边导航图标，修复临时 Unicode 字符在不同字体环境下形状不一致的问题。
+
+### 进度
+
+- 将概览、书签、分类、标签、回收站、安全、设置和帮助等导航图标替换为统一线性 SVG。
+- 保留现有导航状态、选中态和响应式布局，不改变右侧浏览器侧边栏扩展。
+
+### 验证
+
+- `pnpm --filter @bookmark-vault/admin-web lint`：通过。
+- `pnpm --filter @bookmark-vault/admin-web test`：3 项通过。
+- `pnpm --filter @bookmark-vault/admin-web build`：通过。
+
 ## 2026-08-25：`frontend-bookmark-management-ui`
 
 ### 任务
