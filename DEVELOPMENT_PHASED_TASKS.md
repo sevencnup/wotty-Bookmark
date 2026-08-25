@@ -182,3 +182,10 @@ P4 与 P6 在 P3 的协议边界稳定后可以并行开发。P5 必须等待侧
 3. 解除依赖后执行 `floccus-qa`，补充 Chrome、Edge、Firefox 和 WebDAV 黑盒验收记录。
 4. 根据验收结果执行 P7 发布封板和恢复演练。
 
+## 8. 跨窗口交接提示
+
+### 发给 window-2
+
+3 号窗口已完成项目分阶段任务文档。请继续完成 `frontend-sidebar`，重点验证 Chrome、Edge、Firefox 构建与侧边栏功能；完成后释放任务。该任务释放后，3 号窗口将接手依赖它的 `integration-qa`，执行三浏览器 WebDAV/Floccus 验收。
+
+本提示不改变 `frontend-sidebar` 的负责人、文件范围或执行顺序。
