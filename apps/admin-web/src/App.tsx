@@ -4,6 +4,7 @@ import * as api from './api'
 type AdminSection =
   | 'overview'
   | 'storage'
+  | 'bookmark-organizer'
   | 'categories'
   | 'tags'
   | 'trash'
@@ -46,6 +47,7 @@ const navGroups: NavGroup[] = [
     label: '数据管理',
     items: [
       { id: 'storage', label: '存储文件', icon: 'storage' },
+      { id: 'bookmark-organizer', label: '书签整理', icon: 'categories' },
       { id: 'categories', label: '分类管理', icon: 'categories' },
       { id: 'tags', label: '标签管理', icon: 'tags' },
       { id: 'trash', label: '回收站', icon: 'trash' },
@@ -101,7 +103,55 @@ const navIconPaths: Record<NavIconName, string> = {
 }
 
 function NavIcon({ name }: { name: NavIconName }) {
-  return <svg aria-hidden="true" className="nav-svg-icon" fill="none" height="18" viewBox="0 0 24 24" width="18" xmlns="http://www.w3.org/2000/svg"><path d={navIconPaths[name]} stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.7" /></svg>
+  return <svg aria-hidden="true" className="nav-svg-icon" fill="none" height="18" viewBox="0 0 24 24" width="18" xmlns="http://www.w3.org/2000/svg"><path d={navIconPaths[name]} stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" /></svg>
+}
+
+function FolderIcon() {
+  return (
+    <svg aria-hidden="true" fill="none" height="15" viewBox="0 0 24 24" width="15" xmlns="http://www.w3.org/2000/svg">
+      <path d="M3 6h7l2 2h9v11H3V6Z" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
+    </svg>
+  )
+}
+
+function HomeIcon() {
+  return (
+    <svg aria-hidden="true" fill="none" height="15" viewBox="0 0 24 24" width="15" xmlns="http://www.w3.org/2000/svg">
+      <path d="M3 10.5 12 3l9 7.5M5.5 9.5V21h13V9.5M9 21v-6h6v6" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
+    </svg>
+  )
+}
+
+function SearchIcon() {
+  return (
+    <svg aria-hidden="true" fill="none" height="15" viewBox="0 0 24 24" width="15" xmlns="http://www.w3.org/2000/svg">
+      <path d="m20 20-4.3-4.3M10.8 18a7.2 7.2 0 1 0 0-14.4 7.2 7.2 0 0 0 0 14.4Z" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
+    </svg>
+  )
+}
+
+function SyncIcon({ size = 18 }: { size?: number }) {
+  return (
+    <svg aria-hidden="true" fill="none" height={size} viewBox="0 0 24 24" width={size} xmlns="http://www.w3.org/2000/svg">
+      <path d="M4 4v5h5M20 20v-5h-5M4.5 14.5A8.5 8.5 0 0 0 19.5 12M19.5 9.5A8.5 8.5 0 0 0 4.5 12" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
+    </svg>
+  )
+}
+
+function StorageIcon({ size = 18 }: { size?: number }) {
+  return (
+    <svg aria-hidden="true" fill="none" height={size} viewBox="0 0 24 24" width={size} xmlns="http://www.w3.org/2000/svg">
+      <path d="M4 5h16v14H4V5Zm4 4h8M8 13h5M8 16h3" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
+    </svg>
+  )
+}
+
+function KeyIcon({ size = 18 }: { size?: number }) {
+  return (
+    <svg aria-hidden="true" fill="none" height={size} viewBox="0 0 24 24" width={size} xmlns="http://www.w3.org/2000/svg">
+      <path d="M7 10V7a5 5 0 0 1 10 0v3M5 10h14v10H5V10Zm7 4v2" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
+    </svg>
+  )
 }
 
 function BrandLogo({ size = 18 }: { size?: number }) {
@@ -113,13 +163,41 @@ function BrandLogo({ size = 18 }: { size?: number }) {
   )
 }
 
+const SESSION_STORAGE_KEY = 'bookmark-vault.session'
+
+function loadStoredSession(): api.Session | null {
+  try {
+    const raw = localStorage.getItem(SESSION_STORAGE_KEY)
+    if (!raw) return null
+    const value = JSON.parse(raw) as Partial<api.Session>
+    if (!value.token || !value.user?.id || !value.user.loginIdentifier) return null
+    return value as api.Session
+  } catch {
+    localStorage.removeItem(SESSION_STORAGE_KEY)
+    return null
+  }
+}
+
+function persistSession(session: api.Session | null) {
+  try {
+    if (session) localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session))
+    else localStorage.removeItem(SESSION_STORAGE_KEY)
+  } catch {
+    // Private browsing or a storage quota error should not prevent login.
+  }
+}
 
 function App() {
   const [activeSection, setActiveSection] = useState<AdminSection>('overview')
-  const [session, setSession] = useState<api.Session | null>(null)
+  const [session, setSession] = useState<api.Session | null>(() => loadStoredSession())
+
+  function handleSessionChange(nextSession: api.Session | null) {
+    setSession(nextSession)
+    persistSession(nextSession)
+  }
 
   if (!session) {
-    return <LoginCard onLogin={setSession} />
+    return <LoginCard onLogin={handleSessionChange} />
   }
 
   const activeLabel = allNavItems().find((item) => item.id === activeSection)?.label ?? '管理后台'
@@ -161,13 +239,15 @@ function App() {
                 <p className="eyebrow">BOOKMARK VAULT</p>
                 <h1>{activeLabel}</h1>
               </div>
-              <button className="ghost-button" onClick={() => setSession(null)} type="button">退出登录</button>
+              <button className="ghost-button" onClick={() => handleSessionChange(null)} type="button">退出登录</button>
             </header>
             {activeSection === 'overview' && <Overview token={session.token} />}
             {activeSection === 'app-passwords' && <AppPasswords token={session.token} />}
+            {activeSection === 'bookmark-organizer' && <BookmarkOrganizer token={session.token} onOpenFloccus={() => setActiveSection('floccus')} />}
             {activeSection === 'floccus' && <FloccusGuide token={session.token} loginIdentifier={session.user.loginIdentifier} />}
+            {activeSection === 'account' && <AccountSettings loginIdentifier={session.user.loginIdentifier} onOpenAppPasswords={() => setActiveSection('app-passwords')} />}
             {activeSection === 'security' && <Security />}
-            {!['overview', 'app-passwords', 'floccus', 'security'].includes(activeSection) && <ComingSoon label={activeLabel} />}
+            {!['overview', 'app-passwords', 'account', 'bookmark-organizer', 'floccus', 'security'].includes(activeSection) && <ComingSoon label={activeLabel} />}
           </>
         )}
       </main>
@@ -233,9 +313,9 @@ function StorageFiles({ token, onOpenFloccus }: { token: string; onOpenFloccus: 
       </header>
       <div className="bookmark-content">
         <div className="stat-grid">
-          <StatCard icon="↔" iconTone="blue" label="同步文件" value={storage ? String(storage.files) : '—'} suffix="个" detail={storage?.lastModifiedAt ? `最近同步 ${formatDate(storage.lastModifiedAt)}` : '尚未同步'} />
-          <StatCard icon="▣" iconTone="green" label="存储占用" value={storage ? formatBytes(storage.bytes) : '—'} suffix="" detail={storage ? `单文件上限 ${formatBytes(storage.maxFileBytes)}` : '读取中'} />
-          <StatCard icon="◇" iconTone="purple" label="同步状态" value={storage?.files ? '正常' : '待配置'} suffix="" detail={storage?.lastModifiedAt ? formatDate(storage.lastModifiedAt) : '配置 Floccus 后开始同步'} />
+          <StatCard icon={<SyncIcon size={20} />} iconTone="blue" label="同步文件" value={storage ? String(storage.files) : '—'} suffix="个" detail={storage?.lastModifiedAt ? `最近同步 ${formatDate(storage.lastModifiedAt)}` : '尚未同步'} />
+          <StatCard icon={<StorageIcon size={20} />} iconTone="green" label="存储占用" value={storage ? formatBytes(storage.bytes) : '—'} suffix="" detail={storage ? `单文件上限 ${formatBytes(storage.maxFileBytes)}` : '读取中'} />
+          <StatCard icon={<KeyIcon size={20} />} iconTone="purple" label="同步状态" value={storage?.files ? '正常' : '待配置'} suffix="" detail={storage?.lastModifiedAt ? formatDate(storage.lastModifiedAt) : '配置 Floccus 后开始同步'} />
         </div>
         <section className="panel storage-panel">
           <div className="panel-heading">
@@ -245,7 +325,7 @@ function StorageFiles({ token, onOpenFloccus }: { token: string; onOpenFloccus: 
             <div className="empty-state"><span>!</span><h4>无法读取存储状态</h4><p>{error}</p></div>
           ) : storage ? (
             <div className="storage-summary">
-              <div className="storage-summary-icon">▣</div>
+              <div className="storage-summary-icon"><StorageIcon size={24} /></div>
               <div className="storage-summary-content">
                 <strong>Floccus 同步数据</strong>
                 <p>服务端只保存加密后的同步文件，不解析、不展示书签名称、网址、分类或标签。</p>
@@ -271,19 +351,245 @@ function StorageFiles({ token, onOpenFloccus }: { token: string; onOpenFloccus: 
   )
 }
 
-function StatCard({ icon, iconTone, label, value, suffix, detail, trend }: { icon: string; iconTone: string; label: string; value: string; suffix: string; detail: string; trend?: string }) {
-  return <div className="stat-card"><span className={`stat-icon ${iconTone}`}>{icon}</span><div><p>{label}</p><div className="stat-value"><strong>{value}</strong><span>{suffix}</span></div><small>{detail}{trend && <em>{trend}</em>}</small></div></div>
+function StatCard({ icon, iconTone, label, value, suffix, detail, trend }: { icon: React.ReactNode; iconTone: string; label: string; value: string; suffix: string; detail: string; trend?: string }) {
+  return <div className="stat-card"><span className={`stat-icon ${iconTone}`}>{icon}</span><div><p>{label}</p><div className="stat-value"><strong>{value}</strong>{suffix && <span>{suffix}</span>}</div><small>{detail}{trend && <em>{trend}</em>}</small></div></div>
 }
 
 function Overview({ token }: { token: string }) {
   const [storage, setStorage] = useState<api.StorageStatus | null>(null)
   const [passwordCount, setPasswordCount] = useState<number | null>(null)
-  useEffect(() => { api.getStorageStatus(token).then(setStorage).catch(() => setStorage(null)); api.getAppPasswords(token).then((items) => setPasswordCount(items.length)).catch(() => setPasswordCount(null)) }, [token])
-  return <><section className="hero-card"><div><span className="badge">准备就绪</span><h2>从 Floccus 开始同步你的书签</h2><p>服务器只保存 Floccus 加密后的 XBEL 文件，书签内容不会在后台明文展示。</p></div><div className="hero-symbol">↔</div></section><div className="stats-grid"><StatCard icon="↔" iconTone="blue" label="同步文件" value={storage ? String(storage.files) : '—'} suffix="" detail={storage?.lastModifiedAt ? `最近同步 ${formatDate(storage.lastModifiedAt)}` : '尚未配置 Floccus'} /><StatCard icon="▣" iconTone="green" label="存储占用" value={storage ? formatBytes(storage.bytes) : '—'} suffix="" detail={storage ? `单文件上限 ${formatBytes(storage.maxFileBytes)}` : '读取中'} /><StatCard icon="◇" iconTone="purple" label="应用密码" value={passwordCount === null ? '—' : String(passwordCount)} suffix="" detail="建议为每台设备单独创建" /></div><section className="panel"><div className="panel-heading"><div><p className="eyebrow">QUICK START</p><h3>三步完成配置</h3></div></div><ol className="steps"><li><span>1</span><div><strong>创建应用密码</strong><p>为 Floccus 创建独立凭据，主账户密码不会用于 WebDAV。</p></div></li><li><span>2</span><div><strong>安装官方 Floccus</strong><p>在 Chrome、Edge 或 Firefox 的插件市场安装。</p></div></li><li><span>3</span><div><strong>打开加密同步</strong><p>配置 WebDAV 地址和 passphrase，保护你的书签内容。</p></div></li></ol></section></>
+  useEffect(() => {
+    api.getStorageStatus(token).then(setStorage).catch(() => setStorage(null))
+    api.getAppPasswords(token).then((items) => setPasswordCount(items.length)).catch(() => setPasswordCount(null))
+  }, [token])
+
+  return (
+    <>
+      <section className="hero-card">
+        <div>
+          <span className="badge">准备就绪</span>
+          <h2>从 Floccus 开始同步你的书签</h2>
+          <p>服务器只保存 Floccus 加密后的 XBEL 文件，书签内容安全且不会在后台明文展示。</p>
+        </div>
+        <div className="hero-symbol"><SyncIcon size={36} /></div>
+      </section>
+      <div className="stats-grid">
+        <StatCard icon={<SyncIcon size={20} />} iconTone="blue" label="同步文件" value={storage ? String(storage.files) : '—'} suffix="个" detail={storage?.lastModifiedAt ? `最近同步 ${formatDate(storage.lastModifiedAt)}` : '尚未配置 Floccus'} />
+        <StatCard icon={<StorageIcon size={20} />} iconTone="green" label="存储占用" value={storage ? formatBytes(storage.bytes) : '—'} suffix="" detail={storage ? `单文件上限 ${formatBytes(storage.maxFileBytes)}` : '读取中'} />
+        <StatCard icon={<KeyIcon size={20} />} iconTone="purple" label="应用密码" value={passwordCount === null ? '—' : String(passwordCount)} suffix="个" detail="建议为每台设备单独创建" />
+      </div>
+      <section className="panel">
+        <div className="panel-heading">
+          <div>
+            <p className="eyebrow">QUICK START</p>
+            <h3>三步完成配置</h3>
+          </div>
+        </div>
+        <ol className="steps">
+          <li>
+            <span>1</span>
+            <div>
+              <strong>创建应用密码</strong>
+              <p>为 Floccus 创建独立凭据，主账户密码不会用于 WebDAV。</p>
+            </div>
+          </li>
+          <li>
+            <span>2</span>
+            <div>
+              <strong>安装官方 Floccus</strong>
+              <p>在 Chrome、Edge 或 Firefox 的插件市场安装扩展。</p>
+            </div>
+          </li>
+          <li>
+            <span>3</span>
+            <div>
+              <strong>打开加密同步</strong>
+              <p>配置 WebDAV 地址和 passphrase，保护你的书签内容。</p>
+            </div>
+          </li>
+        </ol>
+      </section>
+    </>
+  )
+}
+
+type FlatFolder = api.BookmarkFolder & { depth: number }
+
+function flattenFolders(folders: api.BookmarkFolder[], depth = 0): FlatFolder[] {
+  return folders.flatMap((folder) => [{ ...folder, depth }, ...flattenFolders(folder.children, depth + 1)])
+}
+
+function descendantFolderIds(folder: api.BookmarkFolder): string[] {
+  return [folder.id, ...folder.children.flatMap(descendantFolderIds)]
+}
+
+function findFolder(folders: api.BookmarkFolder[], id: string): api.BookmarkFolder | null {
+  for (const folder of folders) {
+    if (folder.id === id) return folder
+    const match = findFolder(folder.children, id)
+    if (match) return match
+  }
+  return null
+}
+
+function getBookmarkHost(value: string) {
+  try {
+    return new URL(value).hostname.replace(/^www\./, '')
+  } catch {
+    return value
+  }
+}
+
+function BookmarkOrganizer({ token, onOpenFloccus }: { token: string; onOpenFloccus: () => void }) {
+  const [tree, setTree] = useState<api.BookmarkTree | null>(null)
+  const [query, setQuery] = useState('')
+  const [selectedFolderId, setSelectedFolderId] = useState('all')
+  const [targetFolderId, setTargetFolderId] = useState('')
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const [moving, setMoving] = useState(false)
+  const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
+
+  async function loadBookmarks(showLoading = false) {
+    if (showLoading) setRefreshing(true)
+    setError('')
+    try {
+      const nextTree = await api.getBookmarks(token)
+      setTree(nextTree)
+      setSelectedIds(new Set())
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : '书签读取失败')
+    } finally {
+      setLoading(false)
+      setRefreshing(false)
+    }
+  }
+
+  useEffect(() => { void loadBookmarks() }, [token])
+
+  const folders = tree ? flattenFolders(tree.folders) : []
+  const selectedFolder = tree && selectedFolderId !== 'all' ? findFolder(tree.folders, selectedFolderId) : null
+  const folderIds = selectedFolder ? new Set(descendantFolderIds(selectedFolder)) : null
+  const normalizedQuery = query.trim().toLowerCase()
+  const visibleBookmarks = (tree?.bookmarks ?? []).filter((bookmark) => {
+    const inFolder = !folderIds || (bookmark.parentId ? folderIds.has(bookmark.parentId) : false)
+    const searchable = `${bookmark.title} ${bookmark.url} ${bookmark.folderPath}`.toLowerCase()
+    return inFolder && (!normalizedQuery || searchable.includes(normalizedQuery))
+  })
+  const allVisibleSelected = visibleBookmarks.length > 0 && visibleBookmarks.every((bookmark) => selectedIds.has(bookmark.id))
+
+  function toggleSelection(id: string) {
+    setSelectedIds((current) => {
+      const next = new Set(current)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function toggleAllVisible() {
+    setSelectedIds((current) => {
+      const next = new Set(current)
+      if (allVisibleSelected) visibleBookmarks.forEach((bookmark) => next.delete(bookmark.id))
+      else visibleBookmarks.forEach((bookmark) => next.add(bookmark.id))
+      return next
+    })
+  }
+
+  async function moveSelected() {
+    if (!tree || !targetFolderId || selectedIds.size === 0) return
+    setMoving(true)
+    setError('')
+    setNotice('')
+    try {
+      await api.moveBookmarks(token, [...selectedIds], targetFolderId, tree.etag)
+      setNotice(`已移动 ${selectedIds.size} 个书签，等待 Floccus 同步到浏览器`)
+      setTargetFolderId('')
+      await loadBookmarks()
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : '书签移动失败，请刷新后重试')
+    } finally {
+      setMoving(false)
+    }
+  }
+
+  return (
+    <div className="bookmark-organizer">
+      <div className="bookmark-organizer-intro">
+        <div>
+          <p className="eyebrow">BOOKMARK INDEX</p>
+          <h2>管理已同步的书签</h2>
+          <p>这里展示 Floccus 上传到服务器的书签索引。移动书签后，下一次 Floccus 同步会把变化写回浏览器。</p>
+        </div>
+        <div className={`bookmark-sync-state ${tree?.status === 'ready' ? 'ready' : tree?.status === 'encrypted' ? 'encrypted' : ''}`}>
+          <span>{tree?.status === 'ready' ? '●' : tree?.status === 'encrypted' ? '◆' : '○'}</span>
+          {tree?.status === 'ready' ? `${tree.bookmarks.length} 个书签已索引` : tree?.status === 'encrypted' ? '已同步 · 内容已加密' : '等待同步'}
+        </div>
+      </div>
+
+      {error && <div className="bookmark-alert error"><strong>读取失败</strong><span>{error}</span></div>}
+      {notice && <div className="bookmark-alert success"><strong>操作完成</strong><span>{notice}</span></div>}
+
+      {loading ? (
+        <section className="panel bookmark-loading"><span className="bookmark-loading-mark">↔</span><strong>正在读取书签索引…</strong><p>从服务器加载最新的 Floccus 数据。</p></section>
+      ) : tree?.status === 'encrypted' ? (
+        <section className="panel bookmark-encrypted-state">
+          <span className="bookmark-encrypted-icon">◆</span>
+          <strong>同步成功，但书签内容已加密</strong>
+          <p>服务器已经收到 `bookmarks.xbel`，但 Floccus 使用了客户端加密。passphrase 只保存在你的浏览器中，服务器无法解密，所以这里不能直接列出书签。</p>
+          <div className="bookmark-encrypted-actions"><button className="primary-button compact" onClick={onOpenFloccus} type="button">在 Floccus 中管理</button><span>书签仍可在浏览器的「收藏夹栏」中查看</span></div>
+        </section>
+      ) : tree?.status === 'migrationRequired' ? (
+        <section className="panel bookmark-encrypted-state">
+          <span className="bookmark-encrypted-icon">!</span>
+          <strong>同步文件已收到，但格式无法读取</strong>
+          <p>服务器保存了同步文件，但当前格式不是可建立索引的明文 XBEL。请在 Floccus 中确认文件格式为 XBEL，或继续使用浏览器和 Floccus 管理。</p>
+          <button className="primary-button compact" onClick={onOpenFloccus} type="button">检查 Floccus 配置</button>
+        </section>
+      ) : tree?.status !== 'ready' ? (
+        <section className="panel bookmark-empty">
+          <span>↔</span>
+          <strong>还没有同步文件</strong>
+          <p>服务器还没有收到 `bookmarks.xbel`，请先在 Floccus 中完成一次同步。</p>
+          <button className="primary-button compact" onClick={onOpenFloccus} type="button">前往 Floccus 配置</button>
+        </section>
+      ) : (
+        <div className="bookmark-workspace">
+          <aside className="panel bookmark-folder-panel">
+            <div className="bookmark-panel-heading"><div><p className="eyebrow">FOLDERS</p><h3>书签文件夹</h3></div><span>{folders.length}</span></div>
+            <button className={`folder-filter ${selectedFolderId === 'all' ? 'active' : ''}`} onClick={() => setSelectedFolderId('all')} type="button"><span><HomeIcon /></span><strong>全部书签</strong><small>{tree.bookmarks.length}</small></button>
+            <div className="folder-tree">
+              {folders.map((folder) => <button className={`folder-filter ${selectedFolderId === folder.id ? 'active' : ''}`} key={folder.id} onClick={() => setSelectedFolderId(folder.id)} style={{ paddingLeft: `${12 + folder.depth * 16}px` }} type="button"><span><FolderIcon /></span><strong>{folder.title}</strong><small>{folder.bookmarkCount}</small></button>)}
+            </div>
+          </aside>
+
+          <section className="bookmark-results">
+            <div className="bookmark-toolbar organizer-toolbar">
+              <label className="bookmark-search"><span><SearchIcon /></span><input onChange={(event) => setQuery(event.target.value)} placeholder="搜索标题、网址或文件夹" type="search" value={query} /></label>
+              <button className="toolbar-button" disabled={refreshing} onClick={() => void loadBookmarks(true)} type="button">{refreshing ? '刷新中…' : '刷新'}</button>
+              <span className="toolbar-spacer" />
+              <span className="bookmark-result-count">显示 {visibleBookmarks.length} / {tree.bookmarks.length}</span>
+            </div>
+
+            {selectedIds.size > 0 && <div className="bookmark-bulk-bar"><strong>已选择 {selectedIds.size} 个</strong><select aria-label="移动到文件夹" onChange={(event) => setTargetFolderId(event.target.value)} value={targetFolderId}><option value="">移动到…</option>{folders.map((folder) => <option key={folder.id} value={folder.id}>{'　'.repeat(folder.depth)}{folder.title}</option>)}</select><button className="blue-button" disabled={!targetFolderId || moving} onClick={() => void moveSelected()} type="button">{moving ? '移动中…' : '确认移动'}</button><button className="toolbar-button" onClick={() => setSelectedIds(new Set())} type="button">取消选择</button></div>}
+
+            <div className="bookmark-table-shell">
+              <div className="bookmark-table-head"><label className="checkbox-wrap"><input checked={allVisibleSelected} onChange={toggleAllVisible} type="checkbox" /><span /></label><span>书签</span><span>网址</span><span>所在文件夹</span><span>操作</span></div>
+              {visibleBookmarks.length === 0 ? <div className="bookmark-empty"><span>⌕</span><strong>没有匹配的书签</strong><p>换个关键词，或切换左侧文件夹。</p></div> : visibleBookmarks.map((bookmark, index) => <div className={`bookmark-row ${selectedIds.has(bookmark.id) ? 'selected' : ''}`} key={bookmark.id}><label className="checkbox-wrap"><input checked={selectedIds.has(bookmark.id)} onChange={() => toggleSelection(bookmark.id)} type="checkbox" /><span /></label><div className="bookmark-name"><span className={`site-mark site-mark-${index % 4}`}>{(bookmark.title || '?').charAt(0).toUpperCase()}</span><div><strong title={bookmark.title}>{bookmark.title || '未命名书签'}</strong><span>{getBookmarkHost(bookmark.url)}</span></div></div><a className="bookmark-url-cell" href={bookmark.url} rel="noreferrer" target="_blank" title={bookmark.url}>{bookmark.url}</a><span className="category-pill" title={bookmark.folderPath}>{bookmark.folderPath || '根目录'}</span><a className="bookmark-open-link" href={bookmark.url} rel="noreferrer" target="_blank" title="打开书签" aria-label={`打开 ${bookmark.title || bookmark.url}`}>↗</a></div>)}
+            </div>
+            <p className="bookmark-index-note">书签内容仍由 Floccus 加密同步；此页面使用服务器索引进行查找和整理。</p>
+          </section>
+        </div>
+      )}
+    </div>
+  )
 }
 
 function formatBytes(bytes: number) { if (bytes < 1024) return `${bytes} B`; if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`; return `${(bytes / (1024 * 1024)).toFixed(1)} MB` }
 function formatDate(value: string) { return new Date(value).toLocaleString() }
+function getWebDavUrl(loginIdentifier: string) { return `${window.location.origin}/dav/${encodeURIComponent(loginIdentifier)}/` }
 
 function AppPasswords({ token }: { token: string }) {
   const [items, setItems] = useState<api.AppPassword[]>([])
@@ -297,11 +603,13 @@ function AppPasswords({ token }: { token: string }) {
 }
 
 function FloccusGuide({ token, loginIdentifier }: { token: string; loginIdentifier: string }) {
-  const davUrl = `${window.location.origin}/dav/${loginIdentifier}/`
+  const davUrl = getWebDavUrl(loginIdentifier)
   const [passwordName, setPasswordName] = useState('Floccus 书签同步')
   const [createdSecret, setCreatedSecret] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState('')
+  const [sidebarCode, setSidebarCode] = useState<string | null>(null)
+  const [pairing, setPairing] = useState(false)
 
   async function handleCreate() {
     if (!passwordName.trim()) return
@@ -317,6 +625,19 @@ function FloccusGuide({ token, loginIdentifier }: { token: string; loginIdentifi
     }
   }
 
+  async function handleSidebarPairing() {
+    setPairing(true)
+    setError('')
+    try {
+      const result = await api.createSidebarPairing(token)
+      setSidebarCode(result.code)
+    } catch (pairingError) {
+      setError(pairingError instanceof Error ? pairingError.message : '连接码创建失败')
+    } finally {
+      setPairing(false)
+    }
+  }
+
   return (
     <section className="panel">
       <div className="panel-heading">
@@ -325,7 +646,7 @@ function FloccusGuide({ token, loginIdentifier }: { token: string; loginIdentifi
           <h3>Floccus 配置向导</h3>
         </div>
       </div>
-      <p className="floccus-intro">按以下四步完成 Floccus 与 Bookmark Vault 的连接。每台设备建议使用独立的应用密码。</p>
+      <p className="floccus-intro">先完成 Floccus 的 WebDAV 配置，再用一次性连接码把侧边栏接入当前后台。侧边栏不需要再次填写 WebDAV 账号。</p>
 
       <div className="guide-step-card">
         <div className="guide-step-num">1</div>
@@ -382,14 +703,86 @@ function FloccusGuide({ token, loginIdentifier }: { token: string; loginIdentifi
       <div className="guide-step-card">
         <div className="guide-step-num">4</div>
         <div className="guide-step-body">
-          <h4>开启客户端加密（强烈推荐）</h4>
+          <h4>客户端加密（可选）</h4>
           <div className="security-notice">
             <span>!</span>
-            <p>在 Floccus 配置页开启 <strong>加密 / passphrase</strong>。服务器只会保存加密后的 XBEL 文件，无法读取书签内容。<strong>passphrase 不上传，丢失后无法找回书签，请妥善保存。</strong></p>
+            <p>如果希望后台直接显示书签索引，请将 Floccus 的 <strong>Passphrase</strong> 留空。填写 passphrase 后，服务器只能保存密文，后台无法读取书签内容；passphrase 也不会上传。</p>
           </div>
         </div>
       </div>
+
+      <div className="guide-step-card sidebar-pairing-guide">
+        <div className="guide-step-num">↗</div>
+        <div className="guide-step-body">
+          <h4>连接 Bookmark Vault 侧边栏</h4>
+          <p>侧边栏不需要再次填写 WebDAV 地址或应用密码。生成一次性连接码，在侧边栏粘贴即可读取当前后台书签索引。</p>
+          {sidebarCode ? (
+            <div className="secret-box">
+              <strong>连接码有效期 10 分钟，只能使用一次</strong>
+              <code>{sidebarCode}</code>
+              <button className="ghost-button" onClick={() => { void navigator.clipboard?.writeText(sidebarCode) }} type="button">复制连接码</button>
+            </div>
+          ) : (
+            <button className="primary-button compact" disabled={pairing} onClick={() => { void handleSidebarPairing() }} type="button">
+              {pairing ? '生成中…' : '生成侧边栏连接码'}
+            </button>
+          )}
+        </div>
+      </div>
     </section>
+  )
+}
+
+function AccountSettings({ loginIdentifier, onOpenAppPasswords }: { loginIdentifier: string; onOpenAppPasswords: () => void }) {
+  const davUrl = getWebDavUrl(loginIdentifier)
+  const accountInitial = loginIdentifier.trim().charAt(0).toUpperCase() || '?'
+
+  return (
+    <div className="account-settings">
+      <section className="account-hero">
+        <div className="account-avatar">{accountInitial}</div>
+        <div>
+          <p className="eyebrow">YOUR ACCOUNT</p>
+          <h2>这就是你的登录账号</h2>
+          <p>注册时没有单独设置用户名，系统使用你填写的邮箱或登录名作为账号标识。</p>
+        </div>
+      </section>
+
+      <div className="account-settings-grid">
+        <section className="panel account-panel">
+          <div className="panel-heading">
+            <div><p className="eyebrow">ACCOUNT IDENTITY</p><h3>账号信息</h3></div>
+          </div>
+          <div className="account-identity-card">
+            <div className="account-identity-icon"><NavIcon name="account" /></div>
+            <div>
+              <strong>{loginIdentifier}</strong>
+              <p>登录账号 · WebDAV 用户名</p>
+            </div>
+          </div>
+          <div className="account-details">
+            <div><span>账号状态</span><strong className="account-status"><i />正常</strong></div>
+            <div><span>登录方式</span><strong>邮箱或用户名</strong></div>
+          </div>
+        </section>
+
+        <section className="panel account-panel">
+          <div className="panel-heading">
+            <div><p className="eyebrow">WEBDAV CONNECTION</p><h3>同步连接信息</h3></div>
+          </div>
+          <p className="account-panel-intro">在 Floccus 中使用下面的地址和用户名。密码请使用应用密码，不要填写登录密码。</p>
+          <div className="config-fields">
+            <ConfigField label="WebDAV 地址" value={davUrl} />
+            <ConfigField label="WebDAV 用户名" value={loginIdentifier} />
+          </div>
+          <div className="security-notice account-notice">
+            <span>i</span>
+            <p>WebDAV 地址会随当前访问地址生成。部署到服务器后，这里会自动显示服务器域名。</p>
+          </div>
+          <button className="primary-button" onClick={onOpenAppPasswords} type="button">去创建应用密码</button>
+        </section>
+      </div>
+    </div>
   )
 }
 
