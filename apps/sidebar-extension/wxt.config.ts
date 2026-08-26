@@ -20,6 +20,18 @@ export default defineConfig({
     host_permissions: ['http://*/*', 'https://*/*'],
     action: {
       default_title: '打开书签侧边栏',
+      default_icon: {
+        16: 'logo.png',
+        32: 'logo.png',
+        48: 'logo.png',
+        128: 'logo.png',
+      },
+    },
+    icons: {
+      16: 'logo.png',
+      32: 'logo.png',
+      48: 'logo.png',
+      128: 'logo.png',
     },
     browser_specific_settings: {
       gecko: {
