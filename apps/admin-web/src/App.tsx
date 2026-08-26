@@ -23,6 +23,12 @@ import {
   Check,
   Copy,
   Sparkles,
+  ArrowRight,
+  ShieldCheck,
+  Zap,
+  Activity,
+  CheckCircle2,
+  Lock,
 } from 'lucide-react'
 import {
   TrashPage,
@@ -397,12 +403,22 @@ function Overview({ token }: { token: string }) {
   return (
     <>
       <section className="hero-card">
-        <div>
-          <span className="badge">准备就绪</span>
+        <div className="hero-body">
+          <div className="hero-badge-wrap">
+            <span className="badge">
+              <span className="badge-dot" />
+              准备就绪
+            </span>
+          </div>
           <h2>从 Floccus 开始同步你的书签</h2>
           <p>服务器只保存 Floccus 加密后的 XBEL 文件，书签内容安全且不会在后台明文展示。</p>
         </div>
-        <div className="hero-symbol"><RefreshCw size={36} strokeWidth={1.8} /></div>
+        <div className="hero-symbol-container">
+          <div className="hero-symbol-halo" />
+          <div className="hero-symbol">
+            <RefreshCw size={36} strokeWidth={1.8} />
+          </div>
+        </div>
       </section>
       <div className="stats-grid">
         <StatCard icon={<RefreshCw size={20} strokeWidth={1.8} />} iconTone="blue" label="同步文件" value={storage ? String(storage.files) : '—'} suffix="个" detail={storage?.lastModifiedAt ? `最近同步 ${formatDate(storage.lastModifiedAt)}` : '尚未配置 Floccus'} />
@@ -418,21 +434,21 @@ function Overview({ token }: { token: string }) {
         </div>
         <ol className="steps">
           <li>
-            <span>1</span>
+            <span className="step-badge">1</span>
             <div>
               <strong>创建应用密码</strong>
               <p>为 Floccus 创建独立凭据，主账户密码不会用于 WebDAV。</p>
             </div>
           </li>
           <li>
-            <span>2</span>
+            <span className="step-badge">2</span>
             <div>
               <strong>安装官方 Floccus</strong>
               <p>在 Chrome、Edge 或 Firefox 的插件市场安装扩展。</p>
             </div>
           </li>
           <li>
-            <span>3</span>
+            <span className="step-badge">3</span>
             <div>
               <strong>打开加密同步</strong>
               <p>配置 WebDAV 地址和 passphrase，保护你的书签内容。</p>
