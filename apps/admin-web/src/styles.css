@@ -424,32 +424,53 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   font-weight: 600;
 }
 
-/* ── 概览页英雄卡片 (Hero Card - 高级微质感清新绿) ──────────── */
+/* ── 概览页英雄卡片 (Hero Card - 高级双层毛玻璃融合质感) ──── */
 .hero-card {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 200px;
+  min-height: 210px;
   padding: clamp(28px, 4vw, 44px);
-  border-radius: 20px;
-  background: linear-gradient(135deg, #dcefa4 0%, #eaf7b8 60%, #e2f4a8 100%);
+  border-radius: 24px;
+  background: #dcefa4;
   position: relative;
   overflow: hidden;
-  border: 1px solid rgba(80, 98, 71, 0.12);
-  box-shadow: 0 10px 30px -10px rgba(80, 98, 71, 0.15), 0 1px 3px rgba(80, 98, 71, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  box-shadow: 0 16px 36px -12px rgba(80, 98, 71, 0.2), 0 4px 12px rgba(80, 98, 71, 0.06);
   margin-bottom: 28px;
 }
 
+/* 上层玻璃光泽光幕 (Top Glass Sheen Layer) */
 .hero-card::before {
   content: "";
   position: absolute;
-  top: -50px;
-  right: -50px;
-  width: 260px;
-  height: 260px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.4) 0%, rgba(255, 255, 255, 0) 70%);
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 55%;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.48) 0%, rgba(255, 255, 255, 0.12) 80%, rgba(255, 255, 255, 0) 100%);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.35);
+  mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
   pointer-events: none;
+  z-index: 1;
+}
+
+/* 下层玻璃深邃融合底托 (Bottom Glass Liquid Mesh Layer) */
+.hero-card::after {
+  content: "";
+  position: absolute;
+  bottom: -40px;
+  right: -40px;
+  width: 380px;
+  height: 220px;
+  border-radius: 50% 40% 60% 30%;
+  background: radial-gradient(circle at center, rgba(162, 204, 76, 0.45) 0%, rgba(220, 239, 164, 0.1) 70%, transparent 100%);
+  filter: blur(28px);
+  pointer-events: none;
+  z-index: 0;
 }
 
 .hero-body {
@@ -458,26 +479,27 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 }
 
 .hero-badge-wrap {
-  margin-bottom: 12px;
+  margin-bottom: 14px;
 }
 
 .hero-card h2 {
   max-width: 580px;
   margin: 0 0 12px;
-  color: #17221e;
+  color: #152219;
   font-size: clamp(24px, 3vw, 32px);
   font-weight: 800;
   line-height: 1.2;
   letter-spacing: -0.04em;
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.5);
 }
 
 .hero-card p {
   max-width: 580px;
   margin: 0;
-  color: #4a5c40;
+  color: #435436;
   font-size: 14px;
   line-height: 1.65;
-  font-weight: 450;
+  font-weight: 500;
 }
 
 .hero-symbol-container {
@@ -486,35 +508,36 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   place-items: center;
   flex: 0 0 auto;
   margin-left: 20px;
+  z-index: 2;
 }
 
 .hero-symbol-halo {
   position: absolute;
-  width: 140px;
-  height: 140px;
+  width: 146px;
+  height: 146px;
   border-radius: 50%;
-  border: 1px dashed rgba(80, 98, 71, 0.25);
+  border: 1px dashed rgba(80, 98, 71, 0.28);
   animation: rotate-slow 40s linear infinite;
 }
 
 .hero-symbol {
   display: grid;
   place-items: center;
-  width: 110px;
-  height: 110px;
-  border: 1px solid rgba(80, 98, 71, 0.18);
+  width: 112px;
+  height: 112px;
+  border: 1.5px solid rgba(255, 255, 255, 0.85);
   border-radius: 50%;
-  color: #556b30;
-  background: rgba(255, 255, 255, 0.45);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  box-shadow: 0 8px 24px rgba(80, 98, 71, 0.1), inset 0 1px 2px rgba(255, 255, 255, 0.6);
+  color: #4d6328;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.7) 0%, rgba(255, 255, 255, 0.35) 100%);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 12px 28px rgba(80, 98, 71, 0.14), inset 0 2px 4px rgba(255, 255, 255, 0.9), inset 0 -2px 4px rgba(80, 98, 71, 0.08);
   transition: transform var(--duration) var(--ease), box-shadow var(--duration) var(--ease);
 }
 
 .hero-symbol:hover {
-  transform: scale(1.05) rotate(15deg);
-  box-shadow: 0 12px 30px rgba(80, 98, 71, 0.15);
+  transform: scale(1.06) rotate(15deg);
+  box-shadow: 0 16px 36px rgba(80, 98, 71, 0.18), inset 0 2px 4px rgba(255, 255, 255, 1);
 }
 
 @keyframes rotate-slow {
@@ -526,25 +549,25 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 5px 12px;
+  padding: 6px 14px;
   border-radius: 99px;
-  color: #485c26;
-  background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
-  border: 1px solid rgba(80, 98, 71, 0.15);
+  color: #3f5223;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.85) 0%, rgba(255, 255, 255, 0.5) 100%);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.9);
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 750;
   letter-spacing: 0.04em;
-  box-shadow: 0 1px 3px rgba(80, 98, 71, 0.06);
+  box-shadow: 0 2px 8px rgba(80, 98, 71, 0.08), inset 0 1px 1px rgba(255, 255, 255, 0.8);
 }
 
 .badge-dot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #556b30;
-  box-shadow: 0 0 0 2px rgba(85, 107, 48, 0.2);
+  background: #4d6328;
+  box-shadow: 0 0 0 2.5px rgba(77, 99, 40, 0.25);
 }
 
 /* ── 统计卡片 (StatCard) ─────────────────────────────────── */
