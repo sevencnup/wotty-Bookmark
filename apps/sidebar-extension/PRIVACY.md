@@ -1,8 +1,8 @@
-# Bookmark Vault Sidebar 隐私说明
+# WOTTY BOOKMARK Sidebar 隐私说明
 
 生效日期：2026-08-25
 
-Bookmark Vault Sidebar 是一个只操作浏览器原生书签的侧边栏扩展。扩展不提供云端同步服务，也不把书签复制到 Bookmark Vault 服务端。需要跨浏览器同步时，用户可以单独配置官方 Floccus；Floccus 与本扩展是相互独立的产品。
+WOTTY BOOKMARK Sidebar 主要操作浏览器原生书签。用户可以在管理后台生成一次性连接码，让侧边栏读取当前账户的书签索引；连接码兑换为受限于本应用 API 的会话令牌，侧边栏不保存 WebDAV 应用密码、登录密码或 Floccus passphrase。跨浏览器同步仍由官方 Floccus 负责。
 
 ## 访问的数据
 
@@ -12,15 +12,16 @@ Bookmark Vault Sidebar 是一个只操作浏览器原生书签的侧边栏扩展
 
 ## 数据传输和存储
 
-- 扩展不向开发者或第三方服务器发送书签、标签页地址或使用统计数据。
-- 扩展不使用 WebDAV、远程 API、远程脚本、分析 SDK 或广告 SDK。
-- 扩展不创建云端副本、不维护远端书签 ID 映射，也不在本地建立第二套同步数据库。
+- 连接后台后，扩展只向用户配置的 WOTTY BOOKMARK 服务请求书签索引和连接状态。
+- 扩展不直接使用 WebDAV，也不保存 WebDAV 应用密码、登录密码或 Floccus passphrase。
+- 扩展不创建第二份云端副本、不维护远端书签 ID 映射；浏览器原生书签仍是侧边栏编辑的本地数据源。
 - 书签数据继续由浏览器原生书签系统管理；删除和修改遵循浏览器自身行为。
 
 ## 权限用途
 
 - `bookmarks`：展示和管理浏览器原生书签。
 - `tabs`：读取当前活动页面并在用户打开书签时创建标签页。
+- `storage`：保存一次性连接码兑换后的后台会话令牌。
 - Chrome/Edge 的 `sidePanel`：提供浏览器侧边栏入口。
 - Firefox 的 `sidebar_action`：提供 Firefox 侧边栏入口。
 

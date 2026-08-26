@@ -4,7 +4,7 @@
 
 ## 基础资料
 
-- 产品名：Bookmark Vault Sidebar
+- 产品名：WOTTY BOOKMARK Sidebar
 - 简短描述：Search and organize your browser-native bookmarks from a focused sidebar.
 - 分类：生产力
 - 支持平台：Chrome Stable、Microsoft Edge Stable、Firefox Stable（桌面版）
@@ -14,7 +14,7 @@
 
 ## 详细描述
 
-Bookmark Vault Sidebar gives your browser-native bookmarks a focused, searchable side-panel workspace. Search folders and URLs, save the current page, create or edit bookmarks, move items, delete items, and reorder the tree with drag and drop.
+WOTTY BOOKMARK Sidebar gives your browser-native bookmarks a focused, searchable side-panel workspace. Search folders and URLs, save the current page, create or edit bookmarks, move items, delete items, and reorder the tree with drag and drop.
 
 The extension works only with the browser's built-in bookmarks API. It does not connect to WebDAV, upload bookmarks, run a separate sync engine, or store a second cloud copy. If you want cross-browser synchronization, configure the official Floccus extension separately; Floccus remains responsible for synchronization and encryption.
 

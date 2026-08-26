@@ -124,6 +124,18 @@ function Icon({ name, size = 16, strokeWidth = 1.8 }: { name: IconName; size?: n
   }
 }
 
+function BrandLogo({ size = 20 }: { size?: number }) {
+  return (
+    <img
+      alt="Wotty Bookmark Logo"
+      className="brand-logo-img"
+      height={size}
+      src="/logo.png"
+      width={size}
+    />
+  );
+}
+
 interface EditorValues {
   kind: 'bookmark' | 'folder';
   title: string;
@@ -440,10 +452,10 @@ function App() {
           <div className="brand-mark"><BrandLogo size={18} /></div>
           <div>
             <div className="brand-title">书签</div>
-            <div className="brand-subtitle">Bookmark Vault</div>
+            <div className="brand-subtitle">WOTTY BOOKMARK</div>
           </div>
         </div>
-        <button className={`sync-status ${backendConnection ? 'is-connected' : 'is-disconnected'}`} onClick={() => setConnectionOpen(true)} title="连接 Bookmark Vault 后台" type="button">
+        <button className={`sync-status ${backendConnection ? 'is-connected' : 'is-disconnected'}`} onClick={() => setConnectionOpen(true)} title="连接 WOTTY BOOKMARK 后台" type="button">
           <span className="status-dot" />
           <span>{backendConnection ? `后台已连接${backendTree ? ` · ${backendTree.bookmarks.length}` : ''}` : '连接后台'}</span>
           <Icon name="settings" size={12} />
@@ -567,7 +579,7 @@ function App() {
 
       <footer className="app-footer">
         <span><span className="footer-dot" /> 仅使用浏览器原生书签</span>
-        <span className="footer-version">v0.1</span>
+        <span className="footer-version">v0.1.2</span>
       </footer>
 
       {operationError ? <div className="operation-toast" role="alert"><Icon name="warning" size={14} /> {operationError}</div> : null}
@@ -637,15 +649,6 @@ function findBookmarkByUrl(nodes: BookmarkNode[], url: string): BookmarkNode | u
 }
 
 const faviconStatus = new Map<string, 'loaded' | 'failed'>();
-
-function BrandLogo({ size = 18 }: { size?: number }) {
-  return (
-    <svg aria-hidden="true" fill="none" height={size} viewBox="0 0 24 24" width={size} xmlns="http://www.w3.org/2000/svg">
-      <path d="m12 3 8 4v10l-8 4-8-4V7l8-4Z" stroke="currentColor" strokeLinejoin="round" strokeWidth="1.8" />
-      <path d="m8 9 4 2 4-2M12 11v6" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
-    </svg>
-  );
-}
 
 function SiteFavicon({ url, size = 16 }: { url: string; size?: number }) {
   const faviconUrl = getSiteFaviconUrl(url);
@@ -855,7 +858,7 @@ function ConnectionModal({
   const [disconnecting, setDisconnecting] = useState(false);
 
   return (
-    <ModalFrame eyebrow="BACKEND CONNECTION" onClose={onClose} title="连接 Bookmark Vault">
+    <ModalFrame eyebrow="BACKEND CONNECTION" onClose={onClose} title="连接 WOTTY BOOKMARK">
       {connection ? (
         <div className="connection-content">
           <div className="connection-status-card">

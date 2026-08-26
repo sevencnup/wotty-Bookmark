@@ -2,12 +2,22 @@ import { defineConfig } from 'wxt';
 
 export default defineConfig({
   modules: ['@wxt-dev/module-react'],
+  dev: {
+    server: {
+      port: 3000,
+      strictPort: true,
+    },
+  },
+  webExt: {
+    disabled: true,
+  },
   manifest: {
-    name: 'Bookmark Vault Sidebar',
+    name: 'WOTTY BOOKMARK Sidebar',
     short_name: 'Bookmarks',
     description: 'A focused sidebar for your browser-native bookmarks.',
-    version: '0.1.0',
-    permissions: ['bookmarks', 'tabs'],
+    version: '0.1.2',
+    permissions: ['bookmarks', 'tabs', 'storage'],
+    host_permissions: ['http://*/*', 'https://*/*'],
     action: {
       default_title: '打开书签侧边栏',
     },
