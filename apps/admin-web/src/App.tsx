@@ -402,10 +402,7 @@ function Overview({ token }: { token: string }) {
 
   return (
     <>
-      <section className="hero-card aurora-hero">
-        <div className="aurora-glow aurora-glow-1" />
-        <div className="aurora-glow aurora-glow-2" />
-        <div className="aurora-glow aurora-glow-3" />
+      <section className="hero-card">
         <div className="hero-body">
           <div className="hero-badge-wrap">
             <span className="badge">
