@@ -39,7 +39,7 @@ export function CategoryManagementPage({ token, onOpenFloccus }: Props) {
       setTree(nextTree)
       setSelectedIds((current) => new Set([...current].filter((id) => nextTree.bookmarks.some((bookmark) => bookmark.id === id))))
       if (!expandedInitializedRef.current && nextTree.folders.length > 0) {
-        setExpandedIds(new Set(nextTree.folders.map((folder) => folder.id)))
+        setExpandedIds(new Set(allFolderIds(nextTree.folders)))
         expandedInitializedRef.current = true
       }
     } catch (requestError) {
@@ -135,7 +135,9 @@ export function CategoryManagementPage({ token, onOpenFloccus }: Props) {
     if (!drag || moving) return
     event.preventDefault()
     const ids = event.dataTransfer.getData('text/plain').split(',').filter(Boolean)
-    void moveBookmarks(ids.length ? ids : drag.ids, folderId)
+      if (ids.length > 0) {
+        void moveBookmarks(ids, folderId)
+      }
   }
 
   function endDrag() {

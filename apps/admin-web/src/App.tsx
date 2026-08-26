@@ -242,8 +242,8 @@ function App() {
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <div className="brand sidebar-brand">
-          <span className="brand-mark"><BrandLogo size={64} /></span>
+        <div className="sidebar-brand">
+          <span className="brand-mark"><BrandLogo size={80} /></span>
         </div>
         <nav className="nav-list" aria-label="管理后台导航">
           {navGroups.map((group, index) => (
