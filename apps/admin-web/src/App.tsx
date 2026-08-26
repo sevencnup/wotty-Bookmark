@@ -40,6 +40,7 @@ import {
   HelpPage,
   AboutPage,
 } from './FeaturePages'
+import { CategoryManagementPage } from './CategoryManagementPage'
 import * as api from './api'
 import { loadPreferences, savePreferences, type Preferences } from './preferences'
 import { descendantFolderIds, flattenFolders, findFolder, folderHasChildren, resolveDraggedBookmarkIds, visibleFolders, type FlatBookmarkFolder } from './bookmark-tree'
@@ -279,7 +280,7 @@ function App() {
             {activeSection === 'overview' && <Overview token={session.token} />}
             {activeSection === 'app-passwords' && <AppPasswords token={session.token} />}
             {activeSection === 'bookmark-organizer' && <BookmarkOrganizer mode="organizer" token={session.token} onOpenFloccus={() => navigate('floccus')} />}
-            {activeSection === 'categories' && <BookmarkOrganizer mode="categories" token={session.token} onOpenFloccus={() => navigate('floccus')} />}
+            {activeSection === 'categories' && <CategoryManagementPage token={session.token} onOpenFloccus={() => navigate('floccus')} />}
             {activeSection === 'floccus' && <FloccusGuide token={session.token} loginIdentifier={session.user.loginIdentifier} />}
             {activeSection === 'account' && <AccountSettings loginIdentifier={session.user.loginIdentifier} onOpenAppPasswords={() => navigate('app-passwords')} />}
             {activeSection === 'security' && <Security />}
