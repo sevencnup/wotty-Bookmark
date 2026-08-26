@@ -24,6 +24,7 @@ import {
   Copy,
   Sparkles,
   ArrowRight,
+  GripVertical,
   ShieldCheck,
   Zap,
   Activity,
@@ -41,6 +42,7 @@ import {
 } from './FeaturePages'
 import * as api from './api'
 import { loadPreferences, savePreferences, type Preferences } from './preferences'
+import { descendantFolderIds, flattenFolders, findFolder, folderHasChildren, resolveDraggedBookmarkIds, visibleFolders, type FlatBookmarkFolder } from './bookmark-tree'
 
 type AdminSection =
   | 'overview'
@@ -162,12 +164,15 @@ function NavIcon({ name, size = 18 }: { name: NavIconName; size?: number }) {
   }
 }
 
-function BrandLogo({ size = 18 }: { size?: number }) {
+function BrandLogo({ size = 20 }: { size?: number }) {
   return (
-    <svg aria-hidden="true" className="brand-logo-svg" fill="none" height={size} viewBox="0 0 24 24" width={size} xmlns="http://www.w3.org/2000/svg">
-      <path d="m12 3 8 4v10l-8 4-8-4V7l8-4Z" stroke="currentColor" strokeLinejoin="round" strokeWidth="1.8" />
-      <path d="m8 9 4 2 4-2M12 11v6" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
-    </svg>
+    <img
+      alt="Wotty Bookmark Logo"
+      className="brand-logo-img"
+      height={size}
+      src="/logo.png"
+      width={size}
+    />
   )
 }
 
@@ -266,14 +271,15 @@ function App() {
           <>
             <header className="topbar">
               <div>
-                <p className="eyebrow">BOOKMARK VAULT</p>
+                <p className="eyebrow">WOTTY BOOKMARK</p>
                 <h1>{activeLabel}</h1>
               </div>
               <button className="ghost-button" onClick={() => void handleLogout()} type="button">退出登录</button>
             </header>
             {activeSection === 'overview' && <Overview token={session.token} />}
             {activeSection === 'app-passwords' && <AppPasswords token={session.token} />}
-            {activeSection === 'bookmark-organizer' && <BookmarkOrganizer token={session.token} onOpenFloccus={() => navigate('floccus')} />}
+            {activeSection === 'bookmark-organizer' && <BookmarkOrganizer mode="organizer" token={session.token} onOpenFloccus={() => navigate('floccus')} />}
+            {activeSection === 'categories' && <BookmarkOrganizer mode="categories" token={session.token} onOpenFloccus={() => navigate('floccus')} />}
             {activeSection === 'floccus' && <FloccusGuide token={session.token} loginIdentifier={session.user.loginIdentifier} />}
             {activeSection === 'account' && <AccountSettings loginIdentifier={session.user.loginIdentifier} onOpenAppPasswords={() => navigate('app-passwords')} />}
             {activeSection === 'security' && <Security />}
@@ -284,7 +290,7 @@ function App() {
             {activeSection === 'import-export' && <ImportExportPage navigate={navigate} token={session.token} />}
             {activeSection === 'help' && <HelpPage navigate={navigate} token={session.token} />}
             {activeSection === 'about' && <AboutPage />}
-            {!['overview', 'app-passwords', 'account', 'bookmark-organizer', 'floccus', 'security', 'trash', 'tags', 'devices', 'preferences', 'import-export', 'help', 'about'].includes(activeSection) && <ComingSoon label={activeLabel} />}
+            {!['overview', 'app-passwords', 'account', 'bookmark-organizer', 'categories', 'floccus', 'security', 'trash', 'tags', 'devices', 'preferences', 'import-export', 'help', 'about'].includes(activeSection) && <ComingSoon label={activeLabel} />}
           </>
         )}
       </main>
@@ -460,25 +466,6 @@ function Overview({ token }: { token: string }) {
   )
 }
 
-type FlatFolder = api.BookmarkFolder & { depth: number }
-
-function flattenFolders(folders: api.BookmarkFolder[], depth = 0): FlatFolder[] {
-  return folders.flatMap((folder) => [{ ...folder, depth }, ...flattenFolders(folder.children, depth + 1)])
-}
-
-function descendantFolderIds(folder: api.BookmarkFolder): string[] {
-  return [folder.id, ...folder.children.flatMap(descendantFolderIds)]
-}
-
-function findFolder(folders: api.BookmarkFolder[], id: string): api.BookmarkFolder | null {
-  for (const folder of folders) {
-    if (folder.id === id) return folder
-    const match = findFolder(folder.children, id)
-    if (match) return match
-  }
-  return null
-}
-
 function getBookmarkHost(value: string) {
   try {
     return new URL(value).hostname.replace(/^www\./, '')
@@ -487,7 +474,8 @@ function getBookmarkHost(value: string) {
   }
 }
 
-function BookmarkOrganizer({ token, onOpenFloccus }: { token: string; onOpenFloccus: () => void }) {
+function BookmarkOrganizer({ token, onOpenFloccus, mode = 'organizer' }: { token: string; onOpenFloccus: () => void; mode?: 'organizer' | 'categories' }) {
+  const isCategoriesMode = mode === 'categories'
   const [tree, setTree] = useState<api.BookmarkTree | null>(null)
   const [query, setQuery] = useState('')
   const [selectedFolderId, setSelectedFolderId] = useState('all')
@@ -498,6 +486,9 @@ function BookmarkOrganizer({ token, onOpenFloccus }: { token: string; onOpenFloc
   const [moving, setMoving] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const [expandedFolderIds, setExpandedFolderIds] = useState<Set<string>>(new Set())
+  const [draggedIds, setDraggedIds] = useState<string[]>([])
+  const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null)
 
   async function loadBookmarks(showLoading = false) {
     if (showLoading) setRefreshing(true)
@@ -505,7 +496,7 @@ function BookmarkOrganizer({ token, onOpenFloccus }: { token: string; onOpenFloc
     try {
       const nextTree = await api.getBookmarks(token)
       setTree(nextTree)
-      setSelectedIds(new Set())
+      setSelectedIds((current) => new Set([...current].filter((id) => nextTree.bookmarks.some((bookmark) => bookmark.id === id))))
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : '书签读取失败')
     } finally {
@@ -517,6 +508,7 @@ function BookmarkOrganizer({ token, onOpenFloccus }: { token: string; onOpenFloc
   useEffect(() => { void loadBookmarks() }, [token])
 
   const folders = tree ? flattenFolders(tree.folders) : []
+  const visibleCategoryFolders = tree ? visibleFolders(tree.folders, expandedFolderIds) : []
   const selectedFolder = tree && selectedFolderId !== 'all' ? findFolder(tree.folders, selectedFolderId) : null
   const folderIds = selectedFolder ? new Set(descendantFolderIds(selectedFolder)) : null
   const normalizedQuery = query.trim().toLowerCase()
@@ -545,25 +537,84 @@ function BookmarkOrganizer({ token, onOpenFloccus }: { token: string; onOpenFloc
     })
   }
 
-  async function moveSelected() {
-    if (!tree || !targetFolderId || selectedIds.size === 0) return
+  function handleFolderDragLeave() {
+    setDragOverFolderId(null)
+  }
+
+  async function moveToFolder(bookmarkIds: string[], parentId: string) {
+    if (!tree || tree.status !== 'ready' || moving || bookmarkIds.length === 0) return
+    const validIds = [...new Set(bookmarkIds)].filter((id) => tree.bookmarks.some((bookmark) => bookmark.id === id))
+    if (validIds.length === 0) return
+    const alreadyThere = validIds.every((id) => tree.bookmarks.find((bookmark) => bookmark.id === id)?.parentId === parentId)
+    if (alreadyThere) {
+      setNotice('所选书签已经位于该文件夹中')
+      return
+    }
     setMoving(true)
     setError('')
     setNotice('')
     try {
-      await api.moveBookmarks(token, [...selectedIds], targetFolderId, tree.etag)
-      setNotice(`已移动 ${selectedIds.size} 个书签，等待 Floccus 同步到浏览器`)
+      if (validIds.length === 1) await api.moveBookmark(token, validIds[0], parentId, tree.etag)
+      else await api.moveBookmarks(token, validIds, parentId, tree.etag)
+      setNotice(`已移动 ${validIds.length} 个书签，等待 Floccus 同步到浏览器`)
       setTargetFolderId('')
+      setSelectedIds((current) => new Set([...current].filter((id) => !validIds.includes(id))))
       await loadBookmarks()
     } catch (requestError) {
+      try { await loadBookmarks() } catch { /* loadBookmarks stores its own error */ }
       setError(requestError instanceof Error ? requestError.message : '书签移动失败，请刷新后重试')
     } finally {
       setMoving(false)
     }
   }
 
+  async function moveSelected() {
+    if (!targetFolderId) return
+    await moveToFolder([...selectedIds], targetFolderId)
+  }
+
+  function toggleFolderExpanded(folderId: string) {
+    setExpandedFolderIds((current) => {
+      const next = new Set(current)
+      if (next.has(folderId)) next.delete(folderId)
+      else next.add(folderId)
+      return next
+    })
+  }
+
+  function startBookmarkDrag(event: React.DragEvent, bookmarkId: string) {
+    if (!isCategoriesMode || moving || !tree || tree.status !== 'ready') return
+    const validIds = resolveDraggedBookmarkIds(tree.bookmarks, bookmarkId, selectedIds)
+    if (validIds.length === 0) return
+    event.dataTransfer.effectAllowed = 'move'
+    event.dataTransfer.setData('text/plain', validIds.join(','))
+    setDraggedIds(validIds)
+  }
+
+  function handleFolderDragOver(event: React.DragEvent, folderId: string) {
+    if (!isCategoriesMode || moving || draggedIds.length === 0) return
+    event.preventDefault()
+    event.dataTransfer.dropEffect = 'move'
+    setDragOverFolderId(folderId)
+  }
+
+  function handleFolderDrop(event: React.DragEvent, folderId: string) {
+    if (!isCategoriesMode || moving) return
+    event.preventDefault()
+    const rawIds = event.dataTransfer.getData('text/plain').split(',').filter(Boolean)
+    const ids = rawIds.length > 0 ? rawIds : draggedIds
+    setDragOverFolderId(null)
+    setDraggedIds([])
+    void moveToFolder(ids, folderId)
+  }
+
+  function clearDragState() {
+    setDragOverFolderId(null)
+    setDraggedIds([])
+  }
+
   return (
-    <div className="bookmark-organizer">
+    <div className={`bookmark-organizer ${isCategoriesMode ? 'categories-page' : ''}`}>
       <div className="bookmark-organizer-intro">
         <div>
           <p className="eyebrow">BOOKMARK INDEX</p>
@@ -604,11 +655,12 @@ function BookmarkOrganizer({ token, onOpenFloccus }: { token: string; onOpenFloc
         </section>
       ) : (
         <div className="bookmark-workspace">
-          <aside className="panel bookmark-folder-panel">
-            <div className="bookmark-panel-heading"><div><p className="eyebrow">FOLDERS</p><h3>书签文件夹</h3></div><span>{folders.length}</span></div>
-            <button className={`folder-filter ${selectedFolderId === 'all' ? 'active' : ''}`} onClick={() => setSelectedFolderId('all')} type="button"><span><Home size={15} strokeWidth={1.8} /></span><strong>全部书签</strong><small>{tree.bookmarks.length}</small></button>
-            <div className="folder-tree">
-              {folders.map((folder) => <button className={`folder-filter ${selectedFolderId === folder.id ? 'active' : ''}`} key={folder.id} onClick={() => setSelectedFolderId(folder.id)} style={{ paddingLeft: `${12 + folder.depth * 16}px` }} type="button"><span><Folder size={15} strokeWidth={1.8} /></span><strong>{folder.title}</strong><small>{folder.bookmarkCount}</small></button>)}
+          <aside className={`panel bookmark-folder-panel ${isCategoriesMode ? 'categories-folder-panel' : ''}`}>
+            <div className="bookmark-panel-heading"><div><p className="eyebrow">{isCategoriesMode ? 'CATEGORY TREE' : 'FOLDERS'}</p><h3>{isCategoriesMode ? '组织文件夹' : '书签文件夹'}</h3></div><span>{folders.length}</span></div>
+            {isCategoriesMode && <p className="category-panel-hint">将右侧书签拖入左侧文件夹即可归类</p>}
+            <button aria-current={selectedFolderId === 'all' ? 'page' : undefined} className={`folder-filter ${selectedFolderId === 'all' ? 'active' : ''}`} onClick={() => setSelectedFolderId('all')} type="button"><span><Home size={15} strokeWidth={1.8} /></span><strong>全部书签</strong><small>{tree.bookmarks.length}</small></button>
+            <div className={`folder-tree ${isCategoriesMode ? 'category-folder-tree' : ''}`}>
+              {isCategoriesMode ? visibleCategoryFolders.map((folder) => <FolderTreeRow dragOverFolderId={dragOverFolderId} expandedFolderIds={expandedFolderIds} folder={folder} key={folder.id} onDragLeave={handleFolderDragLeave} onDragOver={handleFolderDragOver} onDrop={handleFolderDrop} onSelect={setSelectedFolderId} onToggle={toggleFolderExpanded} selectedFolderId={selectedFolderId} />) : folders.map((folder) => <button className={`folder-filter ${selectedFolderId === folder.id ? 'active' : ''}`} key={folder.id} onClick={() => setSelectedFolderId(folder.id)} style={{ paddingLeft: `${12 + folder.depth * 16}px` }} type="button"><span><Folder size={15} strokeWidth={1.8} /></span><strong>{folder.title}</strong><small>{folder.bookmarkCount}</small></button>)}
             </div>
           </aside>
 
@@ -620,11 +672,11 @@ function BookmarkOrganizer({ token, onOpenFloccus }: { token: string; onOpenFloc
               <span className="bookmark-result-count">显示 {visibleBookmarks.length} / {tree.bookmarks.length}</span>
             </div>
 
-            {selectedIds.size > 0 && <div className="bookmark-bulk-bar"><strong>已选择 {selectedIds.size} 个</strong><select aria-label="移动到文件夹" onChange={(event) => setTargetFolderId(event.target.value)} value={targetFolderId}><option value="">移动到…</option>{folders.map((folder) => <option key={folder.id} value={folder.id}>{'　'.repeat(folder.depth)}{folder.title}</option>)}</select><button className="blue-button" disabled={!targetFolderId || moving} onClick={() => void moveSelected()} type="button">{moving ? '移动中…' : '确认移动'}</button><button className="toolbar-button" onClick={() => setSelectedIds(new Set())} type="button">取消选择</button></div>}
+            {selectedIds.size > 0 && <div className="bookmark-bulk-bar"><strong>已选择 {selectedIds.size} 个</strong>{isCategoriesMode && <span className="category-drag-hint">也可以拖动已选书签到左侧文件夹</span>}<select aria-label="移动到文件夹" onChange={(event) => setTargetFolderId(event.target.value)} value={targetFolderId}><option value="">移动到…</option>{folders.map((folder) => <option key={folder.id} value={folder.id}>{'　'.repeat(folder.depth)}{folder.title}</option>)}</select><button className="blue-button" disabled={!targetFolderId || moving} onClick={() => void moveSelected()} type="button">{moving ? '移动中…' : '确认移动'}</button><button className="toolbar-button" onClick={() => setSelectedIds(new Set())} type="button">取消选择</button></div>}
 
             <div className="bookmark-table-shell">
               <div className="bookmark-table-head"><label className="checkbox-wrap"><input checked={allVisibleSelected} onChange={toggleAllVisible} type="checkbox" /><span /></label><span>书签</span><span>网址</span><span>所在文件夹</span><span>操作</span></div>
-              {visibleBookmarks.length === 0 ? <div className="bookmark-empty"><span><Search size={22} strokeWidth={1.8} /></span><strong>没有匹配的书签</strong><p>换个关键词，或切换左侧文件夹。</p></div> : visibleBookmarks.map((bookmark, index) => <div className={`bookmark-row ${selectedIds.has(bookmark.id) ? 'selected' : ''}`} key={bookmark.id}><label className="checkbox-wrap"><input checked={selectedIds.has(bookmark.id)} onChange={() => toggleSelection(bookmark.id)} type="checkbox" /><span /></label><div className="bookmark-name"><span className={`site-mark site-mark-${index % 4}`}>{(bookmark.title || '?').charAt(0).toUpperCase()}</span><div><strong title={bookmark.title}>{bookmark.title || '未命名书签'}</strong><span>{getBookmarkHost(bookmark.url)}</span></div></div><a className="bookmark-url-cell" href={bookmark.url} rel="noreferrer" target="_blank" title={bookmark.url}>{bookmark.url}</a><span className="category-pill" title={bookmark.folderPath}>{bookmark.folderPath || '根目录'}</span><a className="bookmark-open-link" href={bookmark.url} rel="noreferrer" target="_blank" title="打开书签" aria-label={`打开 ${bookmark.title || bookmark.url}`}><ExternalLink size={13} strokeWidth={1.8} /></a></div>)}
+              {visibleBookmarks.length === 0 ? <div className="bookmark-empty"><span><Search size={22} strokeWidth={1.8} /></span><strong>没有匹配的书签</strong><p>换个关键词，或切换左侧文件夹。</p></div> : visibleBookmarks.map((bookmark, index) => <div className={`bookmark-row ${selectedIds.has(bookmark.id) ? 'selected' : ''} ${isCategoriesMode && draggedIds.includes(bookmark.id) ? 'category-dragging' : ''}`} key={bookmark.id}><label className="checkbox-wrap"><input checked={selectedIds.has(bookmark.id)} onChange={() => toggleSelection(bookmark.id)} type="checkbox" /><span /></label>{isCategoriesMode && <button aria-label={`拖动 ${bookmark.title || bookmark.url}`} className="category-drag-handle" draggable={!moving} onDragEnd={clearDragState} onDragStart={(event) => startBookmarkDrag(event, bookmark.id)} title="拖动到左侧文件夹" type="button">⠿</button>}<div className="bookmark-name"><span className={`site-mark site-mark-${index % 4}`}>{(bookmark.title || '?').charAt(0).toUpperCase()}</span><div><strong title={bookmark.title}>{bookmark.title || '未命名书签'}</strong><span>{getBookmarkHost(bookmark.url)}</span></div></div><a className="bookmark-url-cell" href={bookmark.url} rel="noreferrer" target="_blank" title={bookmark.url}>{bookmark.url}</a><span className="category-pill" title={bookmark.folderPath}>{bookmark.folderPath || '根目录'}</span><a className="bookmark-open-link" href={bookmark.url} rel="noreferrer" target="_blank" title="打开书签" aria-label={`打开 ${bookmark.title || bookmark.url}`}><ExternalLink size={13} strokeWidth={1.8} /></a></div>)}
             </div>
             <p className="bookmark-index-note">书签内容仍由 Floccus 加密同步；此页面使用服务器索引进行查找和整理。</p>
           </section>
@@ -632,6 +684,15 @@ function BookmarkOrganizer({ token, onOpenFloccus }: { token: string; onOpenFloc
       )}
     </div>
   )
+}
+
+function FolderTreeRow({ folder, selectedFolderId, expandedFolderIds, dragOverFolderId, onSelect, onToggle, onDragOver, onDrop, onDragLeave }: { folder: FlatBookmarkFolder; selectedFolderId: string; expandedFolderIds: Set<string>; dragOverFolderId: string | null; onSelect: (id: string) => void; onToggle: (id: string) => void; onDragOver: (event: React.DragEvent, id: string) => void; onDrop: (event: React.DragEvent, id: string) => void; onDragLeave: () => void }) {
+  const hasChildren = folderHasChildren(folder)
+  const expanded = expandedFolderIds.has(folder.id)
+  return <div className={`category-folder-row ${selectedFolderId === folder.id ? 'active' : ''} ${dragOverFolderId === folder.id ? 'drag-over' : ''}`} style={{ marginLeft: `${folder.depth * 16}px` }} onDragLeave={onDragLeave} onDragOver={(event) => onDragOver(event, folder.id)} onDrop={(event) => onDrop(event, folder.id)}>
+    {hasChildren ? <button aria-expanded={expanded} aria-label={expanded ? `折叠 ${folder.title}` : `展开 ${folder.title}`} className="category-folder-toggle" onClick={() => onToggle(folder.id)} type="button">{expanded ? '−' : '+'}</button> : <span className="category-folder-toggle-spacer" />}
+    <button aria-current={selectedFolderId === folder.id ? 'page' : undefined} className="category-folder-select" onClick={() => onSelect(folder.id)} type="button"><Folder size={15} strokeWidth={1.8} /><strong>{folder.title}</strong><small>{folder.bookmarkCount}</small></button>
+  </div>
 }
 
 function formatBytes(bytes: number) { if (bytes < 1024) return `${bytes} B`; if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`; return `${(bytes / (1024 * 1024)).toFixed(1)} MB` }
@@ -761,7 +822,7 @@ function FloccusGuide({ token, loginIdentifier }: { token: string; loginIdentifi
       <div className="guide-step-card sidebar-pairing-guide">
         <div className="guide-step-num">↗</div>
         <div className="guide-step-body">
-          <h4>连接 Bookmark Vault 侧边栏</h4>
+          <h4>连接 WOTTY BOOKMARK 侧边栏</h4>
           <p>侧边栏不需要再次填写 WebDAV 地址或应用密码。生成一次性连接码，在侧边栏粘贴即可读取当前后台书签索引。</p>
           {sidebarCode ? (
             <div className="secret-box">
@@ -854,7 +915,7 @@ function ConfigField({ label, value, copyable = true }: { label: string; value: 
   )
 }
 function GuideStep({ number, title, content }: { number: string; title: string; content: string }) { return <div className="guide-step"><span>{number}</span><div><h4>{title}</h4><p>{content}</p></div></div> }
-function Security() { return <section className="panel"><div className="panel-heading"><div><p className="eyebrow">SECURITY</p><h3>账户安全</h3></div></div><div className="security-notice"><span><Shield size={14} strokeWidth={1.8} /></span><p>Bookmark Vault 不保存 Floccus passphrase。忘记 passphrase 后，服务器无法解密或恢复书签内容。</p></div><button className="danger-button" type="button">删除账户</button></section> }
+function Security() { return <section className="panel"><div className="panel-heading"><div><p className="eyebrow">SECURITY</p><h3>账户安全</h3></div></div><div className="security-notice"><span><Shield size={14} strokeWidth={1.8} /></span><p>WOTTY BOOKMARK 不保存 Floccus passphrase。忘记 passphrase 后，服务器无法解密或恢复书签内容。</p></div><button className="danger-button" type="button">删除账户</button></section> }
 function ComingSoon({ label }: { label: string }) { return <section className="panel coming-soon"><span className="coming-icon"><Sparkles size={24} strokeWidth={1.8} /></span><h3>{label}</h3><p>这个管理模块正在设计中，书签管理和侧边栏会保持独立运行。</p></section> }
 
 export default App

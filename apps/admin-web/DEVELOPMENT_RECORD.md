@@ -1,5 +1,25 @@
 # 管理后台开发记录
 
+## 2026-08-26：`admin-category-drag-and-drop`
+
+### 任务
+
+实现分类管理页面，通过左侧递归文件夹组织树和右侧书签列表完成拖拽归类。
+
+### 进度
+
+- 接通分类管理导航，复用真实书签索引和移动 API。
+- 增加文件夹展开/折叠、递归书签数量、搜索筛选和拖拽到目标文件夹。
+- 保留多选、下拉批量移动作为键盘和触摸设备的替代操作。
+- 增加 ETag 并发控制、刷新恢复、加密文件限制提示和响应式布局。
+
+### 验证
+
+- `pnpm --filter @bookmark-vault/admin-web lint`：通过。
+- `pnpm --filter @bookmark-vault/admin-web test`：13 项通过。
+- `pnpm --filter @bookmark-vault/admin-web build`：通过。
+- `cargo test --manifest-path services/api/Cargo.toml`：18 项通过。
+
 ## 2026-08-26：`admin-seven-feature-pages`
 
 ### 任务
