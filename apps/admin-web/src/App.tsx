@@ -57,6 +57,7 @@ type NavIconName =
   | 'import-export'
   | 'help'
   | 'about'
+  | 'sync'
 
 type NavItem = { id: AdminSection; label: string; icon: NavIconName }
 type NavGroup = { label?: string; items: NavItem[] }
@@ -76,6 +77,7 @@ const navGroups: NavGroup[] = [
     label: '安全管理',
     items: [
       { id: 'app-passwords', label: '密码管理', icon: 'passwords' },
+      { id: 'floccus', label: 'Floccus 配置', icon: 'sync' },
       { id: 'backup', label: '数据备份', icon: 'backup' },
       { id: 'devices', label: '设备管理', icon: 'devices' },
       { id: 'audit-log', label: '操作日志', icon: 'audit-log' },
@@ -117,6 +119,7 @@ const navIconPaths: Record<NavIconName, string> = {
   'import-export': 'M12 3v12m0 0-4-4m4 4 4-4M5 18v3h14v-3',
   help: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm0-5h.01M9.8 9a2.3 2.3 0 1 1 3.7 1.8c-.9.7-1.5 1.1-1.5 2.2',
   about: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm0-10v5m0-8h.01',
+  sync: 'M4 4v5h5M20 20v-5h-5M4.5 14.5A8.5 8.5 0 0 0 19.5 12M19.5 9.5A8.5 8.5 0 0 0 4.5 12',
 }
 
 function NavIcon({ name }: { name: NavIconName }) {
@@ -125,10 +128,10 @@ function NavIcon({ name }: { name: NavIconName }) {
 
 function App() {
   const [activeSection, setActiveSection] = useState<AdminSection>('bookmark-management')
-  const [sessionToken, setSessionToken] = useState<string | null>(null)
+  const [session, setSession] = useState<api.Session | null>(null)
 
-  if (!sessionToken) {
-    return <LoginCard onLogin={(session) => setSessionToken(session.token)} />
+  if (!session) {
+    return <LoginCard onLogin={setSession} />
   }
 
   const activeLabel = allNavItems().find((item) => item.id === activeSection)?.label ?? '管理后台'
@@ -170,11 +173,11 @@ function App() {
                 <p className="eyebrow">BOOKMARK VAULT</p>
                 <h1>{activeLabel}</h1>
               </div>
-              <button className="ghost-button" onClick={() => setSessionToken(null)} type="button">退出登录</button>
+              <button className="ghost-button" onClick={() => setSession(null)} type="button">退出登录</button>
             </header>
-            {activeSection === 'overview' && <Overview token={sessionToken} />}
-            {activeSection === 'app-passwords' && <AppPasswords token={sessionToken} />}
-            {activeSection === 'floccus' && <FloccusGuide />}
+            {activeSection === 'overview' && <Overview token={session.token} />}
+            {activeSection === 'app-passwords' && <AppPasswords token={session.token} />}
+            {activeSection === 'floccus' && <FloccusGuide token={session.token} loginIdentifier={session.user.loginIdentifier} />}
             {activeSection === 'security' && <Security />}
             {!['overview', 'app-passwords', 'floccus', 'security'].includes(activeSection) && <ComingSoon label={activeLabel} />}
           </>
@@ -387,7 +390,123 @@ function AppPasswords({ token }: { token: string }) {
   return <section className="panel"><div className="panel-heading"><div><p className="eyebrow">ACCESS CONTROL</p><h3>应用密码</h3></div></div><div className="password-create"><input value={name} onChange={(event) => setName(event.target.value)} placeholder="例如：Chrome 工作浏览器" /><button className="primary-button compact" onClick={() => void create()} type="button">创建应用密码</button></div>{error && <p className="form-error">{error}</p>}{newSecret && <div className="secret-box"><strong>请立即保存这串应用密码</strong><code>{newSecret}</code><button className="ghost-button" onClick={() => navigator.clipboard?.writeText(newSecret)} type="button">复制</button><p>它只会在创建成功时显示一次。</p></div>}{items.length === 0 ? <div className="empty-state"><span>◇</span><h4>还没有应用密码</h4><p>建议为每个浏览器或设备创建独立的应用密码，撤销时不会影响账户登录。</p></div> : <div className="password-list">{items.map((item) => <div className="password-row" key={item.id}><div><strong>{item.name}</strong><span>创建于 {new Date(item.createdAt).toLocaleString()}</span></div><button className="danger-button" onClick={() => void revoke(item.id)} type="button">撤销</button></div>)}</div>}</section>
 }
 
-function FloccusGuide() { return <section className="panel"><div className="panel-heading"><div><p className="eyebrow">CLIENT SETUP</p><h3>Floccus 配置向导</h3></div></div><div className="guide-list"><GuideStep number="01" title="准备 WebDAV 地址" content="应用密码创建后，这里会显示专属 WebDAV 地址。" /><GuideStep number="02" title="安装官方 Floccus" content="在浏览器插件市场搜索 Floccus 并安装。" /><GuideStep number="03" title="开启客户端加密" content="在 Floccus 中设置 passphrase。服务器只保存加密后的 XBEL 文件。" /></div></section> }
+function FloccusGuide({ token, loginIdentifier }: { token: string; loginIdentifier: string }) {
+  const davUrl = `${window.location.origin}/dav/${loginIdentifier}/`
+  const [passwordName, setPasswordName] = useState('Floccus 书签同步')
+  const [createdSecret, setCreatedSecret] = useState<string | null>(null)
+  const [creating, setCreating] = useState(false)
+  const [error, setError] = useState('')
+
+  async function handleCreate() {
+    if (!passwordName.trim()) return
+    setCreating(true)
+    setError('')
+    try {
+      const item = await api.createAppPassword(token, passwordName.trim())
+      setCreatedSecret(item.secret ?? null)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '创建失败')
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  return (
+    <section className="panel">
+      <div className="panel-heading">
+        <div>
+          <p className="eyebrow">CLIENT SETUP</p>
+          <h3>Floccus 配置向导</h3>
+        </div>
+      </div>
+      <p className="floccus-intro">按以下四步完成 Floccus 与 Bookmark Vault 的连接。每台设备建议使用独立的应用密码。</p>
+
+      <div className="guide-step-card">
+        <div className="guide-step-num">1</div>
+        <div className="guide-step-body">
+          <h4>为 Floccus 创建应用密码</h4>
+          <p>应用密码只用于 WebDAV 认证，撤销时不影响账号登录。</p>
+          {createdSecret ? (
+            <div className="secret-box">
+              <strong>请立即保存，此密码只显示一次</strong>
+              <code>{createdSecret}</code>
+              <button className="ghost-button" onClick={() => { void navigator.clipboard?.writeText(createdSecret) }} type="button">复制</button>
+            </div>
+          ) : (
+            <>
+              <div className="password-create">
+                <input value={passwordName} onChange={(e) => setPasswordName(e.target.value)} placeholder="例如：Chrome 工作浏览器" />
+                <button className="primary-button compact" disabled={creating || !passwordName.trim()} onClick={() => { void handleCreate() }} type="button">
+                  {creating ? '创建中…' : '创建应用密码'}
+                </button>
+              </div>
+              {error && <p className="form-error">{error}</p>}
+            </>
+          )}
+        </div>
+      </div>
+
+      <div className="guide-step-card">
+        <div className="guide-step-num">2</div>
+        <div className="guide-step-body">
+          <h4>安装官方 Floccus</h4>
+          <p>在浏览器插件市场搜索 <strong>Floccus Bookmarks Sync</strong> 并安装，或点击下方直达链接。</p>
+          <div className="browser-links">
+            <a className="browser-link-btn" href="https://chromewebstore.google.com/detail/floccus-bookmarks-sync/fnaicdffflnofjppbagibeoednhnbjhg" rel="noreferrer" target="_blank">Chrome 应用商店</a>
+            <a className="browser-link-btn" href="https://addons.mozilla.org/firefox/addon/floccus/" rel="noreferrer" target="_blank">Firefox Add-ons</a>
+            <a className="browser-link-btn" href="https://microsoftedge.microsoft.com/addons/detail/floccus-bookmarks-sync/gjkddcofhiifldbllobcamllmanombji" rel="noreferrer" target="_blank">Edge 应用商店</a>
+          </div>
+        </div>
+      </div>
+
+      <div className="guide-step-card">
+        <div className="guide-step-num">3</div>
+        <div className="guide-step-body">
+          <h4>在 Floccus 中填写 WebDAV 配置</h4>
+          <p>打开 Floccus 设置页，选择 <strong>WebDAV（XBEL）</strong>，依次填入以下字段：</p>
+          <div className="config-fields">
+            <ConfigField label="WebDAV 地址" value={davUrl} />
+            <ConfigField label="用户名" value={loginIdentifier} />
+            <ConfigField label="应用密码" value={createdSecret ?? '（请先在上方创建应用密码）'} copyable={Boolean(createdSecret)} />
+            <ConfigField label="文件名（Bookmarks file）" value="bookmarks.xbel" />
+          </div>
+        </div>
+      </div>
+
+      <div className="guide-step-card">
+        <div className="guide-step-num">4</div>
+        <div className="guide-step-body">
+          <h4>开启客户端加密（强烈推荐）</h4>
+          <div className="security-notice">
+            <span>!</span>
+            <p>在 Floccus 配置页开启 <strong>加密 / passphrase</strong>。服务器只会保存加密后的 XBEL 文件，无法读取书签内容。<strong>passphrase 不上传，丢失后无法找回书签，请妥善保存。</strong></p>
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function ConfigField({ label, value, copyable = true }: { label: string; value: string; copyable?: boolean }) {
+  const [copied, setCopied] = useState(false)
+  function copy() {
+    if (!copyable) return
+    void navigator.clipboard?.writeText(value)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+  return (
+    <div className="config-field">
+      <span className="config-field-label">{label}</span>
+      <code className={`config-field-value ${!copyable ? 'config-field-muted' : ''}`}>{value}</code>
+      {copyable && (
+        <button className="copy-btn" onClick={copy} title="复制" type="button">
+          {copied ? '✓ 已复制' : '复制'}
+        </button>
+      )}
+    </div>
+  )
+}
 function GuideStep({ number, title, content }: { number: string; title: string; content: string }) { return <div className="guide-step"><span>{number}</span><div><h4>{title}</h4><p>{content}</p></div></div> }
 function Security() { return <section className="panel"><div className="panel-heading"><div><p className="eyebrow">SECURITY</p><h3>账户安全</h3></div></div><div className="security-notice"><span>i</span><p>Bookmark Vault 不保存 Floccus passphrase。忘记 passphrase 后，服务器无法解密或恢复书签内容。</p></div><button className="danger-button" type="button">删除账户</button></section> }
 function ComingSoon({ label }: { label: string }) { return <section className="panel coming-soon"><span className="coming-icon">✦</span><h3>{label}</h3><p>这个管理模块正在设计中，书签管理和侧边栏会保持独立运行。</p></section> }
