@@ -277,3 +277,22 @@ h1, h2, h3, h4, p { margin-top: 0; }
   .browser-links { flex-direction: column; }
   .browser-link-btn { justify-content: center; }
 }
+
+/* ── 加密存储摘要 ─────────────────────────────────────── */
+.storage-encryption-badge { display: inline-flex; align-items: center; padding: 7px 11px; border-radius: 99px; color: #23845a; background: #eaf8f0; font-size: 12px; font-weight: 700; white-space: nowrap; }
+.storage-panel { margin-top: 15px; }
+.storage-summary { display: flex; gap: 17px; align-items: flex-start; padding: 20px; border: 1px solid #e0e9f3; border-radius: 12px; background: #f8fbff; }
+.storage-summary-icon { display: grid; flex: 0 0 auto; place-items: center; width: 44px; height: 44px; border-radius: 12px; color: var(--blue); background: #eaf2ff; font-size: 22px; }
+.storage-summary-content { min-width: 0; flex: 1; }
+.storage-summary-content > strong { color: #23344d; font-size: 15px; }
+.storage-summary-content > p { margin: 7px 0 18px; color: #738196; font-size: 13px; line-height: 1.65; }
+.storage-details { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 28px; margin: 0; }
+.storage-details div { display: flex; justify-content: space-between; gap: 18px; padding-top: 9px; border-top: 1px solid #e5edf6; }
+.storage-details dt { color: #8390a2; font-size: 12px; }
+.storage-details dd { margin: 0; color: #33445c; font-size: 12px; font-weight: 700; text-align: right; }
+
+@media (max-width: 680px) {
+  .storage-encryption-badge { margin-left: auto; }
+  .storage-summary { padding: 16px; }
+  .storage-details { grid-template-columns: 1fr; }
+}

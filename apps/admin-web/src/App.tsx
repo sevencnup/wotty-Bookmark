@@ -1,10 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
-import type { FormEvent } from 'react'
+import { useEffect, useState } from 'react'
 import * as api from './api'
 
 type AdminSection =
   | 'overview'
-  | 'bookmark-management'
+  | 'storage'
   | 'categories'
   | 'tags'
   | 'trash'
@@ -20,31 +19,9 @@ type AdminSection =
   | 'help'
   | 'about'
 
-type Bookmark = {
-  id: string
-  title: string
-  url: string
-  category: string
-  tags: string[]
-  updatedAt: string
-}
-
-type BookmarkDraft = Omit<Bookmark, 'id' | 'updatedAt' | 'tags'> & { tags: string }
-
-const initialBookmarks: Bookmark[] = [
-  { id: 'bing', title: '必应搜索', url: 'https://www.bing.com', category: '搜索引擎', tags: ['搜索', '常用'], updatedAt: '2024-05-20 14:30' },
-  { id: 'google', title: 'Google', url: 'https://www.google.com', category: '搜索引擎', tags: ['搜索', '常用'], updatedAt: '2024-05-20 14:28' },
-  { id: 'github', title: 'GitHub', url: 'https://github.com', category: '开发工具', tags: ['开发', '代码'], updatedAt: '2024-05-19 22:15' },
-  { id: 'stackoverflow', title: 'Stack Overflow', url: 'https://stackoverflow.com', category: '开发工具', tags: ['开发', '技术'], updatedAt: '2024-05-19 21:40' },
-  { id: 'youtube', title: 'YouTube', url: 'https://www.youtube.com', category: '娱乐网站', tags: ['视频', '娱乐'], updatedAt: '2024-05-18 18:30' },
-  { id: 'gmail', title: 'Gmail', url: 'https://mail.google.com', category: '邮箱', tags: ['邮件', '常用'], updatedAt: '2024-05-18 09:15' },
-  { id: 'twitter', title: 'Twitter', url: 'https://twitter.com', category: '社交媒体', tags: ['社交', '资讯'], updatedAt: '2024-05-17 16:22' },
-  { id: 'taobao', title: '淘宝网', url: 'https://www.taobao.com', category: '购物', tags: ['购物', '生活'], updatedAt: '2024-05-17 11:08' },
-]
-
 type NavIconName =
   | 'overview'
-  | 'bookmark-management'
+  | 'storage'
   | 'categories'
   | 'tags'
   | 'trash'
@@ -59,6 +36,7 @@ type NavIconName =
   | 'about'
   | 'sync'
 
+
 type NavItem = { id: AdminSection; label: string; icon: NavIconName }
 type NavGroup = { label?: string; items: NavItem[] }
 
@@ -67,7 +45,7 @@ const navGroups: NavGroup[] = [
   {
     label: '数据管理',
     items: [
-      { id: 'bookmark-management', label: '书签管理', icon: 'bookmark-management' },
+      { id: 'storage', label: '存储文件', icon: 'storage' },
       { id: 'categories', label: '分类管理', icon: 'categories' },
       { id: 'tags', label: '标签管理', icon: 'tags' },
       { id: 'trash', label: '回收站', icon: 'trash' },
@@ -106,7 +84,7 @@ function allNavItems() {
 
 const navIconPaths: Record<NavIconName, string> = {
   overview: 'M3 10.5 12 3l9 7.5M5.5 9.5V21h13V9.5M9 21v-6h6v6',
-  'bookmark-management': 'M6 4h12v17l-6-3.5L6 21V4Z',
+  storage: 'M4 5h16v14H4V5Zm4 4h8M8 13h5M8 16h3',
   categories: 'M3 6h7l2 2h9v11H3V6Z',
   tags: 'M4 5h7l8 8-6 6-8-8V5ZM7.5 8.5h.01',
   trash: 'M5 7h14M10 11v5M14 11v5M9 7V4h6v3m-9 0 1 14h10l1-14',
@@ -127,7 +105,7 @@ function NavIcon({ name }: { name: NavIconName }) {
 }
 
 function App() {
-  const [activeSection, setActiveSection] = useState<AdminSection>('bookmark-management')
+  const [activeSection, setActiveSection] = useState<AdminSection>('overview')
   const [session, setSession] = useState<api.Session | null>(null)
 
   if (!session) {
@@ -135,7 +113,7 @@ function App() {
   }
 
   const activeLabel = allNavItems().find((item) => item.id === activeSection)?.label ?? '管理后台'
-  const isBookmarkWorkspace = activeSection === 'bookmark-management'
+  const isStorageWorkspace = activeSection === 'storage'
 
   return (
     <div className="app-shell">
@@ -163,9 +141,9 @@ function App() {
           ))}
         </nav>
       </aside>
-      <main className={`main-content ${isBookmarkWorkspace ? 'bookmark-main-content' : ''}`}>
-        {isBookmarkWorkspace ? (
-          <BookmarkManagement />
+      <main className={`main-content ${isStorageWorkspace ? 'bookmark-main-content' : ''}`}>
+        {isStorageWorkspace ? (
+          <StorageFiles token={session.token} onOpenFloccus={() => setActiveSection('floccus')} />
         ) : (
           <>
             <header className="topbar">
@@ -227,146 +205,64 @@ function LoginCard({ onLogin }: { onLogin: (session: api.Session) => void }) {
   )
 }
 
-function BookmarkManagement() {
-  const [items, setItems] = useState<Bookmark[]>(initialBookmarks)
-  const [search, setSearch] = useState('')
-  const [activeCategory, setActiveCategory] = useState('全部')
-  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list')
-  const [selected, setSelected] = useState<Set<string>>(new Set())
-  const [openMenu, setOpenMenu] = useState<string | null>(null)
-  const [editing, setEditing] = useState<Bookmark | null>(null)
-  const [showCreate, setShowCreate] = useState(false)
-  const [notice, setNotice] = useState('')
-
-  const categories = useMemo(() => ['全部', ...new Set(items.map((item) => item.category))], [items])
-  const filteredItems = useMemo(() => {
-    const query = search.trim().toLocaleLowerCase()
-    return items.filter((item) => {
-      const matchesCategory = activeCategory === '全部' || item.category === activeCategory
-      const matchesQuery = !query || `${item.title} ${item.url} ${item.tags.join(' ')}`.toLocaleLowerCase().includes(query)
-      return matchesCategory && matchesQuery
-    })
-  }, [activeCategory, items, search])
-  const totalCount = 148 + items.length - initialBookmarks.length
-  const categoryCount = Math.max(12, categories.length - 1)
+function StorageFiles({ token, onOpenFloccus }: { token: string; onOpenFloccus: () => void }) {
+  const [storage, setStorage] = useState<api.StorageStatus | null>(null)
+  const [error, setError] = useState('')
 
   useEffect(() => {
-    if (!notice) return
-    const timer = window.setTimeout(() => setNotice(''), 3200)
-    return () => window.clearTimeout(timer)
-  }, [notice])
-
-  function toggleSelected(id: string) {
-    setSelected((current) => {
-      const next = new Set(current)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
+    api.getStorageStatus(token).then(setStorage).catch((requestError) => {
+      setError(requestError instanceof Error ? requestError.message : '读取存储状态失败')
     })
-  }
-
-  function toggleAll() {
-    setSelected((current) => current.size === filteredItems.length ? new Set() : new Set(filteredItems.map((item) => item.id)))
-  }
-
-  function removeBookmark(id: string) {
-    setItems((current) => current.filter((item) => item.id !== id))
-    setSelected((current) => {
-      const next = new Set(current)
-      next.delete(id)
-      return next
-    })
-    setOpenMenu(null)
-    setNotice('书签已移入回收站')
-  }
-
-  function saveBookmark(draft: BookmarkDraft) {
-    const tags = draft.tags.split(/[,，]/).map((tag) => tag.trim()).filter(Boolean).slice(0, 4)
-    if (editing) {
-      setItems((current) => current.map((item) => item.id === editing.id ? { ...item, ...draft, tags, updatedAt: '刚刚' } : item))
-      setNotice('书签已更新')
-    } else {
-      setItems((current) => [{ ...draft, tags, id: `bookmark-${Date.now()}`, updatedAt: '刚刚' }, ...current])
-      setNotice('书签已创建')
-    }
-    setEditing(null)
-    setShowCreate(false)
-  }
+  }, [token])
 
   return (
     <>
       <header className="bookmark-topbar">
-        <div className="page-heading"><h1>书签管理</h1><span>管理你的所有书签</span></div>
-        <label className="global-search"><span>⌕</span><input aria-label="搜索书签、网址、标签" onChange={(event) => setSearch(event.target.value)} placeholder="搜索书签、网址、标签..." type="search" value={search} /></label>
-        <button className="account-chip" type="button"><span className="avatar">A</span><span>Admin</span><span className="account-chevron">⌄</span></button>
+        <div className="page-heading"><h1>存储文件</h1><span>服务端保存的加密同步数据</span></div>
+        <span className="storage-encryption-badge">端到端加密</span>
       </header>
-
       <div className="bookmark-content">
         <div className="stat-grid">
-          <StatCard icon="▮" iconTone="blue" label="全部书签" value={String(totalCount)} suffix="个" detail="较上周" trend="↑ 12%" />
-          <StatCard icon="▰" iconTone="green" label="分类数量" value={String(categoryCount)} suffix="个" detail="个分类" />
-          <StatCard icon="◆" iconTone="purple" label="标签数量" value="28" suffix="个" detail="个标签" />
-          <StatCard icon="◎" iconTone="orange" label="最近添加" value="8" suffix="个" detail="本周" />
+          <StatCard icon="↔" iconTone="blue" label="同步文件" value={storage ? String(storage.files) : '—'} suffix="个" detail={storage?.lastModifiedAt ? `最近同步 ${formatDate(storage.lastModifiedAt)}` : '尚未同步'} />
+          <StatCard icon="▣" iconTone="green" label="存储占用" value={storage ? formatBytes(storage.bytes) : '—'} suffix="" detail={storage ? `单文件上限 ${formatBytes(storage.maxFileBytes)}` : '读取中'} />
+          <StatCard icon="◇" iconTone="purple" label="同步状态" value={storage?.files ? '正常' : '待配置'} suffix="" detail={storage?.lastModifiedAt ? formatDate(storage.lastModifiedAt) : '配置 Floccus 后开始同步'} />
         </div>
-
-        <div className="bookmark-toolbar">
-          <button className="blue-button" onClick={() => setShowCreate(true)} type="button"><span>＋</span> 新建书签</button>
-          <button className="toolbar-button" onClick={() => setNotice('分类管理即将开放')} type="button"><span>□</span> 新建分类</button>
-          <button className="toolbar-button" disabled={!selected.size} onClick={() => setNotice(`已选择 ${selected.size} 个书签`)} type="button"><span>⇩</span> 批量操作 <span className="down-caret">⌄</span></button>
-          <button className="toolbar-button" onClick={() => setNotice('更多操作即将开放')} type="button">··· 更多操作 <span className="down-caret">⌄</span></button>
-          <div className="toolbar-spacer" />
-          <div className="view-toggle" aria-label="视图模式">
-            <button className={viewMode === 'list' ? 'selected' : ''} onClick={() => setViewMode('list')} title="列表视图" type="button">☷</button>
-            <button className={viewMode === 'grid' ? 'selected' : ''} onClick={() => setViewMode('grid')} title="网格视图" type="button">⊞</button>
+        <section className="panel storage-panel">
+          <div className="panel-heading">
+            <div><p className="eyebrow">ENCRYPTED STORAGE</p><h3>服务器存储摘要</h3></div>
           </div>
-          <label className="filter-button"><span>≡</span><select aria-label="按分类筛选" onChange={(event) => setActiveCategory(event.target.value)} value={activeCategory}>{categories.map((category) => <option key={category}>{category}</option>)}</select></label>
-        </div>
-
-        <div className={`bookmark-table-shell ${viewMode === 'grid' ? 'grid-view' : ''}`}>
-          {viewMode === 'list' && <div className="bookmark-table-head"><label className="checkbox-wrap"><input checked={filteredItems.length > 0 && selected.size === filteredItems.length} onChange={toggleAll} type="checkbox" /><span /></label><span>名称⌄</span><span>网址</span><span>分类</span><span>标签</span><span>修改时间</span><span /></div>}
-          {filteredItems.length ? filteredItems.map((item) => <BookmarkRow item={item} key={item.id} menuOpen={openMenu === item.id} onDelete={removeBookmark} onEdit={(bookmark) => { setEditing(bookmark); setOpenMenu(null) }} onMenu={() => setOpenMenu((current) => current === item.id ? null : item.id)} onSelect={toggleSelected} selected={selected.has(item.id)} viewMode={viewMode} />) : <div className="bookmark-empty"><span>⌕</span><strong>没有找到匹配的书签</strong><p>尝试更换搜索词或筛选条件。</p></div>}
-        </div>
-
-        <div className="bookmark-footer-row"><span>共 {totalCount} 条</span><div className="pagination"><button disabled type="button">‹</button><button className="current" type="button">1</button><button type="button">2</button><button type="button">3</button><button type="button">4</button><button type="button">5</button><span>…</span><button type="button">15</button><button type="button">›</button></div><button className="page-size" type="button">10 条/页⌄</button></div>
-        <p className="workspace-note">书签管理系统 © 2024 · 服务端只保存 Floccus 加密数据，书签内容由浏览器和 Floccus 管理</p>
+          {error ? (
+            <div className="empty-state"><span>!</span><h4>无法读取存储状态</h4><p>{error}</p></div>
+          ) : storage ? (
+            <div className="storage-summary">
+              <div className="storage-summary-icon">▣</div>
+              <div className="storage-summary-content">
+                <strong>Floccus 同步数据</strong>
+                <p>服务端只保存加密后的同步文件，不解析、不展示书签名称、网址、分类或标签。</p>
+                <dl className="storage-details">
+                  <div><dt>文件数量</dt><dd>{storage.files} 个</dd></div>
+                  <div><dt>占用空间</dt><dd>{formatBytes(storage.bytes)}</dd></div>
+                  <div><dt>最近修改</dt><dd>{storage.lastModifiedAt ? formatDate(storage.lastModifiedAt) : '暂无记录'}</dd></div>
+                  <div><dt>单文件上限</dt><dd>{formatBytes(storage.maxFileBytes)}</dd></div>
+                </dl>
+              </div>
+            </div>
+          ) : (
+            <div className="empty-state"><span>…</span><h4>正在读取存储状态</h4><p>请稍候，正在从服务器获取真实数据。</p></div>
+          )}
+        </section>
+        <section className="panel storage-panel">
+          <div className="security-notice"><span>i</span><p>为了保护你的隐私，后台不会提供书签明文管理功能。请通过浏览器原生书签和 Floccus 管理书签内容。</p></div>
+          <button className="primary-button" onClick={onOpenFloccus} type="button">前往 Floccus 配置</button>
+        </section>
+        <p className="workspace-note">服务端只保存 Floccus 加密数据 · 书签内容由浏览器和 Floccus 管理</p>
       </div>
-
-      {notice && <div className="admin-toast" role="status">✓ {notice}</div>}
-      {(showCreate || editing) && <BookmarkModal bookmark={editing} onClose={() => { setShowCreate(false); setEditing(null) }} onSave={saveBookmark} />}
     </>
   )
 }
 
 function StatCard({ icon, iconTone, label, value, suffix, detail, trend }: { icon: string; iconTone: string; label: string; value: string; suffix: string; detail: string; trend?: string }) {
   return <div className="stat-card"><span className={`stat-icon ${iconTone}`}>{icon}</span><div><p>{label}</p><div className="stat-value"><strong>{value}</strong><span>{suffix}</span></div><small>{detail}{trend && <em>{trend}</em>}</small></div></div>
-}
-
-function BookmarkRow({ item, selected, menuOpen, viewMode, onSelect, onMenu, onEdit, onDelete }: { item: Bookmark; selected: boolean; menuOpen: boolean; viewMode: 'list' | 'grid'; onSelect: (id: string) => void; onMenu: () => void; onEdit: (item: Bookmark) => void; onDelete: (id: string) => void }) {
-  const host = getHostname(item.url)
-  return <div className={`bookmark-row ${viewMode === 'grid' ? 'bookmark-card' : ''} ${selected ? 'selected' : ''}`}>
-    {viewMode === 'list' ? <label className="checkbox-wrap row-checkbox"><input checked={selected} onChange={() => onSelect(item.id)} type="checkbox" /><span /></label> : <span className="card-mark">{item.title.slice(0, 1)}</span>}
-    <div className="bookmark-name"><SiteMark host={host} /><div><strong>{item.title}</strong><span>{item.url}</span></div></div>
-    {viewMode === 'list' && <><span className="bookmark-url-cell">{item.url}</span><span className="category-pill">{item.category}</span><span className="tag-list">{item.tags.map((tag) => <em className={`tag tag-${tag.length % 4}`} key={tag}>{tag}</em>)}</span><span className="updated-time">{item.updatedAt}</span></>}
-    {viewMode === 'grid' && <div className="grid-card-meta"><span className="category-pill">{item.category}</span><span>{item.tags.join(' · ')}</span></div>}
-    <div className="row-menu-wrap"><button aria-label={`操作：${item.title}`} className="row-menu-button" onClick={onMenu} type="button">⋮</button>{menuOpen && <div className="row-menu"><button onClick={() => onEdit(item)} type="button">编辑书签</button><button className="menu-danger" onClick={() => onDelete(item.id)} type="button">移入回收站</button></div>}</div>
-  </div>
-}
-
-function SiteMark({ host }: { host: string }) {
-  const letter = host.replace(/^www\./, '').slice(0, 1).toUpperCase()
-  const tone = host.length % 4
-  return <span className={`site-mark site-mark-${tone}`}>{letter}</span>
-}
-
-function BookmarkModal({ bookmark, onClose, onSave }: { bookmark: Bookmark | null; onClose: () => void; onSave: (draft: BookmarkDraft) => void }) {
-  const [draft, setDraft] = useState<BookmarkDraft>({ title: bookmark?.title ?? '', url: bookmark?.url ?? '', category: bookmark?.category ?? '未分类', tags: bookmark?.tags.join(', ') ?? '' })
-  const submit = (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); if (draft.title.trim() && draft.url.trim()) onSave({ ...draft, title: draft.title.trim(), url: draft.url.trim(), category: draft.category.trim() || '未分类' }) }
-  return <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}><section aria-labelledby="bookmark-modal-title" className="admin-modal"><div className="modal-heading"><div><p className="eyebrow">{bookmark ? 'EDIT BOOKMARK' : 'NEW BOOKMARK'}</p><h2 id="bookmark-modal-title">{bookmark ? '编辑书签' : '新建书签'}</h2></div><button aria-label="关闭" className="modal-close" onClick={onClose} type="button">×</button></div><form onSubmit={submit}><label>名称<input autoFocus onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))} placeholder="例如：设计灵感" required type="text" value={draft.title} /></label><label>网址<input onChange={(event) => setDraft((current) => ({ ...current, url: event.target.value }))} placeholder="https://example.com" required type="url" value={draft.url} /></label><label>分类<input onChange={(event) => setDraft((current) => ({ ...current, category: event.target.value }))} placeholder="例如：开发工具" type="text" value={draft.category} /></label><label>标签 <span className="label-hint">用逗号分隔</span><input onChange={(event) => setDraft((current) => ({ ...current, tags: event.target.value }))} placeholder="常用, 工作" type="text" value={draft.tags} /></label><div className="modal-actions"><button className="toolbar-button" onClick={onClose} type="button">取消</button><button className="blue-button" type="submit">{bookmark ? '保存修改' : '创建书签'}</button></div></form></section></div>
-}
-
-function getHostname(url: string) {
-  try { return new URL(url).hostname }
-  catch { return url }
 }
 
 function Overview({ token }: { token: string }) {
