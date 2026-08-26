@@ -4,6 +4,11 @@
   "version": "0.1.0",
   "packageManager": "pnpm@11.23.0",
   "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "dev:infra": "docker compose -f infra/docker-compose.yml up -d --build",
+    "dev:frontend": "pnpm --filter @bookmark-vault/admin-web dev",
+    "dev:sidebar": "pnpm --filter @bookmark-vault/sidebar-extension dev",
+    "dev:stop": "docker compose -f infra/docker-compose.yml down",
     "dev:admin": "pnpm --filter @bookmark-vault/admin-web dev",
     "build:admin": "pnpm --filter @bookmark-vault/admin-web build",
     "build:sidebar": "pnpm --filter @bookmark-vault/sidebar-extension build",

@@ -1,4 +1,29 @@
 import { useEffect, useState } from 'react'
+import {
+  LayoutDashboard,
+  HardDrive,
+  FolderTree,
+  Tags,
+  Trash2,
+  KeyRound,
+  RefreshCw,
+  Cloud,
+  Laptop,
+  ScrollText,
+  User,
+  Sliders,
+  ArrowUpDown,
+  HelpCircle,
+  Info,
+  Folder,
+  Home,
+  Search,
+  ExternalLink,
+  Shield,
+  Check,
+  Copy,
+  Sparkles,
+} from 'lucide-react'
 import * as api from './api'
 
 type AdminSection =
@@ -84,74 +109,41 @@ function allNavItems() {
   return navGroups.flatMap((group) => group.items)
 }
 
-const navIconPaths: Record<NavIconName, string> = {
-  overview: 'M3 10.5 12 3l9 7.5M5.5 9.5V21h13V9.5M9 21v-6h6v6',
-  storage: 'M4 5h16v14H4V5Zm4 4h8M8 13h5M8 16h3',
-  categories: 'M3 6h7l2 2h9v11H3V6Z',
-  tags: 'M4 5h7l8 8-6 6-8-8V5ZM7.5 8.5h.01',
-  trash: 'M5 7h14M10 11v5M14 11v5M9 7V4h6v3m-9 0 1 14h10l1-14',
-  passwords: 'M7 10V7a5 5 0 0 1 10 0v3M5 10h14v10H5V10Zm7 4v2',
-  backup: 'M6 18.5h11.5a3.5 3.5 0 0 0 .5-7A6 6 0 0 0 6.5 10 4.5 4.5 0 0 0 6 18.5ZM12 9v8m0 0-3-3m3 3 3-3',
-  devices: 'M4 5h16v11H4V5Zm-2 14h20M9 19l1-3h4l1 3',
-  'audit-log': 'M6 3h9l3 3v15H6V3Zm9 0v4h3M9 12h6M9 16h4',
-  account: 'M19 21a7 7 0 0 0-14 0M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z',
-  preferences: 'M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Zm0-5v2M12 18.5v2M3.5 12h2M18.5 12h2M6 6l1.5 1.5M16.5 16.5 18 18M18 6l-1.5 1.5M7.5 16.5 6 18',
-  'import-export': 'M12 3v12m0 0-4-4m4 4 4-4M5 18v3h14v-3',
-  help: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm0-5h.01M9.8 9a2.3 2.3 0 1 1 3.7 1.8c-.9.7-1.5 1.1-1.5 2.2',
-  about: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm0-10v5m0-8h.01',
-  sync: 'M4 4v5h5M20 20v-5h-5M4.5 14.5A8.5 8.5 0 0 0 19.5 12M19.5 9.5A8.5 8.5 0 0 0 4.5 12',
-}
-
-function NavIcon({ name }: { name: NavIconName }) {
-  return <svg aria-hidden="true" className="nav-svg-icon" fill="none" height="18" viewBox="0 0 24 24" width="18" xmlns="http://www.w3.org/2000/svg"><path d={navIconPaths[name]} stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" /></svg>
-}
-
-function FolderIcon() {
-  return (
-    <svg aria-hidden="true" fill="none" height="15" viewBox="0 0 24 24" width="15" xmlns="http://www.w3.org/2000/svg">
-      <path d="M3 6h7l2 2h9v11H3V6Z" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
-    </svg>
-  )
-}
-
-function HomeIcon() {
-  return (
-    <svg aria-hidden="true" fill="none" height="15" viewBox="0 0 24 24" width="15" xmlns="http://www.w3.org/2000/svg">
-      <path d="M3 10.5 12 3l9 7.5M5.5 9.5V21h13V9.5M9 21v-6h6v6" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
-    </svg>
-  )
-}
-
-function SearchIcon() {
-  return (
-    <svg aria-hidden="true" fill="none" height="15" viewBox="0 0 24 24" width="15" xmlns="http://www.w3.org/2000/svg">
-      <path d="m20 20-4.3-4.3M10.8 18a7.2 7.2 0 1 0 0-14.4 7.2 7.2 0 0 0 0 14.4Z" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
-    </svg>
-  )
-}
-
-function SyncIcon({ size = 18 }: { size?: number }) {
-  return (
-    <svg aria-hidden="true" fill="none" height={size} viewBox="0 0 24 24" width={size} xmlns="http://www.w3.org/2000/svg">
-      <path d="M4 4v5h5M20 20v-5h-5M4.5 14.5A8.5 8.5 0 0 0 19.5 12M19.5 9.5A8.5 8.5 0 0 0 4.5 12" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
-    </svg>
-  )
-}
-
-function StorageIcon({ size = 18 }: { size?: number }) {
-  return (
-    <svg aria-hidden="true" fill="none" height={size} viewBox="0 0 24 24" width={size} xmlns="http://www.w3.org/2000/svg">
-      <path d="M4 5h16v14H4V5Zm4 4h8M8 13h5M8 16h3" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
-    </svg>
-  )
-}
-
-function KeyIcon({ size = 18 }: { size?: number }) {
-  return (
-    <svg aria-hidden="true" fill="none" height={size} viewBox="0 0 24 24" width={size} xmlns="http://www.w3.org/2000/svg">
-      <path d="M7 10V7a5 5 0 0 1 10 0v3M5 10h14v10H5V10Zm7 4v2" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
-    </svg>
-  )
+function NavIcon({ name, size = 18 }: { name: NavIconName; size?: number }) {
+  switch (name) {
+    case 'overview':
+      return <LayoutDashboard size={size} strokeWidth={1.8} />
+    case 'storage':
+      return <HardDrive size={size} strokeWidth={1.8} />
+    case 'categories':
+      return <FolderTree size={size} strokeWidth={1.8} />
+    case 'tags':
+      return <Tags size={size} strokeWidth={1.8} />
+    case 'trash':
+      return <Trash2 size={size} strokeWidth={1.8} />
+    case 'passwords':
+      return <KeyRound size={size} strokeWidth={1.8} />
+    case 'sync':
+      return <RefreshCw size={size} strokeWidth={1.8} />
+    case 'backup':
+      return <Cloud size={size} strokeWidth={1.8} />
+    case 'devices':
+      return <Laptop size={size} strokeWidth={1.8} />
+    case 'audit-log':
+      return <ScrollText size={size} strokeWidth={1.8} />
+    case 'account':
+      return <User size={size} strokeWidth={1.8} />
+    case 'preferences':
+      return <Sliders size={size} strokeWidth={1.8} />
+    case 'import-export':
+      return <ArrowUpDown size={size} strokeWidth={1.8} />
+    case 'help':
+      return <HelpCircle size={size} strokeWidth={1.8} />
+    case 'about':
+      return <Info size={size} strokeWidth={1.8} />
+    default:
+      return <Info size={size} strokeWidth={1.8} />
+  }
 }
 
 function BrandLogo({ size = 18 }: { size?: number }) {
@@ -313,9 +305,9 @@ function StorageFiles({ token, onOpenFloccus }: { token: string; onOpenFloccus: 
       </header>
       <div className="bookmark-content">
         <div className="stat-grid">
-          <StatCard icon={<SyncIcon size={20} />} iconTone="blue" label="同步文件" value={storage ? String(storage.files) : '—'} suffix="个" detail={storage?.lastModifiedAt ? `最近同步 ${formatDate(storage.lastModifiedAt)}` : '尚未同步'} />
-          <StatCard icon={<StorageIcon size={20} />} iconTone="green" label="存储占用" value={storage ? formatBytes(storage.bytes) : '—'} suffix="" detail={storage ? `单文件上限 ${formatBytes(storage.maxFileBytes)}` : '读取中'} />
-          <StatCard icon={<KeyIcon size={20} />} iconTone="purple" label="同步状态" value={storage?.files ? '正常' : '待配置'} suffix="" detail={storage?.lastModifiedAt ? formatDate(storage.lastModifiedAt) : '配置 Floccus 后开始同步'} />
+          <StatCard icon={<RefreshCw size={20} strokeWidth={1.8} />} iconTone="blue" label="同步文件" value={storage ? String(storage.files) : '—'} suffix="个" detail={storage?.lastModifiedAt ? `最近同步 ${formatDate(storage.lastModifiedAt)}` : '尚未同步'} />
+          <StatCard icon={<HardDrive size={20} strokeWidth={1.8} />} iconTone="green" label="存储占用" value={storage ? formatBytes(storage.bytes) : '—'} suffix="" detail={storage ? `单文件上限 ${formatBytes(storage.maxFileBytes)}` : '读取中'} />
+          <StatCard icon={<KeyRound size={20} strokeWidth={1.8} />} iconTone="purple" label="同步状态" value={storage?.files ? '正常' : '待配置'} suffix="" detail={storage?.lastModifiedAt ? formatDate(storage.lastModifiedAt) : '配置 Floccus 后开始同步'} />
         </div>
         <section className="panel storage-panel">
           <div className="panel-heading">
@@ -325,7 +317,7 @@ function StorageFiles({ token, onOpenFloccus }: { token: string; onOpenFloccus: 
             <div className="empty-state"><span>!</span><h4>无法读取存储状态</h4><p>{error}</p></div>
           ) : storage ? (
             <div className="storage-summary">
-              <div className="storage-summary-icon"><StorageIcon size={24} /></div>
+              <div className="storage-summary-icon"><HardDrive size={24} strokeWidth={1.8} /></div>
               <div className="storage-summary-content">
                 <strong>Floccus 同步数据</strong>
                 <p>服务端只保存加密后的同步文件，不解析、不展示书签名称、网址、分类或标签。</p>
@@ -371,12 +363,12 @@ function Overview({ token }: { token: string }) {
           <h2>从 Floccus 开始同步你的书签</h2>
           <p>服务器只保存 Floccus 加密后的 XBEL 文件，书签内容安全且不会在后台明文展示。</p>
         </div>
-        <div className="hero-symbol"><SyncIcon size={36} /></div>
+        <div className="hero-symbol"><RefreshCw size={36} strokeWidth={1.8} /></div>
       </section>
       <div className="stats-grid">
-        <StatCard icon={<SyncIcon size={20} />} iconTone="blue" label="同步文件" value={storage ? String(storage.files) : '—'} suffix="个" detail={storage?.lastModifiedAt ? `最近同步 ${formatDate(storage.lastModifiedAt)}` : '尚未配置 Floccus'} />
-        <StatCard icon={<StorageIcon size={20} />} iconTone="green" label="存储占用" value={storage ? formatBytes(storage.bytes) : '—'} suffix="" detail={storage ? `单文件上限 ${formatBytes(storage.maxFileBytes)}` : '读取中'} />
-        <StatCard icon={<KeyIcon size={20} />} iconTone="purple" label="应用密码" value={passwordCount === null ? '—' : String(passwordCount)} suffix="个" detail="建议为每台设备单独创建" />
+        <StatCard icon={<RefreshCw size={20} strokeWidth={1.8} />} iconTone="blue" label="同步文件" value={storage ? String(storage.files) : '—'} suffix="个" detail={storage?.lastModifiedAt ? `最近同步 ${formatDate(storage.lastModifiedAt)}` : '尚未配置 Floccus'} />
+        <StatCard icon={<HardDrive size={20} strokeWidth={1.8} />} iconTone="green" label="存储占用" value={storage ? formatBytes(storage.bytes) : '—'} suffix="" detail={storage ? `单文件上限 ${formatBytes(storage.maxFileBytes)}` : '读取中'} />
+        <StatCard icon={<KeyRound size={20} strokeWidth={1.8} />} iconTone="purple" label="应用密码" value={passwordCount === null ? '—' : String(passwordCount)} suffix="个" detail="建议为每台设备单独创建" />
       </div>
       <section className="panel">
         <div className="panel-heading">
@@ -559,15 +551,15 @@ function BookmarkOrganizer({ token, onOpenFloccus }: { token: string; onOpenFloc
         <div className="bookmark-workspace">
           <aside className="panel bookmark-folder-panel">
             <div className="bookmark-panel-heading"><div><p className="eyebrow">FOLDERS</p><h3>书签文件夹</h3></div><span>{folders.length}</span></div>
-            <button className={`folder-filter ${selectedFolderId === 'all' ? 'active' : ''}`} onClick={() => setSelectedFolderId('all')} type="button"><span><HomeIcon /></span><strong>全部书签</strong><small>{tree.bookmarks.length}</small></button>
+            <button className={`folder-filter ${selectedFolderId === 'all' ? 'active' : ''}`} onClick={() => setSelectedFolderId('all')} type="button"><span><Home size={15} strokeWidth={1.8} /></span><strong>全部书签</strong><small>{tree.bookmarks.length}</small></button>
             <div className="folder-tree">
-              {folders.map((folder) => <button className={`folder-filter ${selectedFolderId === folder.id ? 'active' : ''}`} key={folder.id} onClick={() => setSelectedFolderId(folder.id)} style={{ paddingLeft: `${12 + folder.depth * 16}px` }} type="button"><span><FolderIcon /></span><strong>{folder.title}</strong><small>{folder.bookmarkCount}</small></button>)}
+              {folders.map((folder) => <button className={`folder-filter ${selectedFolderId === folder.id ? 'active' : ''}`} key={folder.id} onClick={() => setSelectedFolderId(folder.id)} style={{ paddingLeft: `${12 + folder.depth * 16}px` }} type="button"><span><Folder size={15} strokeWidth={1.8} /></span><strong>{folder.title}</strong><small>{folder.bookmarkCount}</small></button>)}
             </div>
           </aside>
 
           <section className="bookmark-results">
             <div className="bookmark-toolbar organizer-toolbar">
-              <label className="bookmark-search"><span><SearchIcon /></span><input onChange={(event) => setQuery(event.target.value)} placeholder="搜索标题、网址或文件夹" type="search" value={query} /></label>
+              <label className="bookmark-search"><span><Search size={15} strokeWidth={1.8} /></span><input onChange={(event) => setQuery(event.target.value)} placeholder="搜索标题、网址或文件夹" type="search" value={query} /></label>
               <button className="toolbar-button" disabled={refreshing} onClick={() => void loadBookmarks(true)} type="button">{refreshing ? '刷新中…' : '刷新'}</button>
               <span className="toolbar-spacer" />
               <span className="bookmark-result-count">显示 {visibleBookmarks.length} / {tree.bookmarks.length}</span>
@@ -577,7 +569,7 @@ function BookmarkOrganizer({ token, onOpenFloccus }: { token: string; onOpenFloc
 
             <div className="bookmark-table-shell">
               <div className="bookmark-table-head"><label className="checkbox-wrap"><input checked={allVisibleSelected} onChange={toggleAllVisible} type="checkbox" /><span /></label><span>书签</span><span>网址</span><span>所在文件夹</span><span>操作</span></div>
-              {visibleBookmarks.length === 0 ? <div className="bookmark-empty"><span>⌕</span><strong>没有匹配的书签</strong><p>换个关键词，或切换左侧文件夹。</p></div> : visibleBookmarks.map((bookmark, index) => <div className={`bookmark-row ${selectedIds.has(bookmark.id) ? 'selected' : ''}`} key={bookmark.id}><label className="checkbox-wrap"><input checked={selectedIds.has(bookmark.id)} onChange={() => toggleSelection(bookmark.id)} type="checkbox" /><span /></label><div className="bookmark-name"><span className={`site-mark site-mark-${index % 4}`}>{(bookmark.title || '?').charAt(0).toUpperCase()}</span><div><strong title={bookmark.title}>{bookmark.title || '未命名书签'}</strong><span>{getBookmarkHost(bookmark.url)}</span></div></div><a className="bookmark-url-cell" href={bookmark.url} rel="noreferrer" target="_blank" title={bookmark.url}>{bookmark.url}</a><span className="category-pill" title={bookmark.folderPath}>{bookmark.folderPath || '根目录'}</span><a className="bookmark-open-link" href={bookmark.url} rel="noreferrer" target="_blank" title="打开书签" aria-label={`打开 ${bookmark.title || bookmark.url}`}>↗</a></div>)}
+              {visibleBookmarks.length === 0 ? <div className="bookmark-empty"><span><Search size={22} strokeWidth={1.8} /></span><strong>没有匹配的书签</strong><p>换个关键词，或切换左侧文件夹。</p></div> : visibleBookmarks.map((bookmark, index) => <div className={`bookmark-row ${selectedIds.has(bookmark.id) ? 'selected' : ''}`} key={bookmark.id}><label className="checkbox-wrap"><input checked={selectedIds.has(bookmark.id)} onChange={() => toggleSelection(bookmark.id)} type="checkbox" /><span /></label><div className="bookmark-name"><span className={`site-mark site-mark-${index % 4}`}>{(bookmark.title || '?').charAt(0).toUpperCase()}</span><div><strong title={bookmark.title}>{bookmark.title || '未命名书签'}</strong><span>{getBookmarkHost(bookmark.url)}</span></div></div><a className="bookmark-url-cell" href={bookmark.url} rel="noreferrer" target="_blank" title={bookmark.url}>{bookmark.url}</a><span className="category-pill" title={bookmark.folderPath}>{bookmark.folderPath || '根目录'}</span><a className="bookmark-open-link" href={bookmark.url} rel="noreferrer" target="_blank" title="打开书签" aria-label={`打开 ${bookmark.title || bookmark.url}`}><ExternalLink size={13} strokeWidth={1.8} /></a></div>)}
             </div>
             <p className="bookmark-index-note">书签内容仍由 Floccus 加密同步；此页面使用服务器索引进行查找和整理。</p>
           </section>
@@ -807,7 +799,7 @@ function ConfigField({ label, value, copyable = true }: { label: string; value: 
   )
 }
 function GuideStep({ number, title, content }: { number: string; title: string; content: string }) { return <div className="guide-step"><span>{number}</span><div><h4>{title}</h4><p>{content}</p></div></div> }
-function Security() { return <section className="panel"><div className="panel-heading"><div><p className="eyebrow">SECURITY</p><h3>账户安全</h3></div></div><div className="security-notice"><span>i</span><p>Bookmark Vault 不保存 Floccus passphrase。忘记 passphrase 后，服务器无法解密或恢复书签内容。</p></div><button className="danger-button" type="button">删除账户</button></section> }
-function ComingSoon({ label }: { label: string }) { return <section className="panel coming-soon"><span className="coming-icon">✦</span><h3>{label}</h3><p>这个管理模块正在设计中，书签管理和侧边栏会保持独立运行。</p></section> }
+function Security() { return <section className="panel"><div className="panel-heading"><div><p className="eyebrow">SECURITY</p><h3>账户安全</h3></div></div><div className="security-notice"><span><Shield size={14} strokeWidth={1.8} /></span><p>Bookmark Vault 不保存 Floccus passphrase。忘记 passphrase 后，服务器无法解密或恢复书签内容。</p></div><button className="danger-button" type="button">删除账户</button></section> }
+function ComingSoon({ label }: { label: string }) { return <section className="panel coming-soon"><span className="coming-icon"><Sparkles size={24} strokeWidth={1.8} /></span><h3>{label}</h3><p>这个管理模块正在设计中，书签管理和侧边栏会保持独立运行。</p></section> }
 
 export default App

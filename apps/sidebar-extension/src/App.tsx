@@ -1,6 +1,29 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, DragEvent, FormEvent, ReactNode } from 'react';
 import {
+  ArrowUpRight,
+  Bookmark,
+  Check,
+  ChevronDown,
+  ChevronRight,
+  Copy,
+  ExternalLink,
+  Folder,
+  Globe,
+  GripVertical,
+  Link2,
+  MoreHorizontal,
+  Move,
+  Pencil,
+  Plus,
+  Search,
+  Settings,
+  Sparkles,
+  Trash2,
+  AlertTriangle,
+  X,
+} from 'lucide-react';
+import {
   getActiveTab,
   getBookmarkTree,
   getBookmarksApi,
@@ -21,6 +44,13 @@ import {
 } from './lib/bookmark-tree';
 import { getSiteFaviconUrl } from './lib/site-favicon';
 import type { FlatBookmarkNode, SearchResult } from './lib/bookmark-tree';
+import {
+  clearBackendConnection,
+  connectWithPairingCode,
+  getBackendBookmarks,
+  loadBackendConnection,
+} from './lib/backend';
+import type { BackendBookmarkTree, BackendConnection } from './lib/backend';
 
 type IconName =
   | 'arrow-up-right'
@@ -40,47 +70,58 @@ type IconName =
   | 'pencil'
   | 'plus'
   | 'search'
+  | 'settings'
   | 'sparkles'
   | 'trash'
   | 'warning';
 
-const ICON_PATHS: Record<IconName, string> = {
-  'arrow-up-right': 'M7 17 17 7M8 7h9v9',
-  bookmark: 'm6 3 6-1 6 1v18l-6-4-6 4V3Z',
-  check: 'm5 12 4 4L19 6',
-  'chevron-down': 'm5 8 7 7 7-7',
-  'chevron-right': 'm9 5 7 7-7 7',
-  close: 'm6 6 12 12M18 6 6 18',
-  copy: 'M8 8h10v10H8zM5 16H4V5h11v1',
-  external: 'M14 4h6v6M20 4 11 13M18 13v6H4V5h6',
-  folder: 'M3 6h7l2 2h9v10H3V6Z',
-  globe: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18ZM3 12h18M12 3c2.2 2.4 3.2 5.4 3.2 9S14.2 18.6 12 21c-2.2-2.4-3.2-5.4-3.2-9S9.8 5.4 12 3Z',
-  grip: 'M9 5h.01M15 5h.01M9 12h.01M15 12h.01M9 19h.01M15 19h.01',
-  link: 'M10 13a5 5 0 0 0 7.1.1l1.4-1.4a5 5 0 0 0-7.1-7.1L10.2 5.8M14 11a5 5 0 0 0-7.1-.1l-1.4 1.4a5 5 0 0 0 7.1 7.1l1.2-1.2',
-  more: 'M5 12h.01M12 12h.01M19 12h.01',
-  move: 'M5 9h14M15 5l4 4-4 4M19 15H5M9 11l-4 4 4 4',
-  pencil: 'm4 16-.8 4.8L8 20l11.4-11.4-4-4L4 16ZM13.9 6.1l4 4',
-  plus: 'M12 5v14M5 12h14',
-  search: 'm20 20-4.3-4.3M10.8 18a7.2 7.2 0 1 0 0-14.4 7.2 7.2 0 0 0 0 14.4Z',
-  sparkles: 'm12 3 1.1 4.9L18 9l-4.9 1.1L12 15l-1.1-4.9L6 9l4.9-1.1L12 3ZM19 15l.6 2.4L22 18l-2.4.6L19 21l-.6-2.4L16 18l2.4-.6L19 15Z',
-  trash: 'M5 7h14M10 11v5M14 11v5M9 7V4h6v3m-9 0 1 14h10l1-14',
-  warning: 'M12 3 2.7 20h18.6L12 3ZM12 9v5M12 17h.01',
-};
-
 function Icon({ name, size = 16, strokeWidth = 1.8 }: { name: IconName; size?: number; strokeWidth?: number }) {
-  return (
-    <svg
-      aria-hidden="true"
-      className="icon"
-      fill="none"
-      height={size}
-      viewBox="0 0 24 24"
-      width={size}
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <path d={ICON_PATHS[name]} stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth={strokeWidth} />
-    </svg>
-  );
+  switch (name) {
+    case 'arrow-up-right':
+      return <ArrowUpRight size={size} strokeWidth={strokeWidth} />;
+    case 'bookmark':
+      return <Bookmark size={size} strokeWidth={strokeWidth} />;
+    case 'check':
+      return <Check size={size} strokeWidth={strokeWidth} />;
+    case 'chevron-down':
+      return <ChevronDown size={size} strokeWidth={strokeWidth} />;
+    case 'chevron-right':
+      return <ChevronRight size={size} strokeWidth={strokeWidth} />;
+    case 'close':
+      return <X size={size} strokeWidth={strokeWidth} />;
+    case 'copy':
+      return <Copy size={size} strokeWidth={strokeWidth} />;
+    case 'external':
+      return <ExternalLink size={size} strokeWidth={strokeWidth} />;
+    case 'folder':
+      return <Folder size={size} strokeWidth={strokeWidth} />;
+    case 'globe':
+      return <Globe size={size} strokeWidth={strokeWidth} />;
+    case 'grip':
+      return <GripVertical size={size} strokeWidth={strokeWidth} />;
+    case 'link':
+      return <Link2 size={size} strokeWidth={strokeWidth} />;
+    case 'more':
+      return <MoreHorizontal size={size} strokeWidth={strokeWidth} />;
+    case 'move':
+      return <Move size={size} strokeWidth={strokeWidth} />;
+    case 'pencil':
+      return <Pencil size={size} strokeWidth={strokeWidth} />;
+    case 'plus':
+      return <Plus size={size} strokeWidth={strokeWidth} />;
+    case 'search':
+      return <Search size={size} strokeWidth={strokeWidth} />;
+    case 'settings':
+      return <Settings size={size} strokeWidth={strokeWidth} />;
+    case 'sparkles':
+      return <Sparkles size={size} strokeWidth={strokeWidth} />;
+    case 'trash':
+      return <Trash2 size={size} strokeWidth={strokeWidth} />;
+    case 'warning':
+      return <AlertTriangle size={size} strokeWidth={strokeWidth} />;
+    default:
+      return <Bookmark size={size} strokeWidth={strokeWidth} />;
+  }
 }
 
 interface EditorValues {
@@ -200,6 +241,11 @@ function getInitialFolder(nodes: BookmarkNode[]): string {
 function App() {
   const { tree, loading, error, reload } = useBookmarkTree();
   const activeTab = useCurrentTab();
+  const [backendConnection, setBackendConnection] = useState<BackendConnection | null>(null);
+  const [backendTree, setBackendTree] = useState<BackendBookmarkTree | null>(null);
+  const [backendLoading, setBackendLoading] = useState(false);
+  const [backendError, setBackendError] = useState<string | null>(null);
+  const [connectionOpen, setConnectionOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [modal, setModal] = useState<ModalState>(null);
@@ -215,6 +261,31 @@ function App() {
   const bookmarkCount = useMemo(() => countBookmarks(displayNodes), [displayNodes]);
   const folderCount = useMemo(() => countFolders(displayNodes), [displayNodes]);
   const activePageIsBookmarked = Boolean(activeTab && findBookmarkByUrl(displayNodes, activeTab.url));
+
+  const refreshBackend = useCallback(async (connection: BackendConnection) => {
+    setBackendLoading(true);
+    setBackendError(null);
+    try {
+      setBackendTree(await getBackendBookmarks(connection));
+    } catch (loadError) {
+      const message = loadError instanceof Error ? loadError.message : '读取后台书签失败';
+      setBackendError(message);
+      if (/登录|授权|token|unauthorized|401/i.test(message)) {
+        await clearBackendConnection();
+        setBackendConnection(null);
+        setBackendTree(null);
+      }
+    } finally {
+      setBackendLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadBackendConnection().then((connection) => {
+      setBackendConnection(connection);
+      if (connection) void refreshBackend(connection);
+    });
+  }, [refreshBackend]);
 
   useEffect(() => {
     setExpanded((current) => {
@@ -372,10 +443,11 @@ function App() {
             <div className="brand-subtitle">Bookmark Vault</div>
           </div>
         </div>
-        <div className="sync-status" title="书签修改会由 Floccus 负责同步">
+        <button className={`sync-status ${backendConnection ? 'is-connected' : 'is-disconnected'}`} onClick={() => setConnectionOpen(true)} title="连接 Bookmark Vault 后台" type="button">
           <span className="status-dot" />
-          <span>Floccus 同步</span>
-        </div>
+          <span>{backendConnection ? `后台已连接${backendTree ? ` · ${backendTree.bookmarks.length}` : ''}` : '连接后台'}</span>
+          <Icon name="settings" size={12} />
+        </button>
       </header>
 
       <section className="workspace">
@@ -437,6 +509,7 @@ function App() {
             <span>原生书签</span>
           </button>
         </div>
+        {backendConnection && backendTree ? <p className="backend-sync-note">后台索引 {backendTree.bookmarks.length} 个书签 · Floccus 负责跨浏览器同步 · {backendLoading ? '刷新中…' : '已连接'}</p> : null}
 
         {error ? (
           <div className="error-state">
@@ -520,6 +593,35 @@ function App() {
       ) : null}
       {modal?.type === 'delete' && deletingNode ? (
         <DeleteModal busy={busy} node={deletingNode} onClose={() => setModal(null)} onConfirm={() => void handleDelete()} />
+      ) : null}
+      {connectionOpen ? (
+        <ConnectionModal
+          busy={backendLoading}
+          connection={backendConnection}
+          error={backendError}
+          tree={backendTree}
+          onClose={() => setConnectionOpen(false)}
+          onConnect={async (code) => {
+            setBackendLoading(true);
+            setBackendError(null);
+            try {
+              const connection = await connectWithPairingCode(code);
+              setBackendConnection(connection);
+              setBackendTree(await getBackendBookmarks(connection));
+            } catch (connectError) {
+              setBackendError(connectError instanceof Error ? connectError.message : '侧边栏连接失败');
+            } finally {
+              setBackendLoading(false);
+            }
+          }}
+          onDisconnect={async () => {
+            await clearBackendConnection();
+            setBackendConnection(null);
+            setBackendTree(null);
+            setBackendError(null);
+          }}
+          onRefresh={() => backendConnection ? refreshBackend(backendConnection) : Promise.resolve()}
+        />
       ) : null}
     </main>
   );
@@ -727,6 +829,60 @@ function ModalFrame({ title, eyebrow, children, onClose, wide = false }: { title
         {children}
       </section>
     </div>
+  );
+}
+
+function ConnectionModal({
+  busy,
+  connection,
+  error,
+  tree,
+  onClose,
+  onConnect,
+  onDisconnect,
+  onRefresh,
+}: {
+  busy: boolean;
+  connection: BackendConnection | null;
+  error: string | null;
+  tree: BackendBookmarkTree | null;
+  onClose: () => void;
+  onConnect: (code: string) => Promise<void>;
+  onDisconnect: () => Promise<void>;
+  onRefresh: () => Promise<void>;
+}) {
+  const [code, setCode] = useState('');
+  const [disconnecting, setDisconnecting] = useState(false);
+
+  return (
+    <ModalFrame eyebrow="BACKEND CONNECTION" onClose={onClose} title="连接 Bookmark Vault">
+      {connection ? (
+        <div className="connection-content">
+          <div className="connection-status-card">
+            <span className="connection-status-icon"><Icon name="check" size={19} /></span>
+            <div><strong>后台已连接</strong><span>{tree ? `${tree.bookmarks.length} 个书签已读取` : '正在读取书签索引…'}</span></div>
+          </div>
+          <dl className="connection-details">
+            <div><dt>账号</dt><dd>{connection.loginIdentifier}</dd></div>
+            <div><dt>后台地址</dt><dd>{connection.serverUrl}</dd></div>
+          </dl>
+          {error ? <p className="connection-error" role="alert">{error}</p> : null}
+          <p className="connection-help">侧边栏仍操作当前浏览器的原生书签；Floccus负责把这些书签同步到其他浏览器。后台连接用于确认服务器索引和登录状态。</p>
+          <div className="modal-actions connection-actions">
+            <button className="secondary-button" disabled={busy} onClick={() => void onRefresh()} type="button">{busy ? '刷新中…' : '刷新后台索引'}</button>
+            <button className="danger-button" disabled={disconnecting} onClick={() => { setDisconnecting(true); void onDisconnect().finally(() => setDisconnecting(false)); }} type="button">{disconnecting ? '断开中…' : '断开连接'}</button>
+          </div>
+        </div>
+      ) : (
+        <form className="editor-form connection-form" onSubmit={(event) => { event.preventDefault(); void onConnect(code); }}>
+          <div className="connection-intro"><span className="connection-status-icon"><Icon name="settings" size={18} /></span><div><strong>不用再填写 WebDAV 密码</strong><p>在管理后台的「Floccus 配置」页面生成一次性连接码，复制后粘贴到这里。</p></div></div>
+          <label className="field-label">后台连接码<textarea autoFocus onChange={(event) => setCode(event.target.value)} placeholder="bvpair.v1...." required rows={4} value={code} /></label>
+          {error ? <p className="connection-error" role="alert">{error}</p> : null}
+          <p className="connection-help">连接码 10 分钟内有效，只能使用一次。连接后不会保存 WebDAV 应用密码或登录密码。</p>
+          <div className="modal-actions"><button className="secondary-button" onClick={onClose} type="button">取消</button><button className="primary-button" disabled={busy || !code.trim()} type="submit">{busy ? '连接中…' : '连接后台'}</button></div>
+        </form>
+      )}
+    </ModalFrame>
   );
 }
 
