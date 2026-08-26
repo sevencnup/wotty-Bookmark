@@ -19,11 +19,14 @@
   --paper: #ffffff;
   --canvas: #f8fafc;
 
-  /* 主题色 (森林绿/薄荷微调为高雅自然科技感) */
-  --brand-green: #059669;
-  --brand-green-hover: #047857;
-  --brand-green-soft: #ecfdf5;
-  --brand-green-border: #a7f3d0;
+  /* 主题色 (与管理后台统一为 Modern Tech Blue 系统) */
+  --brand-primary: #2563eb;
+  --brand-primary-hover: #1d4ed8;
+  --brand-primary-active: #1e40af;
+  --brand-primary-soft: #eff6ff;
+  --brand-primary-border: #bfdbfe;
+  --brand-primary-glow: rgba(37, 99, 235, 0.15);
+
   --brand-blue: #2563eb;
   --brand-blue-soft: #eff6ff;
 
@@ -95,8 +98,8 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   height: 28px;
   border-radius: var(--radius-sm);
   color: #ffffff;
-  background: linear-gradient(135deg, var(--brand-green) 0%, #047857 100%);
-  box-shadow: 0 2px 8px rgba(5, 150, 105, 0.25);
+  background: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-primary-hover) 100%);
+  box-shadow: 0 2px 8px var(--brand-primary-glow);
 }
 
 .brand-title {
@@ -132,15 +135,15 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 }
 
 .sync-status:hover {
-  border-color: var(--brand-green-border);
-  background: var(--brand-green-soft);
-  color: var(--brand-green);
+  border-color: var(--brand-primary-border);
+  background: var(--brand-primary-soft);
+  color: var(--brand-primary);
 }
 
 .sync-status.is-connected {
-  border-color: var(--brand-green-border);
-  background: var(--brand-green-soft);
-  color: var(--brand-green);
+  border-color: var(--brand-primary-border);
+  background: var(--brand-primary-soft);
+  color: var(--brand-primary);
   font-weight: 600;
 }
 
@@ -155,8 +158,8 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--brand-green);
-  box-shadow: 0 0 0 2px var(--brand-green-soft);
+  background: var(--brand-primary);
+  box-shadow: 0 0 0 2px var(--brand-primary-soft);
 }
 
 .sync-status.is-disconnected .status-dot {
@@ -185,9 +188,9 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 }
 
 .search-shell:focus-within {
-  border-color: var(--brand-green);
-  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.12);
-  color: var(--brand-green);
+  border-color: var(--brand-primary);
+  box-shadow: 0 0 0 3px var(--brand-primary-glow);
+  color: var(--brand-primary);
 }
 
 .search-shell input {
@@ -239,9 +242,9 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   gap: 10px;
   margin-top: 12px;
   padding: 10px 12px;
-  border: 1px solid var(--brand-green-border);
+  border: 1px solid var(--brand-primary-border);
   border-radius: var(--radius-md);
-  background: linear-gradient(135deg, #ecfdf5 0%, #ffffff 80%);
+  background: linear-gradient(135deg, var(--brand-primary-soft) 0%, #ffffff 80%);
   box-shadow: var(--shadow-xs);
 }
 
@@ -259,10 +262,10 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   width: 32px;
   height: 32px;
   border-radius: var(--radius-sm);
-  color: var(--brand-green);
+  color: var(--brand-primary);
   background: #ffffff;
-  border: 1px solid var(--brand-green-border);
-  box-shadow: 0 1px 4px rgba(5, 150, 105, 0.12);
+  border: 1px solid var(--brand-primary-border);
+  box-shadow: 0 1px 4px var(--brand-primary-glow);
 }
 
 .quick-save-copy {
@@ -274,7 +277,7 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 
 .quick-save-copy .eyebrow {
   margin: 0 0 2px;
-  color: var(--brand-green);
+  color: var(--brand-primary);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 9px;
   font-weight: 700;
@@ -309,15 +312,15 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   border: 0;
   border-radius: var(--radius-sm);
   color: #ffffff;
-  background: var(--brand-green);
+  background: var(--brand-primary);
   font-size: 11px;
   font-weight: 600;
-  box-shadow: 0 2px 6px rgba(5, 150, 105, 0.25);
+  box-shadow: 0 2px 6px var(--brand-primary-glow);
   transition: all var(--duration) var(--ease);
 }
 
 .save-current-button:hover:not(:disabled) {
-  background: var(--brand-green-hover);
+  background: var(--brand-primary-hover);
   transform: translateY(-1px);
 }
 
@@ -368,9 +371,9 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 }
 
 .new-bookmark-button:hover {
-  border-color: var(--brand-green-border);
-  color: var(--brand-green);
-  background: var(--brand-green-soft);
+  border-color: var(--brand-primary-border);
+  color: var(--brand-primary);
+  background: var(--brand-primary-soft);
 }
 
 .library-meta {
@@ -401,7 +404,7 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   transition: color var(--duration) var(--ease);
 }
 
-.refresh-button:hover { color: var(--brand-green); }
+.refresh-button:hover { color: var(--brand-primary); }
 
 .backend-sync-note {
   margin: -4px 2px 10px;
@@ -439,7 +442,7 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   right: 10px;
   height: 2px;
   border-radius: 2px;
-  background: var(--brand-green);
+  background: var(--brand-primary);
   z-index: 5;
 }
 
@@ -447,8 +450,8 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 .bookmark-row.drop-after::after { bottom: -1px; }
 
 .bookmark-row.drop-inside {
-  background: var(--brand-green-soft);
-  box-shadow: inset 3px 0 var(--brand-green);
+  background: var(--brand-primary-soft);
+  box-shadow: inset 3px 0 var(--brand-primary);
 }
 
 .bookmark-row-main {
@@ -531,7 +534,7 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   transition: color var(--duration) var(--ease);
 }
 
-.bookmark-title:hover { color: var(--brand-green); }
+.bookmark-title:hover { color: var(--brand-primary); }
 
 .bookmark-url {
   display: block;
@@ -568,8 +571,8 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 }
 
 .row-action:hover {
-  color: var(--brand-green);
-  background: var(--brand-green-soft);
+  color: var(--brand-primary);
+  background: var(--brand-primary-soft);
 }
 
 .row-action.danger-action:hover {
@@ -713,8 +716,8 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   height: 48px;
   margin-bottom: 12px;
   border-radius: var(--radius-lg);
-  color: var(--brand-green);
-  background: var(--brand-green-soft);
+  color: var(--brand-primary);
+  background: var(--brand-primary-soft);
 }
 
 .state-icon.warning {
@@ -739,17 +742,17 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 .empty-state button, .error-state button {
   margin-top: 14px;
   padding: 7px 12px;
-  border: 1px solid var(--brand-green-border);
+  border: 1px solid var(--brand-primary-border);
   border-radius: var(--radius-sm);
-  color: var(--brand-green);
-  background: var(--brand-green-soft);
+  color: var(--brand-primary);
+  background: var(--brand-primary-soft);
   font-size: 11px;
   font-weight: 600;
   transition: all var(--duration) var(--ease);
 }
 
 .empty-state button:hover, .error-state button:hover {
-  background: #d1fae5;
+  background: #dbeafe;
 }
 
 /* ── 页脚 ─────────────────────────────────────────────────── */
@@ -878,7 +881,7 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 }
 
 .type-switch button.selected {
-  color: var(--brand-green);
+  color: var(--brand-primary);
   background: var(--paper);
   font-weight: 600;
   box-shadow: var(--shadow-xs);
@@ -907,8 +910,8 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 }
 
 .field-label input:focus, .field-label select:focus, .field-label textarea:focus {
-  border-color: var(--brand-green);
-  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.12);
+  border-color: var(--brand-primary);
+  box-shadow: 0 0 0 3px var(--brand-primary-glow);
 }
 
 .input-with-icon {
@@ -923,8 +926,8 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 }
 
 .input-with-icon:focus-within {
-  border-color: var(--brand-green);
-  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.12);
+  border-color: var(--brand-primary);
+  box-shadow: 0 0 0 3px var(--brand-primary-glow);
 }
 
 .input-with-icon input {
@@ -961,12 +964,12 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 
 .primary-button {
   color: #ffffff;
-  background: var(--brand-green);
-  box-shadow: 0 2px 6px rgba(5, 150, 105, 0.25);
+  background: var(--brand-primary);
+  box-shadow: 0 2px 6px var(--brand-primary-glow);
 }
 
 .primary-button:hover:not(:disabled) {
-  background: var(--brand-green-hover);
+  background: var(--brand-primary-hover);
 }
 
 .danger-button {
@@ -988,9 +991,9 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   align-items: center;
   gap: 10px;
   padding: 12px;
-  border: 1px solid var(--brand-green-border);
+  border: 1px solid var(--brand-primary-border);
   border-radius: var(--radius-md);
-  background: var(--brand-green-soft);
+  background: var(--brand-primary-soft);
 }
 
 .connection-status-icon {
@@ -1000,7 +1003,7 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   width: 32px;
   height: 32px;
   border-radius: var(--radius-sm);
-  color: var(--brand-green);
+  color: var(--brand-primary);
   background: #ffffff;
 }
 
