@@ -22,6 +22,8 @@ const LOGIN_RATE_LIMIT: u32 = 5;
 const LOGIN_RATE_WINDOW: Duration = Duration::from_secs(15 * 60);
 const WEBDAV_RATE_LIMIT: u32 = 20;
 const WEBDAV_RATE_WINDOW: Duration = Duration::from_secs(15 * 60);
+const SIDEBAR_PAIRING_TTL: Duration = Duration::from_secs(10 * 60);
+const SIDEBAR_PAIRING_PREFIX: &str = "bvpair.v1.";
 
 #[derive(Serialize)]
 pub struct HealthResponse {
@@ -81,6 +83,19 @@ pub struct AppPasswordResponse {
     pub last_used_at: Option<String>,
     pub expires_at: Option<String>,
     pub created_at: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SidebarPairingResponse {
+    pub code: String,
+    pub expires_at: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SidebarPairingExchangePayload {
+    pub code: String,
 }
 
 pub async fn register(
@@ -227,7 +242,7 @@ pub async fn logout(State(state): State<AppState>, headers: HeaderMap) -> Respon
     let Some(token) = bearer_token(&headers) else {
         return StatusCode::NO_CONTENT.into_response();
     };
-    let _ = sqlx::query("UPDATE sessions SET revoked_at = NOW() WHERE token_hash = $1")
+    let _ = sqlx::query("UPDATE sessions SET revoked_at = CURRENT_TIMESTAMP WHERE token_hash = $1")
         .bind(hash_token(&token))
         .execute(&state.db)
         .await;
@@ -243,6 +258,121 @@ pub async fn me(State(state): State<AppState>, headers: HeaderMap) -> Response {
         login_identifier: user.login_identifier,
     })
     .into_response()
+}
+
+pub async fn create_sidebar_pairing(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+) -> Response {
+    let Some(user) = authenticate_session(&state, &headers).await else {
+        return error(StatusCode::UNAUTHORIZED, "unauthorized", "请先登录");
+    };
+    let raw_code = generate_secret();
+    let pairing_id = Uuid::new_v4();
+    let expires_at = chrono::Utc::now() + chrono::Duration::from_std(SIDEBAR_PAIRING_TTL).unwrap();
+    let result = sqlx::query(
+        "INSERT INTO sidebar_pairings (id, user_id, code_hash, expires_at) VALUES ($1, $2, $3, $4)",
+    )
+    .bind(pairing_id)
+    .bind(user.id)
+    .bind(hash_token(&raw_code))
+    .bind(expires_at)
+    .execute(&state.db)
+    .await;
+    if result.is_err() {
+        return error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "pairing_create_failed",
+            "侧边栏连接码创建失败",
+        );
+    }
+
+    let server_url = headers
+        .get(header::ORIGIN)
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or_default()
+        .trim_end_matches('/');
+    let payload = json!({ "serverUrl": server_url, "secret": raw_code });
+    let encoded = URL_SAFE_NO_PAD.encode(payload.to_string());
+    Json(SidebarPairingResponse {
+        code: format!("{SIDEBAR_PAIRING_PREFIX}{encoded}"),
+        expires_at: expires_at.to_rfc3339(),
+    })
+    .into_response()
+}
+
+pub async fn exchange_sidebar_pairing(
+    State(state): State<AppState>,
+    Json(payload): Json<SidebarPairingExchangePayload>,
+) -> Response {
+    let Some(encoded) = payload.code.strip_prefix(SIDEBAR_PAIRING_PREFIX) else {
+        return error(StatusCode::BAD_REQUEST, "invalid_pairing_code", "连接码无效");
+    };
+    let decoded = match URL_SAFE_NO_PAD.decode(encoded) {
+        Ok(value) => value,
+        Err(_) => return error(StatusCode::BAD_REQUEST, "invalid_pairing_code", "连接码无效"),
+    };
+    let envelope: serde_json::Value = match serde_json::from_slice(&decoded) {
+        Ok(value) => value,
+        Err(_) => return error(StatusCode::BAD_REQUEST, "invalid_pairing_code", "连接码无效"),
+    };
+    let Some(secret) = envelope.get("secret").and_then(|value| value.as_str()) else {
+        return error(StatusCode::BAD_REQUEST, "invalid_pairing_code", "连接码无效");
+    };
+    let row = sqlx::query(
+        "SELECT id, user_id FROM sidebar_pairings WHERE code_hash = $1 AND used_at IS NULL AND expires_at > CURRENT_TIMESTAMP",
+    )
+    .bind(hash_token(secret))
+    .fetch_optional(&state.db)
+    .await;
+    let Some(row) = (match row {
+        Ok(value) => value,
+        Err(error_value) => {
+            tracing::error!(?error_value, "sidebar pairing lookup failed");
+            return error(StatusCode::INTERNAL_SERVER_ERROR, "pairing_exchange_failed", "侧边栏连接失败");
+        }
+    }) else {
+        return error(StatusCode::UNAUTHORIZED, "pairing_expired", "连接码已失效，请重新生成");
+    };
+    let pairing_id: Uuid = row.get("id");
+    let user_id: Uuid = row.get("user_id");
+    let mut transaction = match state.db.begin().await {
+        Ok(value) => value,
+        Err(error_value) => {
+            tracing::error!(?error_value, "sidebar pairing transaction failed");
+            return error(StatusCode::INTERNAL_SERVER_ERROR, "pairing_exchange_failed", "侧边栏连接失败");
+        }
+    };
+    let updated = sqlx::query(
+        "UPDATE sidebar_pairings SET used_at = CURRENT_TIMESTAMP WHERE id = $1 AND used_at IS NULL",
+    )
+    .bind(pairing_id)
+    .execute(&mut *transaction)
+    .await;
+    if updated.map(|value| value.rows_affected()).unwrap_or(0) != 1 {
+        return error(StatusCode::UNAUTHORIZED, "pairing_expired", "连接码已失效，请重新生成");
+    }
+    if transaction.commit().await.is_err() {
+        return error(StatusCode::INTERNAL_SERVER_ERROR, "pairing_exchange_failed", "侧边栏连接失败");
+    }
+    match create_session(&state, user_id).await {
+        Ok(token) => {
+            let login_identifier: String = match sqlx::query_scalar("SELECT login_identifier FROM users WHERE id = $1")
+                .bind(user_id)
+                .fetch_one(&state.db)
+                .await
+            {
+                Ok(value) => value,
+                Err(_) => return error(StatusCode::INTERNAL_SERVER_ERROR, "pairing_exchange_failed", "侧边栏连接失败"),
+            };
+            Json(TokenResponse {
+                token,
+                user: UserResponse { id: user_id, login_identifier },
+            })
+            .into_response()
+        }
+        Err(_) => error(StatusCode::INTERNAL_SERVER_ERROR, "pairing_exchange_failed", "侧边栏连接失败"),
+    }
 }
 
 pub async fn list_app_passwords(State(state): State<AppState>, headers: HeaderMap) -> Response {
@@ -344,7 +474,7 @@ pub async fn revoke_app_password(
         return error(StatusCode::UNAUTHORIZED, "unauthorized", "请先登录");
     };
     let result = sqlx::query(
-        "UPDATE app_passwords SET revoked_at = NOW() WHERE id = $1 AND user_id = $2 AND revoked_at IS NULL",
+        "UPDATE app_passwords SET revoked_at = CURRENT_TIMESTAMP WHERE id = $1 AND user_id = $2 AND revoked_at IS NULL",
     )
     .bind(id)
     .bind(user.id)
@@ -369,8 +499,8 @@ pub async fn storage_status(State(state): State<AppState>, headers: HeaderMap) -
         return error(StatusCode::UNAUTHORIZED, "unauthorized", "请先登录");
     };
     let row = sqlx::query(
-        "SELECT COUNT(*)::BIGINT AS files,
-                COALESCE(SUM(byte_size), 0)::BIGINT AS bytes,
+        "SELECT COUNT(*) AS files,
+                COALESCE(SUM(byte_size), 0) AS bytes,
                 MAX(last_modified_at) AS last_modified_at
          FROM dav_files
          WHERE user_id = $1",
@@ -412,7 +542,7 @@ pub async fn authenticate_session(
     headers: &HeaderMap,
 ) -> Option<AuthenticatedUser> {
     let token = bearer_token(headers)?;
-    sqlx::query("SELECT u.id, u.login_identifier FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.revoked_at IS NULL AND s.expires_at > NOW() AND u.status = 'active'")
+    sqlx::query("SELECT u.id, u.login_identifier FROM sessions s JOIN users u ON u.id = s.user_id LEFT JOIN devices d ON d.id = s.device_id WHERE s.token_hash = $1 AND s.revoked_at IS NULL AND s.expires_at > CURRENT_TIMESTAMP AND u.status = 'active' AND (s.device_id IS NULL OR d.revoked_at IS NULL)")
         .bind(hash_token(&token))
         .fetch_optional(&state.db)
         .await
@@ -436,7 +566,7 @@ pub async fn authenticate_webdav(
         .auth_rate_limiter
         .try_acquire(&rate_limit_key, WEBDAV_RATE_LIMIT, WEBDAV_RATE_WINDOW)?;
 
-    let row = sqlx::query("SELECT u.id, u.login_identifier, ap.id AS app_password_id FROM app_passwords ap JOIN users u ON u.id = ap.user_id WHERE u.login_identifier = $1 AND ap.secret_hash = $2 AND ap.revoked_at IS NULL AND (ap.expires_at IS NULL OR ap.expires_at > NOW()) AND u.status = 'active'")
+    let row = sqlx::query("SELECT u.id, u.login_identifier, ap.id AS app_password_id FROM app_passwords ap JOIN users u ON u.id = ap.user_id WHERE u.login_identifier = $1 AND ap.secret_hash = $2 AND ap.revoked_at IS NULL AND (ap.expires_at IS NULL OR ap.expires_at > CURRENT_TIMESTAMP) AND u.status = 'active'")
         .bind(login_identifier)
         .bind(hash_token(&secret))
         .fetch_optional(&state.db)
@@ -454,7 +584,7 @@ pub async fn authenticate_webdav(
         let app_password_id: Uuid = row.get("app_password_id");
         let db = state.db.clone();
         tokio::spawn(async move {
-            let _ = sqlx::query("UPDATE app_passwords SET last_used_at = NOW() WHERE id = $1")
+            let _ = sqlx::query("UPDATE app_passwords SET last_used_at = CURRENT_TIMESTAMP WHERE id = $1")
                 .bind(app_password_id)
                 .execute(&db)
                 .await;
@@ -476,7 +606,7 @@ fn hash_password(password: &str) -> Result<String, argon2::password_hash::Error>
 
 async fn create_session(state: &AppState, user_id: Uuid) -> Result<String, sqlx::Error> {
     let token = generate_secret();
-    sqlx::query("INSERT INTO sessions (id, user_id, token_hash, expires_at) VALUES ($1, $2, $3, NOW() + INTERVAL '30 days')")
+    sqlx::query("INSERT INTO sessions (id, user_id, token_hash, expires_at) VALUES ($1, $2, $3, datetime(CURRENT_TIMESTAMP, '+30 days'))")
         .bind(Uuid::new_v4())
         .bind(user_id)
         .bind(hash_token(&token))
@@ -495,6 +625,12 @@ fn hash_token(value: &str) -> String {
     let mut digest = Sha256::new();
     digest.update(value.as_bytes());
     format!("{:x}", digest.finalize())
+}
+
+pub fn token_hash_from_headers(headers: &HeaderMap) -> String {
+    bearer_token(headers)
+        .map(|token| hash_token(&token))
+        .unwrap_or_default()
 }
 
 fn bearer_token(headers: &HeaderMap) -> Option<String> {

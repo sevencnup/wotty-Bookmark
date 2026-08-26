@@ -24,7 +24,17 @@ import {
   Copy,
   Sparkles,
 } from 'lucide-react'
+import {
+  TrashPage,
+  TagsPage,
+  DevicesPage,
+  PreferencesPage,
+  ImportExportPage,
+  HelpPage,
+  AboutPage,
+} from './FeaturePages'
 import * as api from './api'
+import { loadPreferences, savePreferences, type Preferences } from './preferences'
 
 type AdminSection =
   | 'overview'
@@ -180,12 +190,34 @@ function persistSession(session: api.Session | null) {
 }
 
 function App() {
-  const [activeSection, setActiveSection] = useState<AdminSection>('overview')
+  const [activeSection, setActiveSection] = useState<AdminSection>(() => loadPreferences().defaultSection as AdminSection)
+  const [preferences, setPreferences] = useState<Preferences>(() => loadPreferences())
   const [session, setSession] = useState<api.Session | null>(() => loadStoredSession())
 
   function handleSessionChange(nextSession: api.Session | null) {
     setSession(nextSession)
     persistSession(nextSession)
+  }
+
+  function navigate(section: string) {
+    setActiveSection(section as AdminSection)
+  }
+
+  function handlePreferencesChange(next: Preferences) {
+    setPreferences(next)
+    savePreferences(next)
+    document.documentElement.dataset.density = next.density
+    document.documentElement.classList.toggle('reduce-motion', next.reduceMotion)
+  }
+
+  useEffect(() => {
+    document.documentElement.dataset.density = preferences.density
+    document.documentElement.classList.toggle('reduce-motion', preferences.reduceMotion)
+  }, [preferences])
+
+  async function handleLogout() {
+    if (session) await api.logout(session.token).catch(() => undefined)
+    handleSessionChange(null)
   }
 
   if (!session) {
@@ -210,7 +242,7 @@ function App() {
                 <button
                   className={`nav-item ${activeSection === item.id ? 'active' : ''}`}
                   key={item.id}
-                  onClick={() => setActiveSection(item.id)}
+                  onClick={() => navigate(item.id)}
                   type="button"
                 >
                   <span className="nav-icon"><NavIcon name={item.icon} /></span>
@@ -223,7 +255,7 @@ function App() {
       </aside>
       <main className={`main-content ${isStorageWorkspace ? 'bookmark-main-content' : ''}`}>
         {isStorageWorkspace ? (
-          <StorageFiles token={session.token} onOpenFloccus={() => setActiveSection('floccus')} />
+          <StorageFiles token={session.token} onOpenFloccus={() => navigate('floccus')} />
         ) : (
           <>
             <header className="topbar">
@@ -231,15 +263,22 @@ function App() {
                 <p className="eyebrow">BOOKMARK VAULT</p>
                 <h1>{activeLabel}</h1>
               </div>
-              <button className="ghost-button" onClick={() => handleSessionChange(null)} type="button">退出登录</button>
+              <button className="ghost-button" onClick={() => void handleLogout()} type="button">退出登录</button>
             </header>
             {activeSection === 'overview' && <Overview token={session.token} />}
             {activeSection === 'app-passwords' && <AppPasswords token={session.token} />}
-            {activeSection === 'bookmark-organizer' && <BookmarkOrganizer token={session.token} onOpenFloccus={() => setActiveSection('floccus')} />}
+            {activeSection === 'bookmark-organizer' && <BookmarkOrganizer token={session.token} onOpenFloccus={() => navigate('floccus')} />}
             {activeSection === 'floccus' && <FloccusGuide token={session.token} loginIdentifier={session.user.loginIdentifier} />}
-            {activeSection === 'account' && <AccountSettings loginIdentifier={session.user.loginIdentifier} onOpenAppPasswords={() => setActiveSection('app-passwords')} />}
+            {activeSection === 'account' && <AccountSettings loginIdentifier={session.user.loginIdentifier} onOpenAppPasswords={() => navigate('app-passwords')} />}
             {activeSection === 'security' && <Security />}
-            {!['overview', 'app-passwords', 'account', 'bookmark-organizer', 'floccus', 'security'].includes(activeSection) && <ComingSoon label={activeLabel} />}
+            {activeSection === 'trash' && <TrashPage navigate={navigate} token={session.token} />}
+            {activeSection === 'tags' && <TagsPage navigate={navigate} token={session.token} />}
+            {activeSection === 'devices' && <DevicesPage navigate={navigate} onSessionRevoked={() => handleSessionChange(null)} token={session.token} />}
+            {activeSection === 'preferences' && <PreferencesPage onChange={handlePreferencesChange} preferences={preferences} />}
+            {activeSection === 'import-export' && <ImportExportPage navigate={navigate} token={session.token} />}
+            {activeSection === 'help' && <HelpPage navigate={navigate} token={session.token} />}
+            {activeSection === 'about' && <AboutPage />}
+            {!['overview', 'app-passwords', 'account', 'bookmark-organizer', 'floccus', 'security', 'trash', 'tags', 'devices', 'preferences', 'import-export', 'help', 'about'].includes(activeSection) && <ComingSoon label={activeLabel} />}
           </>
         )}
       </main>

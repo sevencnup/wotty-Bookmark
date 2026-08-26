@@ -7,10 +7,11 @@ use axum::{
     Json,
 };
 use httpdate::fmt_http_date;
+use percent_encoding::percent_decode_str;
 use serde::Serialize;
 use serde_json::json;
 use sha2::{Digest, Sha256};
-use sqlx::Row;
+use sqlx::{Row, SqlitePool};
 use std::{
     path::{Path as FsPath, PathBuf},
     time::Duration,
@@ -71,6 +72,110 @@ pub async fn handle(
     }
 }
 
+pub async fn export_file(State(state): State<AppState>, headers: HeaderMap) -> Response {
+    let Some(user) = auth::authenticate_session(&state, &headers).await else {
+        return auth::error(StatusCode::UNAUTHORIZED, "unauthorized", "请先登录");
+    };
+    let path = state.data_dir.join(user.id.to_string()).join("bookmarks.xbel");
+    let body = match fs::read(path).await {
+        Ok(body) => body,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            return auth::error(StatusCode::NOT_FOUND, "file_not_found", "还没有可导出的同步文件")
+        }
+        Err(error) => {
+            tracing::error!(?error, "export WebDAV file failed");
+            return auth::error(StatusCode::INTERNAL_SERVER_ERROR, "export_failed", "导出同步文件失败");
+        }
+    };
+    let mut response = (StatusCode::OK, Body::from(body)).into_response();
+    response.headers_mut().insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_static("application/octet-stream"),
+    );
+    response.headers_mut().insert(
+        header::CONTENT_DISPOSITION,
+        HeaderValue::from_static("attachment; filename=bookmarks.xbel"),
+    );
+    response
+}
+
+pub async fn import_file(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    request: Request,
+) -> Response {
+    let Some(user) = auth::authenticate_session(&state, &headers).await else {
+        return auth::error(StatusCode::UNAUTHORIZED, "unauthorized", "请先登录");
+    };
+    let target = DavTarget {
+        user_id: user.id,
+        relative_path: format!("{}/bookmarks.xbel", user.login_identifier),
+        file_path: state.data_dir.join(user.id.to_string()).join("bookmarks.xbel"),
+        data_root: state.data_dir.clone(),
+    };
+    if let Err(response) = ensure_unlocked(&target).await {
+        return response;
+    }
+    let body = match to_bytes(request.into_body(), MAX_FILE_BYTES + 1).await {
+        Ok(body) if body.len() <= MAX_FILE_BYTES => body,
+        Ok(_) => return auth::error(StatusCode::PAYLOAD_TOO_LARGE, "file_too_large", "书签文件不能超过 10 MB"),
+        Err(_) => return auth::error(StatusCode::BAD_REQUEST, "invalid_body", "无法读取导入文件"),
+    };
+    let parsed = match validate_import_body(&body) {
+        Ok(parsed) => parsed,
+        Err(response) => return response,
+    };
+    if fs::try_exists(&target.file_path).await.unwrap_or(false) {
+        if let Err(error) = snapshot_existing_file(&state.db, &target).await {
+            tracing::error!(?error, "snapshot before import failed");
+            return auth::error(StatusCode::INTERNAL_SERVER_ERROR, "import_failed", "导入前备份失败");
+        }
+    }
+    if let Err(error) = replace_file(&target.file_path, &body).await {
+        tracing::error!(?error, "replace imported file failed");
+        return auth::error(StatusCode::INTERNAL_SERVER_ERROR, "import_failed", "导入同步文件失败");
+    }
+    if let Err(error) = record_file(&state.db, &target, &body).await {
+        tracing::error!(?error, "record imported file failed");
+        return auth::error(StatusCode::INTERNAL_SERVER_ERROR, "import_failed", "导入文件元数据更新失败");
+    }
+    let encrypted = parsed.is_none();
+    match parsed {
+        Some(parsed) => {
+            if let Err(error) = crate::bookmarks::replace_index(&state.db, user.id, &parsed).await {
+                tracing::error!(?error, "index imported bookmarks failed");
+                return auth::error(StatusCode::INTERNAL_SERVER_ERROR, "import_failed", "导入书签索引失败");
+            }
+        }
+        None => {
+            if let Err(error) = sqlx::query("DELETE FROM bookmark_nodes WHERE user_id = $1")
+                .bind(user.id)
+                .execute(&state.db)
+                .await
+            {
+                tracing::error!(?error, "clear encrypted bookmark index after import failed");
+                return auth::error(StatusCode::INTERNAL_SERVER_ERROR, "import_failed", "导入文件索引清理失败");
+            }
+        }
+    }
+    Json(json!({ "imported": true, "encrypted": encrypted, "byteSize": body.len() })).into_response()
+}
+
+fn validate_import_body(body: &[u8]) -> Result<Option<Vec<crate::bookmarks::XbelNode>>, Response> {
+    if is_encrypted_sync_file(body) {
+        return Ok(None);
+    }
+    crate::bookmarks::parse_xbel(body)
+        .map(Some)
+        .map_err(|_| auth::error(StatusCode::UNPROCESSABLE_ENTITY, "invalid_xbel", "导入文件不是有效的 XBEL 或 Floccus 加密文件"))
+}
+
+fn is_encrypted_sync_file(bytes: &[u8]) -> bool {
+    let Ok(value) = serde_json::from_slice::<serde_json::Value>(bytes) else { return false };
+    let Some(object) = value.as_object() else { return false };
+    object.get("ciphertext").and_then(serde_json::Value::as_str).is_some()
+        && object.get("salt").and_then(serde_json::Value::as_str).is_some()
+}
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct FileVersionResponse {
@@ -194,6 +299,35 @@ pub async fn restore_version(
         tracing::error!(?error, path = %target.relative_path, "record restored file metadata failed");
         return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     }
+    if is_versioned_file(&target) {
+        match crate::bookmarks::parse_xbel(&body) {
+            Ok(parsed) => {
+                if let Err(error) = crate::bookmarks::replace_index(&state.db, user.id, &parsed).await {
+                    tracing::error!(?error, path = %target.relative_path, "restore bookmark index failed");
+                    return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+                }
+            }
+            Err(error) if is_encrypted_sync_file(&body) => {
+                tracing::debug!(?error, path = %target.relative_path, "restoring encrypted bookmark file without index");
+                if let Err(error) = sqlx::query("DELETE FROM bookmark_nodes WHERE user_id = $1")
+                    .bind(user.id)
+                    .execute(&state.db)
+                    .await
+                {
+                    tracing::error!(?error, path = %target.relative_path, "clear encrypted bookmark index failed");
+                    return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+                }
+            }
+            Err(error) => {
+                tracing::error!(?error, path = %target.relative_path, "restore invalid XBEL");
+                return auth::error(
+                    StatusCode::UNPROCESSABLE_ENTITY,
+                    "invalid_xbel",
+                    "历史版本不是有效的 XBEL 或 Floccus 加密文件",
+                );
+            }
+        }
+    }
     Json(json!({
         "restored": true,
         "versionId": version_id,
@@ -304,6 +438,68 @@ impl DavResource {
     }
 }
 
+pub async fn ensure_bookmark_editable(
+    state: &AppState,
+    user_id: uuid::Uuid,
+    login_identifier: &str,
+    expected_etag: Option<&str>,
+) -> Result<(), Response> {
+    let target = DavTarget {
+        user_id,
+        relative_path: format!("{login_identifier}/bookmarks.xbel"),
+        file_path: state.data_dir.join(user_id.to_string()).join("bookmarks.xbel"),
+        data_root: state.data_dir.clone(),
+    };
+    ensure_unlocked(&target).await?;
+    if let Some(expected_etag) = expected_etag {
+        let current = sqlx::query("SELECT etag FROM dav_files WHERE user_id = $1 AND path LIKE $2")
+            .bind(user_id)
+            .bind("%/bookmarks.xbel")
+            .fetch_optional(&state.db)
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR.into_response())?;
+        let Some(current) = current else {
+            return Err(auth::error(StatusCode::CONFLICT, "version_conflict", "同步文件已发生变化，请刷新后重试"));
+        };
+        let current_etag: String = current.get("etag");
+        if current_etag != expected_etag {
+            return Err(auth::error(StatusCode::CONFLICT, "version_conflict", "同步文件已发生变化，请刷新后重试"));
+        }
+    }
+    Ok(())
+}
+
+pub async fn rewrite_bookmark_file(
+    state: &AppState,
+    user_id: uuid::Uuid,
+    login_identifier: &str,
+) -> Result<(String, i64), Response> {
+    let target = DavTarget {
+        user_id,
+        relative_path: format!("{login_identifier}/bookmarks.xbel"),
+        file_path: state.data_dir.join(user_id.to_string()).join("bookmarks.xbel"),
+        data_root: state.data_dir.clone(),
+    };
+    let nodes = crate::bookmarks::load_index(&state.db, user_id)
+        .await
+        .map_err(|_| auth::error(StatusCode::INTERNAL_SERVER_ERROR, "rewrite_failed", "同步文件生成失败"))?;
+    let body = crate::bookmarks::render_xbel(&nodes)
+        .map_err(|_| auth::error(StatusCode::INTERNAL_SERVER_ERROR, "rewrite_failed", "同步文件生成失败"))?;
+    if let Err(error) = replace_file(&target.file_path, &body).await {
+        tracing::error!(?error, "rewrite bookmark file failed");
+        return Err(StatusCode::INTERNAL_SERVER_ERROR.into_response());
+    }
+    record_file(&state.db, &target, &body)
+        .await
+        .map_err(|_| auth::error(StatusCode::INTERNAL_SERVER_ERROR, "rewrite_failed", "同步文件元数据更新失败"))?;
+    let row = sqlx::query("SELECT etag, version FROM dav_files WHERE user_id = $1 AND path = $2")
+        .bind(user_id)
+        .bind(&target.relative_path)
+        .fetch_one(&state.db)
+        .await
+        .map_err(|_| auth::error(StatusCode::INTERNAL_SERVER_ERROR, "rewrite_failed", "同步文件元数据读取失败"))?;
+    Ok((row.get("etag"), row.get("version")))
+}
 async fn read_file(target: &DavTarget, head_only: bool) -> Response {
     let bytes = match fs::read(&target.file_path).await {
         Ok(bytes) => bytes,
@@ -327,11 +523,10 @@ async fn read_file(target: &DavTarget, head_only: bool) -> Response {
     apply_file_headers(&mut response, &bytes, modified);
     response
 }
-
 async fn write_file(
     target: &DavTarget,
     request: Request,
-    db: &sqlx::PgPool,
+    db: &SqlitePool,
     owner_id: Option<uuid::Uuid>,
 ) -> Response {
     if target
@@ -359,6 +554,25 @@ async fn write_file(
         }
         Err(_) => return auth::error(StatusCode::BAD_REQUEST, "invalid_body", "无法读取请求内容"),
     };
+    let parsed = if is_versioned_file(target) {
+        if is_encrypted_sync_file(&body) {
+            None
+        } else {
+            match crate::bookmarks::parse_xbel(&body) {
+                Ok(parsed) => Some(parsed),
+                Err(error) => {
+                    tracing::warn!(?error, path = %target.relative_path, "reject invalid plaintext XBEL");
+                    return auth::error(
+                        StatusCode::UNPROCESSABLE_ENTITY,
+                        "invalid_xbel",
+                        "书签文件不是有效的 XBEL 或 Floccus 加密文件",
+                    );
+                }
+            }
+        }
+    } else {
+        None
+    };
     if let Some(parent) = target.file_path.parent() {
         if let Err(error) = fs::create_dir_all(parent).await {
             tracing::error!(?error, "create WebDAV storage directory failed");
@@ -378,6 +592,29 @@ async fn write_file(
     }
     if let Err(error) = record_file(db, target, &body).await {
         tracing::error!(?error, path = %target.relative_path, "record WebDAV file metadata failed");
+    }
+    if let Some(parsed) = parsed {
+        if let Err(error) = crate::bookmarks::replace_index(db, target.user_id, &parsed).await {
+            tracing::error!(?error, path = %target.relative_path, "index plaintext bookmarks failed");
+            return auth::error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "bookmark_index_failed",
+                "书签索引更新失败",
+            );
+        }
+    } else if is_versioned_file(target) {
+        if let Err(error) = sqlx::query("DELETE FROM bookmark_nodes WHERE user_id = $1")
+            .bind(target.user_id)
+            .execute(db)
+            .await
+        {
+            tracing::error!(?error, path = %target.relative_path, "clear encrypted bookmark index failed");
+            return auth::error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "bookmark_index_failed",
+                "书签索引清理失败",
+            );
+        }
     }
     if existed {
         StatusCode::NO_CONTENT.into_response()
@@ -468,7 +705,7 @@ async fn acquire_lock(target: &DavTarget, owner_id: uuid::Uuid) -> Response {
 
 async fn delete_file(
     target: &DavTarget,
-    db: &sqlx::PgPool,
+    db: &SqlitePool,
     owner_id: Option<uuid::Uuid>,
 ) -> Response {
     if let Err(response) = check_lock_owner(target, owner_id).await {
@@ -492,7 +729,7 @@ async fn delete_file(
 async fn move_file(
     source: &DavTarget,
     request: Request,
-    db: &sqlx::PgPool,
+    db: &SqlitePool,
     owner_id: Option<uuid::Uuid>,
 ) -> Response {
     if let Err(response) = check_lock_owner(source, owner_id).await {
@@ -565,6 +802,24 @@ async fn move_file(
                 if let Err(error) = record_file(db, &target, &body).await {
                     tracing::error!(?error, path = %target.relative_path, "record WebDAV MOVE metadata failed");
                 }
+                if is_versioned_file(&target) {
+                    match crate::bookmarks::parse_xbel(&body) {
+                        Ok(parsed) => {
+                            if let Err(error) = crate::bookmarks::replace_index(db, target.user_id, &parsed).await {
+                                tracing::error!(?error, path = %target.relative_path, "index moved plaintext bookmarks failed");
+                            }
+                        }
+                        Err(_) => {
+                            if let Err(error) = sqlx::query("DELETE FROM bookmark_nodes WHERE user_id = $1")
+                                .bind(target.user_id)
+                                .execute(db)
+                                .await
+                            {
+                                tracing::error!(?error, path = %target.relative_path, "clear encrypted bookmark index failed");
+                            }
+                        }
+                    }
+                }
             }
             if destination_exists {
                 StatusCode::NO_CONTENT.into_response()
@@ -583,7 +838,7 @@ async fn move_file(
 }
 
 async fn record_file(
-    db: &sqlx::PgPool,
+    db: &SqlitePool,
     target: &DavTarget,
     body: &[u8],
 ) -> Result<(), sqlx::Error> {
@@ -592,14 +847,14 @@ async fn record_file(
     let etag = format!("\"{:x}\"", digest.finalize());
     sqlx::query(
         "INSERT INTO dav_files (id, user_id, path, storage_key, etag, byte_size, version, last_modified_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, 1, NOW(), NOW())
+         VALUES ($1, $2, $3, $4, $5, $6, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
          ON CONFLICT (user_id, path) DO UPDATE SET
            storage_key = EXCLUDED.storage_key,
            etag = EXCLUDED.etag,
            byte_size = EXCLUDED.byte_size,
            version = dav_files.version + 1,
-           last_modified_at = NOW(),
-           updated_at = NOW()",
+           last_modified_at = CURRENT_TIMESTAMP,
+           updated_at = CURRENT_TIMESTAMP",
     )
     .bind(uuid::Uuid::new_v4())
     .bind(target.user_id)
@@ -642,7 +897,7 @@ async fn replace_file(path: &FsPath, body: &[u8]) -> Result<(), std::io::Error> 
     result
 }
 
-async fn snapshot_existing_file(db: &sqlx::PgPool, target: &DavTarget) -> Result<(), String> {
+async fn snapshot_existing_file(db: &SqlitePool, target: &DavTarget) -> Result<(), String> {
     let body = fs::read(&target.file_path)
         .await
         .map_err(|error| format!("read current file: {error}"))?;
@@ -701,7 +956,7 @@ async fn snapshot_existing_file(db: &sqlx::PgPool, target: &DavTarget) -> Result
 }
 
 async fn cleanup_versions_for_user(
-    db: &sqlx::PgPool,
+    db: &SqlitePool,
     user_id: uuid::Uuid,
 ) -> Result<usize, sqlx::Error> {
     let rows = sqlx::query(
@@ -744,7 +999,7 @@ async fn cleanup_versions_for_user(
     Ok(removed)
 }
 
-async fn remove_file_metadata(db: &sqlx::PgPool, target: &DavTarget) {
+async fn remove_file_metadata(db: &SqlitePool, target: &DavTarget) {
     if let Err(error) = sqlx::query("DELETE FROM dav_files WHERE user_id = $1 AND path = $2")
         .bind(target.user_id)
         .bind(&target.relative_path)
@@ -861,7 +1116,15 @@ fn normalize_destination(destination: &str) -> Option<String> {
         .or_else(|| path.strip_prefix("dav/"))
         .or_else(|| path.strip_prefix('/'))?;
     let path = path.trim_matches('/');
-    (!path.is_empty()).then(|| path.to_owned())
+    if path.is_empty() {
+        return None;
+    }
+    let decoded = path
+        .split('/')
+        .map(|segment| percent_decode_str(segment).decode_utf8().ok())
+        .collect::<Option<Vec<_>>>()?
+        .join("/");
+    (!decoded.is_empty()).then_some(decoded)
 }
 
 fn method_not_allowed() -> Response {
@@ -974,6 +1237,14 @@ mod tests {
             Some("alice/bookmarks.xbel".to_owned())
         );
         assert_eq!(normalize_destination("/dav/"), None);
+    }
+
+    #[test]
+    fn decodes_percent_encoded_account_in_move_destination() {
+        assert_eq!(
+            normalize_destination("http://localhost:4174/dav/05110%40163.com/bookmarks.xbel"),
+            Some("05110@163.com/bookmarks.xbel".to_owned())
+        );
     }
 
     #[test]

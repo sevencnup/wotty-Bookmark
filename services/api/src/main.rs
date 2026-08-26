@@ -1,5 +1,8 @@
 mod auth;
+mod bookmarks;
+mod devices;
 mod state;
+mod trash;
 mod webdav;
 
 use axum::{
@@ -7,7 +10,7 @@ use axum::{
     routing::{any, delete, get, post},
     Router,
 };
-use sqlx::postgres::PgPoolOptions;
+use sqlx::sqlite::SqlitePoolOptions;
 use std::{env, fs, net::SocketAddr, sync::Arc, time::Duration};
 use tokio::net::TcpListener;
 use tower_http::{
@@ -29,16 +32,27 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .init();
 
     let bind_addr: SocketAddr = env::var("BIND_ADDR")
-        .unwrap_or_else(|_| "127.0.0.1:8080".into())
+        .unwrap_or_else(|_| "127.0.0.1:26626".into())
         .parse()?;
-    let database_url = env::var("DATABASE_URL").unwrap_or_else(|_| {
-        "postgres://bookmark_vault:change-me-in-production@127.0.0.1:5433/bookmark_vault".into()
-    });
     let data_dir = env::var("DATA_DIR").unwrap_or_else(|_| "./data".into());
     fs::create_dir_all(&data_dir)?;
+    let database_url = match env::var("DATABASE_URL") {
+        Ok(value) => value,
+        Err(_) => {
+            let database_path = env::current_dir()?
+                .join(&data_dir)
+                .join("bookmark-vault.sqlite");
+            let database_path = database_path.to_string_lossy().replace('\\', "/");
+            if cfg!(windows) {
+                format!("sqlite:///{database_path}?mode=rwc")
+            } else {
+                format!("sqlite://{database_path}?mode=rwc")
+            }
+        }
+    };
 
-    let db = PgPoolOptions::new()
-        .max_connections(10)
+    let db = SqlitePoolOptions::new()
+        .max_connections(5)
         .connect(&database_url)
         .await?;
     sqlx::migrate!("../../migrations").run(&db).await?;
@@ -66,11 +80,43 @@ fn app_router(state: AppState) -> Router {
         .route("/api/v1/auth/logout", post(auth::logout))
         .route("/api/v1/me", get(auth::me))
         .route(
+            "/api/v1/sidebar/pairing-codes",
+            post(auth::create_sidebar_pairing),
+        )
+        .route("/api/v1/sidebar/exchange", post(auth::exchange_sidebar_pairing))
+        .route(
             "/api/v1/app-passwords",
             get(auth::list_app_passwords).post(auth::create_app_password),
         )
         .route(APP_PASSWORD_BY_ID_ROUTE, delete(auth::revoke_app_password))
         .route("/api/v1/storage/status", get(auth::storage_status))
+        .route("/api/v1/bookmarks", get(bookmarks::list_bookmarks))
+        .route("/api/v1/bookmarks/move", post(bookmarks::move_bookmark))
+        .route(
+            "/api/v1/bookmarks/move-batch",
+            post(bookmarks::move_bookmarks_batch),
+        )
+        .route(
+            "/api/v1/bookmarks/trash",
+            get(trash::list).post(trash::create),
+        )
+        .route(
+            "/api/v1/bookmarks/trash/empty",
+            post(trash::empty),
+        )
+        .route(
+            "/api/v1/bookmarks/trash/:id",
+            delete(trash::remove),
+        )
+        .route(
+            "/api/v1/bookmarks/trash/:id/restore",
+            post(trash::restore),
+        )
+        .route("/api/v1/devices", get(devices::list))
+        .route("/api/v1/devices/register", post(devices::register))
+        .route("/api/v1/devices/:id/revoke", post(devices::revoke))
+        .route("/api/v1/storage/export", get(webdav::export_file))
+        .route("/api/v1/storage/import", post(webdav::import_file))
         .route("/api/v1/storage/versions", get(webdav::list_versions))
         .route(
             "/api/v1/storage/versions/cleanup",
@@ -147,7 +193,7 @@ mod tests {
         body::Body,
         http::{Method, Request, StatusCode},
     };
-    use sqlx::postgres::PgPoolOptions;
+    use sqlx::sqlite::SqlitePoolOptions;
     use std::{path::PathBuf, sync::Arc};
     use tower::ServiceExt;
     use tower_http::cors::CorsLayer;
@@ -167,8 +213,8 @@ mod tests {
     #[tokio::test]
     async fn app_password_id_route_matches_axum_07_parameter_syntax() {
         let state = AppState {
-            db: PgPoolOptions::new()
-                .connect_lazy("postgres://bookmark_vault:change-me-in-production@127.0.0.1:5433/bookmark_vault")
+            db: SqlitePoolOptions::new()
+                .connect_lazy("sqlite::memory:")
                 .expect("lazy database pool should be constructible"),
             data_dir: PathBuf::from("/tmp/bookmark-vault-route-test"),
             version: "test".into(),

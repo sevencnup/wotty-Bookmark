@@ -1,5 +1,23 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { login, register, revokeAppPassword } from './api'
+import {
+  cleanupFileVersions,
+  emptyTrash,
+  exportStorageFile,
+  getDevices,
+  getFileVersions,
+  getHealth,
+  getTrash,
+  importStorageFile,
+  login,
+  permanentlyDeleteTrashItem,
+  register,
+  registerDevice,
+  restoreFileVersion,
+  restoreTrashItem,
+  revokeAppPassword,
+  revokeDevice,
+  trashBookmark,
+} from './api'
 
 function response(payload: unknown, status = 200): Response {
   return {
@@ -44,20 +62,70 @@ describe('admin API contract', () => {
     )
   })
 
-  it('accepts an empty 204 revoke response and sends the bearer token', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(response(undefined, 204))
+  it('uses binary requests for storage import and export', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: true, status: 200, blob: vi.fn().mockResolvedValue(new Blob(['data'])) })
+      .mockResolvedValueOnce(response({ imported: true, encrypted: true, byteSize: 4 }))
     vi.stubGlobal('fetch', fetchMock)
 
-    await revokeAppPassword('session-token', 'app-password-id')
+    await exportStorageFile('session-token')
+    await importStorageFile('session-token', new Blob(['data']))
 
-    expect(fetchMock).toHaveBeenCalledWith(
-      '/api/v1/app-passwords/app-password-id',
-      expect.objectContaining({
-        method: 'DELETE',
-        headers: expect.any(Headers),
-      }),
-    )
-    const requestInit = fetchMock.mock.calls[0][1] as RequestInit
-    expect(new Headers(requestInit.headers).get('authorization')).toBe('Bearer session-token')
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/v1/storage/export')
+    expect(fetchMock.mock.calls[0][1]).toEqual({ headers: { authorization: 'Bearer session-token' } })
+    expect(fetchMock.mock.calls[1][1]).toEqual(expect.objectContaining({
+      method: 'POST',
+      body: expect.any(Blob),
+    }))
+    expect(new Headers(fetchMock.mock.calls[1][1].headers).get('content-type')).toBe('application/octet-stream')
+  })
+
+  it('preserves API status codes for actionable errors', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(response({ code: 'locked', message: '同步中' }, 423))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(getTrash('session-token')).rejects.toMatchObject({ status: 423, code: 'locked' })
+  })
+
+  it('calls trash, device, version, and health endpoints with the expected methods', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(response([]))
+      .mockResolvedValueOnce(response({ id: 'device', clientId: 'client', name: '浏览器', deviceType: 'browser', userAgentSummary: '', lastSeenAt: '', createdAt: '', revokedAt: null }))
+      .mockResolvedValueOnce(response(undefined, 204))
+      .mockResolvedValueOnce(response([]))
+      .mockResolvedValueOnce(response({ removed: 0, retainedPerFile: 30 }))
+      .mockResolvedValueOnce(response({ restored: true }))
+      .mockResolvedValueOnce(response({ deleted: true }))
+      .mockResolvedValueOnce(response({ restored: true }))
+      .mockResolvedValueOnce(response(undefined, 204))
+      .mockResolvedValueOnce(response({ removed: 1 }))
+      .mockResolvedValueOnce(response({ status: 'ok', service: 'bookmark-vault-api', version: 'test' }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await getDevices('token')
+    await registerDevice('token', { clientId: 'client', name: '浏览器', deviceType: 'browser' })
+    await revokeDevice('token', 'device')
+    await getFileVersions('token')
+    await cleanupFileVersions('token')
+    await restoreFileVersion('token', 'version')
+    await trashBookmark('token', 'bookmark', 'etag')
+    await restoreTrashItem('token', 'trash', 'etag')
+    await permanentlyDeleteTrashItem('token', 'trash')
+    await emptyTrash('token')
+    await getHealth()
+
+    expect(fetchMock.mock.calls.map(([path, init]) => [path, init?.method ?? 'GET'])).toEqual([
+      ['/api/v1/devices', 'GET'],
+      ['/api/v1/devices/register', 'POST'],
+      ['/api/v1/devices/device/revoke', 'POST'],
+      ['/api/v1/storage/versions', 'GET'],
+      ['/api/v1/storage/versions/cleanup', 'POST'],
+      ['/api/v1/storage/versions/version/restore', 'POST'],
+      ['/api/v1/bookmarks/trash', 'POST'],
+      ['/api/v1/bookmarks/trash/trash/restore', 'POST'],
+      ['/api/v1/bookmarks/trash/trash', 'DELETE'],
+      ['/api/v1/bookmarks/trash/empty', 'POST'],
+      ['/health/live', 'GET'],
+    ])
   })
 })

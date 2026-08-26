@@ -1,5 +1,26 @@
 # 管理后台开发记录
 
+## 2026-08-26：`admin-seven-feature-pages`
+
+### 任务
+
+开发回收站、标签管理、设备管理、偏好设置、导入/导出、帮助中心和关于项目页面，保持 Floccus WebDAV 与客户端加密边界。
+
+### 进度
+
+- 完成七个管理后台页面和响应式交互状态。
+- 补充回收站、设备登记/撤销、原始同步文件导入导出 API 与 SQLite 数据模型。
+- 修复密文同步文件覆盖明文索引时的残留风险，并允许加密历史版本安全恢复。
+- 标签管理按当前协议边界提供能力说明，不伪造未实现的跨设备标签数据。
+- 增加偏好设置持久化、帮助 FAQ 搜索、关于页健康状态和 API 契约类型。
+
+### 验证
+
+- `pnpm --filter @bookmark-vault/admin-web lint`：通过。
+- `pnpm --filter @bookmark-vault/admin-web test`：7 项通过。
+- `pnpm --filter @bookmark-vault/admin-web build`：通过。
+- `cargo test --manifest-path services/api/Cargo.toml`：18 项通过。
+
 ## 2026-08-25：`frontend-admin-navigation-icons`
 
 ### 任务
@@ -21,7 +42,7 @@
 
 ### 任务
 
-按产品参考图完成独立的管理后台书签工作区。管理后台与浏览器侧边栏保持两个独立入口，不共享页面状态，也不让后台读取 Floccus 密文中的书签内容。
+按产品参考图完成独立的管理后台书签工作区。管理后台与浏览器侧边栏保持两个独立入口，不共享页面状态，也不让后台读取 Floccus 密文中的书签明文。
 
 ### 进度
 

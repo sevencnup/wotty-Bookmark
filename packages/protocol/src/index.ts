@@ -1,6 +1,24 @@
 import { z } from 'zod'
 
-export const adminSectionSchema = z.enum(['overview', 'app-passwords', 'floccus', 'security'])
+export const adminSectionSchema = z.enum([
+  'overview',
+  'storage',
+  'bookmark-organizer',
+  'categories',
+  'tags',
+  'trash',
+  'app-passwords',
+  'backup',
+  'devices',
+  'audit-log',
+  'account',
+  'preferences',
+  'import-export',
+  'floccus',
+  'security',
+  'help',
+  'about',
+])
 export type AdminSection = z.infer<typeof adminSectionSchema>
 
 export const appPasswordSchema = z.object({
@@ -19,6 +37,15 @@ export const storageStatusSchema = z.object({
   maxFileBytes: z.number().int().positive(),
 })
 export type StorageStatus = z.infer<typeof storageStatusSchema>
+
+export const fileVersionSchema = z.object({
+  id: z.string(),
+  filePath: z.string(),
+  etag: z.string(),
+  byteSize: z.number().int().nonnegative(),
+  createdAt: z.string().datetime(),
+})
+export type FileVersion = z.infer<typeof fileVersionSchema>
 
 export const apiErrorSchema = z.object({
   code: z.string(),
