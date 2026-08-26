@@ -92,8 +92,9 @@ button:disabled { cursor: not-allowed; }
 .folder-toggle:hover { color: var(--ink); }
 .chevron-expanded, .chevron-collapsed { display: inline-flex; transition: transform .18s; }
 .chevron-collapsed { transform: rotate(-90deg); }
-.node-icon { align-items: center; color: #91a59a; display: inline-flex; flex: 0 0 auto; }
+.node-icon { align-items: center; color: #91a59a; display: inline-flex; flex: 0 0 auto; height: 16px; justify-content: center; width: 16px; }
 .node-icon.folder-color { color: #c3a46e; }
+.site-favicon { display: block; object-fit: contain; }
 .bookmark-title { background: transparent; border: 0; color: #3e4c46; flex: 1; font-size: 11px; min-width: 0; overflow: hidden; padding: 9px 3px; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
 .bookmark-title:hover { color: var(--mint-deep); }
 .bookmark-url { color: #aab2ad; display: block; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 8px; margin: -7px 10px 6px calc(7px + var(--depth) * 20px + 47px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

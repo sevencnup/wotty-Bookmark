@@ -19,6 +19,7 @@ import {
   isFolder,
   searchBookmarks,
 } from './lib/bookmark-tree';
+import { getSiteFaviconUrl } from './lib/site-favicon';
 import type { FlatBookmarkNode, SearchResult } from './lib/bookmark-tree';
 
 type IconName =
@@ -365,7 +366,7 @@ function App() {
     <main className="app-shell">
       <header className="topbar">
         <div className="brand-lockup">
-          <div className="brand-mark"><Icon name="bookmark" size={18} strokeWidth={2.2} /></div>
+          <div className="brand-mark"><BrandLogo size={18} /></div>
           <div>
             <div className="brand-title">书签</div>
             <div className="brand-subtitle">Bookmark Vault</div>
@@ -533,6 +534,34 @@ function findBookmarkByUrl(nodes: BookmarkNode[], url: string): BookmarkNode | u
   return undefined;
 }
 
+const faviconStatus = new Map<string, 'loaded' | 'failed'>();
+
+function BrandLogo({ size = 18 }: { size?: number }) {
+  return (
+    <svg aria-hidden="true" fill="none" height={size} viewBox="0 0 24 24" width={size} xmlns="http://www.w3.org/2000/svg">
+      <path d="m12 3 8 4v10l-8 4-8-4V7l8-4Z" stroke="currentColor" strokeLinejoin="round" strokeWidth="1.8" />
+      <path d="m8 9 4 2 4-2M12 11v6" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
+    </svg>
+  );
+}
+
+function SiteFavicon({ url, size = 16 }: { url: string; size?: number }) {
+  const faviconUrl = getSiteFaviconUrl(url);
+  const [failed, setFailed] = useState(() => !faviconUrl || faviconStatus.get(faviconUrl) === 'failed');
+
+  useEffect(() => {
+    setFailed(!faviconUrl || faviconStatus.get(faviconUrl) === 'failed');
+  }, [faviconUrl]);
+
+  if (!faviconUrl || failed) {
+    return <Icon name="bookmark" size={size} />;
+  }
+
+  return <img alt="" className="site-favicon" height={size} onError={() => { faviconStatus.set(faviconUrl, 'failed'); setFailed(true); }} onLoad={() => faviconStatus.set(faviconUrl, 'loaded')} src={faviconUrl} width={size} />;
+}
+
+
+
 function LoadingState() {
   return (
     <div className="loading-state" aria-label="正在读取书签">
@@ -623,7 +652,7 @@ function BookmarkRow({
           </button>
         ) : <span className="folder-toggle-spacer" />}
         <span className={`node-icon ${folder ? 'folder-color' : ''}`}>
-          <Icon name={folder ? 'folder' : 'bookmark'} size={16} />
+          {folder ? <Icon name="folder" size={16} /> : <SiteFavicon size={16} url={node.url!} />}
         </span>
         <button className="bookmark-title" onClick={() => (folder ? onToggle(node.id) : onOpen(node.url!))} title={node.title || '未命名'} type="button">
           {node.title || '未命名'}
@@ -669,7 +698,7 @@ function SearchResults({
       {results.map(({ node, breadcrumb }) => (
         <div className="search-result" key={node.id}>
           <button className="result-main" onClick={() => onOpen(node.url!)} type="button">
-            <span className="node-icon"><Icon name="bookmark" size={16} /></span>
+            <span className="node-icon"><SiteFavicon size={16} url={node.url!} /></span>
             <span className="result-copy">
               <strong>{node.title || '未命名'}</strong>
               <span>{breadcrumb.join(' / ') || '我的书签'}</span>
@@ -775,7 +804,7 @@ function MoveModal({
   return (
     <ModalFrame eyebrow="MOVE ITEM" onClose={onClose} title="移动到文件夹">
       <form className="editor-form" onSubmit={(event) => { event.preventDefault(); void onSubmit(parentId); }}>
-        <div className="move-preview"><span className={`node-icon ${isFolder(node) ? 'folder-color' : ''}`}><Icon name={isFolder(node) ? 'folder' : 'bookmark'} size={18} /></span><span><strong>{node.title || '未命名'}</strong><small>选择新的保存位置</small></span></div>
+        <div className="move-preview"><span className={`node-icon ${isFolder(node) ? 'folder-color' : ''}`}>{isFolder(node) ? <Icon name="folder" size={18} /> : <SiteFavicon size={18} url={node.url!} />}</span><span><strong>{node.title || '未命名'}</strong><small>选择新的保存位置</small></span></div>
         <label className="field-label">目标文件夹<select onChange={(event) => setParentId(event.target.value)} value={parentId}>{folderOptions.map((folder) => <option key={folder.id} value={folder.id}>{folder.title || '未命名文件夹'}</option>)}</select></label>
         <div className="modal-actions"><button className="secondary-button" onClick={onClose} type="button">取消</button><button className="primary-button" disabled={busy || !parentId} type="submit">{busy ? '移动中…' : '移动'}</button></div>
       </form>

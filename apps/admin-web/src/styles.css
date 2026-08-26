@@ -26,7 +26,8 @@ button:disabled { cursor: not-allowed; opacity: .52; }
 .app-shell { display: flex; min-height: 100vh; }
 .sidebar { width: 240px; flex: 0 0 240px; padding: 29px 18px 22px; border-right: 1px solid var(--line); background: var(--paper); }
 .brand { display: flex; align-items: center; gap: 10px; color: var(--ink); font-size: 17px; font-weight: 800; letter-spacing: -.04em; }
-.brand-mark { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; color: #fff; background: var(--blue); font-size: 18px; line-height: 1; }
+.brand-mark { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; color: #fff; background: var(--blue); line-height: 1; }
+.brand-logo-svg { display: block; }
 .nav-list { display: grid; gap: 24px; margin-top: 40px; }
 .nav-group { display: grid; gap: 3px; }
 .nav-group-label { margin: 0 12px 8px; color: #a5afbd; font-size: 12px; }

@@ -104,6 +104,16 @@ function NavIcon({ name }: { name: NavIconName }) {
   return <svg aria-hidden="true" className="nav-svg-icon" fill="none" height="18" viewBox="0 0 24 24" width="18" xmlns="http://www.w3.org/2000/svg"><path d={navIconPaths[name]} stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.7" /></svg>
 }
 
+function BrandLogo({ size = 18 }: { size?: number }) {
+  return (
+    <svg aria-hidden="true" className="brand-logo-svg" fill="none" height={size} viewBox="0 0 24 24" width={size} xmlns="http://www.w3.org/2000/svg">
+      <path d="m12 3 8 4v10l-8 4-8-4V7l8-4Z" stroke="currentColor" strokeLinejoin="round" strokeWidth="1.8" />
+      <path d="m8 9 4 2 4-2M12 11v6" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
+    </svg>
+  )
+}
+
+
 function App() {
   const [activeSection, setActiveSection] = useState<AdminSection>('overview')
   const [session, setSession] = useState<api.Session | null>(null)
@@ -119,7 +129,7 @@ function App() {
     <div className="app-shell">
       <aside className="sidebar">
         <div className="brand">
-          <span className="brand-mark">⬡</span>
+          <span className="brand-mark"><BrandLogo size={18} /></span>
           <span>书签管理</span>
         </div>
         <nav className="nav-list" aria-label="管理后台导航">
@@ -190,7 +200,7 @@ function LoginCard({ onLogin }: { onLogin: (session: api.Session) => void }) {
   return (
     <main className="auth-page">
       <section className="auth-card">
-        <div className="brand auth-brand"><span className="brand-mark">⬡</span> 书签管理</div>
+        <div className="brand auth-brand"><span className="brand-mark"><BrandLogo size={18} /></span> 书签管理</div>
         <p className="eyebrow">SELF-HOSTED BOOKMARK SYNC</p>
         <h1>管理你的同步服务</h1>
         <p className="muted">登录后台创建 WebDAV 应用密码，然后使用官方 Floccus 同步浏览器书签。</p>
