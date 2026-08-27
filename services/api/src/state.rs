@@ -1,4 +1,4 @@
-use sqlx::PgPool;
+use sqlx::SqlitePool;
 use std::{
     collections::HashMap,
     path::PathBuf,
@@ -8,7 +8,7 @@ use std::{
 
 #[derive(Clone)]
 pub struct AppState {
-    pub db: PgPool,
+    pub db: SqlitePool,
     pub data_dir: PathBuf,
     pub version: Arc<str>,
     pub auth_rate_limiter: Arc<AuthRateLimiter>,

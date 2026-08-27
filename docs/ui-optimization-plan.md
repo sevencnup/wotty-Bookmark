@@ -1,8 +1,8 @@
-# Bookmark Vault 前端 UI/UX 深度优化开发文档
+# WOTTY BOOKMARK 前端 UI/UX 深度优化开发文档
 
 ## 1. 需求与优化目标
 
-提升 Bookmark Vault 两大前端应用（管理后台 `admin-web` 与浏览器侧边栏扩展 `sidebar-extension`）的视觉质感、设计一致性、交互流畅度与响应式体验。
+提升 WOTTY BOOKMARK 两大前端应用（管理后台 `admin-web` 与浏览器侧边栏扩展 `sidebar-extension`）的视觉质感、设计一致性、交互流畅度与响应式体验。
 
 ### 核心优化原则
 1. **现代化设计语言 (Modern & Clean)**：引入现代 SaaS（如 Linear, Raycast, Vercel）的高级质感，包括微质感阴影、柔和边框、精心调校的色彩层级与平滑过渡。

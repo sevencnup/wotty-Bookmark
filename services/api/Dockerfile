@@ -14,6 +14,6 @@ RUN useradd --system --create-home --uid 10001 app
 RUN mkdir -p /var/lib/bookmark-vault && chown -R app:app /var/lib/bookmark-vault
 USER app
 COPY --from=builder /app/services/api/target/release/bookmark-vault-api /usr/local/bin/bookmark-vault-api
-EXPOSE 8080
-ENV BIND_ADDR=0.0.0.0:8080
+EXPOSE 26626
+ENV BIND_ADDR=0.0.0.0:26626
 ENTRYPOINT ["/usr/local/bin/bookmark-vault-api"]

@@ -42,7 +42,7 @@ import {
   isFolder,
   searchBookmarks,
 } from './lib/bookmark-tree';
-import { getSiteFaviconUrl } from './lib/site-favicon';
+import { loadSiteFavicon } from './lib/site-favicon';
 import type { FlatBookmarkNode, SearchResult } from './lib/bookmark-tree';
 import {
   clearBackendConnection,
@@ -648,21 +648,22 @@ function findBookmarkByUrl(nodes: BookmarkNode[], url: string): BookmarkNode | u
   return undefined;
 }
 
-const faviconStatus = new Map<string, 'loaded' | 'failed'>();
-
 function SiteFavicon({ url, size = 16 }: { url: string; size?: number }) {
-  const faviconUrl = getSiteFaviconUrl(url);
-  const [failed, setFailed] = useState(() => !faviconUrl || faviconStatus.get(faviconUrl) === 'failed');
+  const [asset, setAsset] = useState<Awaited<ReturnType<typeof loadSiteFavicon>>>(null);
 
   useEffect(() => {
-    setFailed(!faviconUrl || faviconStatus.get(faviconUrl) === 'failed');
-  }, [faviconUrl]);
+    let cancelled = false;
+    loadSiteFavicon(url).then((nextAsset) => {
+      if (!cancelled) setAsset(nextAsset);
+    });
+    return () => { cancelled = true; };
+  }, [url]);
 
-  if (!faviconUrl || failed) {
-    return <Icon name="bookmark" size={size} />;
+  if (!asset) return <Icon name="bookmark" size={size} />;
+  if (asset.kind === 'svg') {
+    return <span aria-hidden="true" className="site-favicon site-favicon-svg" dangerouslySetInnerHTML={{ __html: asset.source }} />;
   }
-
-  return <img alt="" className="site-favicon" height={size} onError={() => { faviconStatus.set(faviconUrl, 'failed'); setFailed(true); }} onLoad={() => faviconStatus.set(faviconUrl, 'loaded')} src={faviconUrl} width={size} />;
+  return <img alt="" className="site-favicon" height={size} src={asset.source} width={size} />;
 }
 
 

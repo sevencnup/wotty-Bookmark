@@ -1,4 +1,6 @@
-# Bookmark Vault 开发执行计划
+# WOTTY BOOKMARK 开发执行计划
+
+> 当前架构决定（2026-08-26）：本项目面向私人服务器部署，保留登录、应用密码、WebDAV、Floccus 和文件版本；数据库由 PostgreSQL 切换为 SQLite，旧的 PostgreSQL/Docker 数据库要求仅作为历史计划，不再适用。
 
 ## 1. 文档评估结论
 
@@ -53,7 +55,7 @@ TypeScript 书签侧边栏插件
 3. 安装官方 Floccus。
 4. 在 Floccus 中配置 WebDAV 地址、用户名、应用密码、书签文件名和 passphrase。
 5. Floccus 在两个浏览器之间同步书签。
-6. 安装 Bookmark Vault 侧边栏插件。
+6. 安装 WOTTY BOOKMARK 侧边栏插件。
 7. 从侧边栏搜索、新增、编辑、移动和删除书签。
 8. 这些修改被 Floccus 自动同步到其他浏览器。
 

@@ -1,6 +1,6 @@
 # WebDAV 协议烟测
 
-本目录保存 Bookmark Vault WebDAV/Floccus 集成验收的可重复命令和结果约定。命令只验证服务端协议，不替代官方 Floccus 在真实浏览器中的黑盒验收；真实浏览器流程见 [`docs/floccus-integration-qa.md`](../../docs/floccus-integration-qa.md)。
+本目录保存 WOTTY BOOKMARK WebDAV/Floccus 集成验收的可重复命令和结果约定。命令只验证服务端协议，不替代官方 Floccus 在真实浏览器中的黑盒验收；真实浏览器流程见 [`docs/floccus-integration-qa.md`](../../docs/floccus-integration-qa.md)。
 
 ## 使用边界
 
@@ -17,7 +17,7 @@ docker compose -f infra/docker-compose.yml config --quiet
 CORS_ALLOWED_ORIGINS=http://localhost:5173 \
   docker compose -f infra/docker-compose.yml up -d --build
 
-API_BASE=http://127.0.0.1:8080
+API_BASE=http://127.0.0.1:26626
 QA_USER="qa-$(date +%s)"
 QA_PASSWORD='QaWebdavPassword_2026!'
 ```

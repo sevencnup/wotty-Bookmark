@@ -263,34 +263,28 @@ function App() {
             </div>
           ))}
         </nav>
+        <button className="sidebar-logout" onClick={() => void handleLogout()} type="button">退出登录</button>
       </aside>
-      <main className={`main-content ${isStorageWorkspace ? 'bookmark-main-content' : ''}`}>
+      <main className="main-content">
         {isStorageWorkspace ? (
           <StorageFiles token={session.token} onOpenFloccus={() => navigate('floccus')} />
         ) : (
           <>
-            <header className="topbar">
-              <div>
-                <p className="eyebrow">WOTTY BOOKMARK</p>
-                <h1>{activeLabel}</h1>
-              </div>
-              <button className="ghost-button" onClick={() => void handleLogout()} type="button">退出登录</button>
-            </header>
-            {activeSection === 'overview' && <Overview token={session.token} />}
-            {activeSection === 'app-passwords' && <AppPasswords token={session.token} />}
-            {activeSection === 'bookmark-organizer' && <BookmarkOrganizer mode="organizer" token={session.token} onOpenFloccus={() => navigate('floccus')} />}
-            {activeSection === 'categories' && <CategoryManagementPage token={session.token} onOpenFloccus={() => navigate('floccus')} />}
-            {activeSection === 'floccus' && <FloccusGuide token={session.token} loginIdentifier={session.user.loginIdentifier} />}
-            {activeSection === 'account' && <AccountSettings loginIdentifier={session.user.loginIdentifier} onOpenAppPasswords={() => navigate('app-passwords')} />}
-            {activeSection === 'security' && <Security />}
-            {activeSection === 'trash' && <TrashPage navigate={navigate} token={session.token} />}
-            {activeSection === 'tags' && <TagsPage navigate={navigate} token={session.token} />}
-            {activeSection === 'devices' && <DevicesPage navigate={navigate} onSessionRevoked={() => handleSessionChange(null)} token={session.token} />}
-            {activeSection === 'preferences' && <PreferencesPage onChange={handlePreferencesChange} preferences={preferences} />}
-            {activeSection === 'import-export' && <ImportExportPage navigate={navigate} token={session.token} />}
-            {activeSection === 'help' && <HelpPage navigate={navigate} token={session.token} />}
-            {activeSection === 'about' && <AboutPage />}
-            {!['overview', 'app-passwords', 'account', 'bookmark-organizer', 'categories', 'floccus', 'security', 'trash', 'tags', 'devices', 'preferences', 'import-export', 'help', 'about'].includes(activeSection) && <ComingSoon label={activeLabel} />}
+              {activeSection === 'overview' && <Overview token={session.token} />}
+              {activeSection === 'app-passwords' && <AppPasswords token={session.token} />}
+              {activeSection === 'bookmark-organizer' && <BookmarkOrganizer mode="organizer" token={session.token} onOpenFloccus={() => navigate('floccus')} />}
+              {activeSection === 'categories' && <CategoryManagementPage token={session.token} onOpenFloccus={() => navigate('floccus')} />}
+              {activeSection === 'floccus' && <FloccusGuide token={session.token} loginIdentifier={session.user.loginIdentifier} />}
+              {activeSection === 'account' && <AccountSettings loginIdentifier={session.user.loginIdentifier} onOpenAppPasswords={() => navigate('app-passwords')} />}
+              {activeSection === 'security' && <Security />}
+              {activeSection === 'trash' && <TrashPage navigate={navigate} token={session.token} />}
+              {activeSection === 'tags' && <TagsPage navigate={navigate} token={session.token} />}
+              {activeSection === 'devices' && <DevicesPage navigate={navigate} onSessionRevoked={() => handleSessionChange(null)} token={session.token} />}
+              {activeSection === 'preferences' && <PreferencesPage onChange={handlePreferencesChange} preferences={preferences} />}
+              {activeSection === 'import-export' && <ImportExportPage navigate={navigate} token={session.token} />}
+              {activeSection === 'help' && <HelpPage navigate={navigate} token={session.token} />}
+              {activeSection === 'about' && <AboutPage />}
+              {!['overview', 'app-passwords', 'account', 'bookmark-organizer', 'categories', 'floccus', 'security', 'trash', 'tags', 'devices', 'preferences', 'import-export', 'help', 'about'].includes(activeSection) && <ComingSoon label={activeLabel} />}
           </>
         )}
       </main>
@@ -349,13 +343,8 @@ function StorageFiles({ token, onOpenFloccus }: { token: string; onOpenFloccus: 
   }, [token])
 
   return (
-    <>
-      <header className="bookmark-topbar">
-        <div className="page-heading"><h1>存储文件</h1><span>服务端保存的加密同步数据</span></div>
-        <span className="storage-encryption-badge">端到端加密</span>
-      </header>
-      <div className="bookmark-content">
-        <div className="stat-grid">
+    <div className="storage-content">
+      <div className="stat-grid">
           <StatCard icon={<RefreshCw size={20} strokeWidth={1.8} />} iconTone="blue" label="同步文件" value={storage ? String(storage.files) : '—'} suffix="个" detail={storage?.lastModifiedAt ? `最近同步 ${formatDate(storage.lastModifiedAt)}` : '尚未同步'} />
           <StatCard icon={<HardDrive size={20} strokeWidth={1.8} />} iconTone="green" label="存储占用" value={storage ? formatBytes(storage.bytes) : '—'} suffix="" detail={storage ? `单文件上限 ${formatBytes(storage.maxFileBytes)}` : '读取中'} />
           <StatCard icon={<KeyRound size={20} strokeWidth={1.8} />} iconTone="purple" label="同步状态" value={storage?.files ? '正常' : '待配置'} suffix="" detail={storage?.lastModifiedAt ? formatDate(storage.lastModifiedAt) : '配置 Floccus 后开始同步'} />
@@ -363,6 +352,7 @@ function StorageFiles({ token, onOpenFloccus }: { token: string; onOpenFloccus: 
         <section className="panel storage-panel">
           <div className="panel-heading">
             <div><p className="eyebrow">ENCRYPTED STORAGE</p><h3>服务器存储摘要</h3></div>
+            <span className="storage-encryption-badge">端到端加密</span>
           </div>
           {error ? (
             <div className="empty-state"><span>!</span><h4>无法读取存储状态</h4><p>{error}</p></div>
@@ -388,9 +378,8 @@ function StorageFiles({ token, onOpenFloccus }: { token: string; onOpenFloccus: 
           <div className="security-notice"><span>i</span><p>为了保护你的隐私，后台不会提供书签明文管理功能。请通过浏览器原生书签和 Floccus 管理书签内容。</p></div>
           <button className="primary-button" onClick={onOpenFloccus} type="button">前往 Floccus 配置</button>
         </section>
-        <p className="workspace-note">服务端只保存 Floccus 加密数据 · 书签内容由浏览器和 Floccus 管理</p>
-      </div>
-    </>
+      <p className="workspace-note">服务端只保存 Floccus 加密数据 · 书签内容由浏览器和 Floccus 管理</p>
+    </div>
   )
 }
 
@@ -615,18 +604,6 @@ function BookmarkOrganizer({ token, onOpenFloccus, mode = 'organizer' }: { token
 
   return (
     <div className={`bookmark-organizer ${isCategoriesMode ? 'categories-page' : ''}`}>
-      <div className="bookmark-organizer-intro">
-        <div>
-          <p className="eyebrow">BOOKMARK INDEX</p>
-          <h2>管理已同步的书签</h2>
-          <p>这里展示 Floccus 上传到服务器的书签索引。移动书签后，下一次 Floccus 同步会把变化写回浏览器。</p>
-        </div>
-        <div className={`bookmark-sync-state ${tree?.status === 'ready' ? 'ready' : tree?.status === 'encrypted' ? 'encrypted' : ''}`}>
-          <span>{tree?.status === 'ready' ? '●' : tree?.status === 'encrypted' ? '◆' : '○'}</span>
-          {tree?.status === 'ready' ? `${tree.bookmarks.length} 个书签已索引` : tree?.status === 'encrypted' ? '已同步 · 内容已加密' : '等待同步'}
-        </div>
-      </div>
-
       {error && <div className="bookmark-alert error"><strong>读取失败</strong><span>{error}</span></div>}
       {notice && <div className="bookmark-alert success"><strong>操作完成</strong><span>{notice}</span></div>}
 
@@ -843,19 +820,9 @@ function FloccusGuide({ token, loginIdentifier }: { token: string; loginIdentifi
 
 function AccountSettings({ loginIdentifier, onOpenAppPasswords }: { loginIdentifier: string; onOpenAppPasswords: () => void }) {
   const davUrl = getWebDavUrl(loginIdentifier)
-  const accountInitial = loginIdentifier.trim().charAt(0).toUpperCase() || '?'
 
   return (
     <div className="account-settings">
-      <section className="account-hero">
-        <div className="account-avatar">{accountInitial}</div>
-        <div>
-          <p className="eyebrow">YOUR ACCOUNT</p>
-          <h2>这就是你的登录账号</h2>
-          <p>注册时没有单独设置用户名，系统使用你填写的邮箱或登录名作为账号标识。</p>
-        </div>
-      </section>
-
       <div className="account-settings-grid">
         <section className="panel account-panel">
           <div className="panel-heading">

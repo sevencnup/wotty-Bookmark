@@ -2,17 +2,17 @@
 
 ## 1. 目标和范围
 
-本 runbook 验证 Bookmark Vault 的首期闭环：管理后台创建应用密码，官方 Floccus 通过 WebDAV 保存加密 XBEL，Chrome、Edge、Firefox 的原生书签最终收敛，Bookmark Vault 侧边栏只操作浏览器原生书签。
+本 runbook 验证 WOTTY BOOKMARK 的首期闭环：管理后台创建应用密码，官方 Floccus 通过 WebDAV 保存加密 XBEL，Chrome、Edge、Firefox 的原生书签最终收敛，WOTTY BOOKMARK 侧边栏只操作浏览器原生书签。
 
 服务端协议烟测见 [`tests/webdav/README.md`](../tests/webdav/README.md)。本文件不实现自有同步协议，也不把 Floccus 的 passphrase 上传到服务器。
 
 ## 2. 验收前置条件
 
-- 使用经过验证的 API 镜像或本地源码构建，并记录 API、PostgreSQL、Floccus 和浏览器版本。
+- 使用经过验证的 API 镜像或本地源码构建，并记录 API、SQLite、Floccus 和浏览器版本。
 - 使用独立的 Chrome、Edge、Firefox 测试配置文件，不使用个人书签配置文件。
 - 使用独立测试账户和每个设备独立的 WebDAV 应用密码。
 - 在 Compose 或反向代理中配置精确的 `CORS_ALLOWED_ORIGINS`，禁止使用 `*`；记录实际 Floccus 扩展来源。
-- 服务地址使用 HTTPS；仅本地 smoke test 可以使用 `http://127.0.0.1:8080`。
+- 服务地址使用 HTTPS；仅本地 smoke test 可以使用 `http://127.0.0.1:26626`。
 - Floccus WebDAV 地址使用 `/dav/<用户名>/`，文件名使用 `bookmarks.xbel`；若 Floccus 版本要求完整路径，则使用 `/dav/<用户名>/bookmarks.xbel`。
 - 为 Floccus 设置只在客户端保存的测试 passphrase；不要把它写入 issue、日志、截图或 Git。
 - 每个浏览器、Floccus 版本和测试结果都写入证据表。

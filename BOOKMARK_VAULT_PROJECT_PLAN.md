@@ -1,8 +1,10 @@
-# Bookmark Vault：自部署浏览器书签同步项目计划
+# WOTTY BOOKMARK：自部署浏览器书签同步项目计划
+
+> 当前架构决定（2026-08-26）：本项目是私人服务器上的 Bitwarden 式书签保险库。保留账户登录、应用密码、WebDAV、Floccus 和加密文件版本；使用 SQLite 替代 PostgreSQL，减少部署依赖。本文早期 PostgreSQL 方案仅作历史记录。
 
 ## 1. 项目概述
 
-Bookmark Vault 是一个面向个人和小团队的自部署浏览器书签同步系统，产品体验参考 Bitwarden：
+WOTTY BOOKMARK 是一个面向个人和小团队的自部署浏览器书签同步系统，产品体验参考 Bitwarden：
 
 - 首期复用官方 Floccus 扩展读取、创建、修改和删除浏览器原生书签。
 - 通过 WebDAV 将 Floccus 的书签文件同步到自部署服务器。
@@ -43,7 +45,7 @@ Bookmark Vault 是一个面向个人和小团队的自部署浏览器书签同�
 首期有两个客户端概念：
 
 1. 官方 Floccus：负责浏览器书签读取、书签树操作、同步和冲突处理；它不是本项目代码，也不需要我们发布插件。
-2. Bookmark Vault 管理后台：负责账户、应用密码、设备、服务状态和部署配置；这是本项目需要开发和部署的前端。
+2. WOTTY BOOKMARK 管理后台：负责账户、应用密码、设备、服务状态和部署配置；这是本项目需要开发和部署的前端。
 
 管理后台使用：
 
@@ -174,7 +176,7 @@ WebDAV 自部署服务
 
 ## 5. 扩展能力和浏览器适配（后续自有扩展）
 
-本章不属于 Floccus WebDAV MVP。首期由官方 Floccus 负责浏览器 API 适配；只有开发 Bookmark Vault 自有扩展时，才实现以下适配器。
+本章不属于 Floccus WebDAV MVP。首期由官方 Floccus 负责浏览器 API 适配；只有开发 WOTTY BOOKMARK 自有扩展时，才实现以下适配器。
 
 ### 5.1 必要权限
 
@@ -302,7 +304,7 @@ type BookmarkOperation =
 
 ## 7. 同步方案（后续自有扩展）
 
-Floccus MVP 的同步、离线队列和冲突策略由 Floccus 客户端负责；本章描述的是未来 Bookmark Vault 自有扩展的事件同步方案。
+Floccus MVP 的同步、离线队列和冲突策略由 Floccus 客户端负责；本章描述的是未来 WOTTY BOOKMARK 自有扩展的事件同步方案。
 
 ### 7.1 首次登录
 
@@ -396,7 +398,7 @@ POST /vault/export
 
 ### 9.1 结论
 
-可以使用 Floccus 自动同步，但不能让 Floccus 直接调用 Bookmark Vault 自定义的 `/api/v1/sync` 接口。Floccus 使用内置的后端适配器，服务端必须实现它支持的协议之一。
+可以使用 Floccus 自动同步，但不能让 Floccus 直接调用 WOTTY BOOKMARK 自定义的 `/api/v1/sync` 接口。Floccus 使用内置的后端适配器，服务端必须实现它支持的协议之一。
 
 首选 WebDAV 兼容层，原因是协议简单、部署成熟、Floccus 已原生支持，并且不需要维护 Floccus 分支。
 
@@ -405,16 +407,16 @@ POST /vault/export
 ```text
 Floccus
    ↓ WebDAV + XBEL
-Bookmark Vault WebDAV Adapter
+WOTTY BOOKMARK WebDAV Adapter
    ↓
 账户认证 / 文件锁 / 加密文件存储
 ```
 
-后续如果开发自己的 Bookmark Vault 扩展，再使用原计划中的加密事件 API：
+后续如果开发自己的 WOTTY BOOKMARK 扩展，再使用原计划中的加密事件 API：
 
 ```text
 Floccus ───────────→ /dav/{account}/bookmarks.xbel
-Bookmark Vault 扩展 ─→ /api/v1/sync
+WOTTY BOOKMARK 扩展 ─→ /api/v1/sync
 ```
 
 两个入口可以共用账户、设备管理、备份和审计系统，但不应直接混用两套同步事件格式。
@@ -453,13 +455,13 @@ Rust 服务需要实现 Floccus WebDAV 适配器实际使用到的操作：
 
 Floccus WebDAV 配置本身支持使用 passphrase 在客户端加密整个书签文件。启用后，服务器看到的是加密后的文件，符合“服务器不读取书签明文”的目标。
 
-但这套加密格式和 Bookmark Vault 原计划的 Argon2id + vaultKey + 加密事件模型不是同一套协议。当前 Floccus 的 WebDAV 加密是单个 XBEL 文件整体加密，客户端负责加密和解密。因此：
+但这套加密格式和 WOTTY BOOKMARK 原计划的 Argon2id + vaultKey + 加密事件模型不是同一套协议。当前 Floccus 的 WebDAV 加密是单个 XBEL 文件整体加密，客户端负责加密和解密。因此：
 
 - 使用官方 Floccus：采用 Floccus 自己的 passphrase 加密格式。
-- 使用 Bookmark Vault 自有扩展：采用 Bookmark Vault 的加密事件 API。
+- 使用 WOTTY BOOKMARK 自有扩展：采用 WOTTY BOOKMARK 的加密事件 API。
 - 两者需要共享数据时，必须由服务端或客户端增加 XBEL 与内部书签模型的转换层，不能直接把一套密文当成另一套密文解析。
 
-这意味着 Floccus 兼容模式的主密码和 Bookmark Vault 自有扩展的主密码最好明确区分，或者在产品设计阶段统一密钥协议。首期建议使用独立的 Floccus 加密口令，避免错误地宣称两种加密格式可以互相解密。
+这意味着 Floccus 兼容模式的主密码和 WOTTY BOOKMARK 自有扩展的主密码最好明确区分，或者在产品设计阶段统一密钥协议。首期建议使用独立的 Floccus 加密口令，避免错误地宣称两种加密格式可以互相解密。
 
 ### 9.4 兼容模式的优点和限制
 
@@ -473,7 +475,7 @@ Floccus WebDAV 配置本身支持使用 passphrase 在客户端加密整个书�
 限制：
 
 - Floccus 以一个 XBEL/HTML 文件为主要同步单元，通常是全量文件上传，不是我们的逐条事件同步。
-- 服务端不能提供 Bookmark Vault 专属的标签、备注、全文索引和高级冲突界面。
+- 服务端不能提供 WOTTY BOOKMARK 专属的标签、备注、全文索引和高级冲突界面。
 - Floccus 的登录配置是服务器地址、用户名、密码/应用密码和 passphrase，不是我们的自定义登录页面。
 - 如果需要 Argon2id、设备密钥、恢复密钥和更细粒度的加密事件同步，仍然需要自己的扩展。
 - Floccus 的同步策略和冲突逻辑由 Floccus 客户端决定，服务端只能提供文件和锁能力。
@@ -553,7 +555,7 @@ TypeScript 子项目统一纳入根目录 pnpm workspace。创建项目后只在
 - 支持 Floccus 的 passphrase 加密文件格式透传。
 - 使用官方 Floccus 完成 Chrome、Firefox 双端测试。
 
-交付物：用户无需安装 Bookmark Vault 自有扩展，即可使用官方 Floccus 连接自部署服务并自动同步书签。
+交付物：用户无需安装 WOTTY BOOKMARK 自有扩展，即可使用官方 Floccus 连接自部署服务并自动同步书签。
 
 ### 阶段 1.6：管理后台，1～2 周
 
@@ -599,7 +601,7 @@ TypeScript 子项目统一纳入根目录 pnpm workspace。创建项目后只在
 - 原生加密事件 API、离线队列和冲突中心。
 - 扩展商店资料、隐私政策和权限说明。
 
-交付物：可选的 Bookmark Vault 官方浏览器扩展；该扩展与 Floccus WebDAV 客户端是两种不同客户端，不应在同一浏览器配置中同时写入同一个书签库。
+交付物：可选的 WOTTY BOOKMARK 官方浏览器扩展；该扩展与 Floccus WebDAV 客户端是两种不同客户端，不应在同一浏览器配置中同时写入同一个书签库。
 
 ### 阶段 3.1：自有扩展同步引擎，可选，2～3 周
 
@@ -741,7 +743,7 @@ MVP 只有在以下条件全部满足时才发布：
 
 第一优先级建议调整为先完成“Floccus → WebDAV → XBEL 文件 → 另一浏览器自动恢复”的兼容闭环。这样可以快速得到可用的自部署同步服务。
 
-后续如果确实需要标签、备注、全文搜索、设备密钥和高级冲突界面，再完成“书签事件 → 加密操作 → 服务端保存 → 另一浏览器解密并恢复”的 Bookmark Vault 原生扩展闭环。
+后续如果确实需要标签、备注、全文搜索、设备密钥和高级冲突界面，再完成“书签事件 → 加密操作 → 服务端保存 → 另一浏览器解密并恢复”的 WOTTY BOOKMARK 原生扩展闭环。
 
 最终产品定位可以概括为：
 

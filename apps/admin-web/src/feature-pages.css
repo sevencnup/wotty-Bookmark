@@ -1,19 +1,5 @@
 
-/* ── 七个功能页面 ─────────────────────────────────────────── */
-.page-intro {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 24px;
-  margin-bottom: 22px;
-  padding: 24px 28px;
-  border: 1px solid var(--primary-border);
-  border-radius: var(--radius-lg);
-  background: linear-gradient(135deg, var(--primary-soft) 0%, var(--paper) 68%, #f0fdf4 100%);
-  box-shadow: var(--shadow-xs);
-}
-.page-intro h2 { margin: 0 0 5px; color: var(--ink); font-size: 24px; letter-spacing: -0.04em; }
-.page-intro p:last-child { max-width: 700px; margin: 0; color: var(--ink-secondary); font-size: 13px; line-height: 1.65; }
+/* ── 功能页面 ─────────────────────────────────────────────── */
 .feature-page { display: grid; gap: 20px; }
 .feature-page > .panel { margin-bottom: 0; }
 .page-alert { display: flex; align-items: center; gap: 10px; padding: 12px 15px; border: 1px solid var(--danger-border); border-radius: var(--radius-md); color: var(--danger); background: var(--danger-soft); font-size: 13px; }
@@ -145,8 +131,6 @@ html.reduce-motion *, html.reduce-motion *::before, html.reduce-motion *::after 
   .help-topics button { flex: 0 0 auto; white-space: nowrap; }
 }
 @media (max-width: 680px) {
-  .page-intro { flex-direction: column; padding: 20px; }
-  .page-intro h2 { font-size: 21px; }
   .trash-item, .device-card, .version-row { align-items: flex-start; flex-direction: column; }
   .trash-item-main { width: 100%; }
   .trash-actions { width: 100%; }

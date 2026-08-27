@@ -2933,8 +2933,22 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   .category-management-page .category-workspace {
     grid-template-columns: minmax(0, 38%) minmax(0, 1fr) !important;
     width: 100% !important;
-    height: clamp(500px, calc(100vh - 220px), 680px) !important;
-    overflow: hidden !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+  }
+}
+
+@media (min-width: 681px) {
+  .category-management-page {
+    height: 100%;
+    min-height: 0;
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  .category-management-page > .category-workspace {
+    height: 100% !important;
+    min-height: 0 !important;
   }
 }
 
@@ -2981,7 +2995,6 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 @media (max-width: 1120px) {
   .category-management-page .category-workspace {
     grid-template-columns: minmax(0, 36%) minmax(0, 1fr) !important;
-    height: clamp(520px, calc(100vh - 240px), 760px) !important;
   }
 }
 
@@ -2989,7 +3002,58 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   .category-management-page .category-workspace {
     grid-template-columns: minmax(0, 38%) minmax(0, 1fr) !important;
     width: 100% !important;
-    height: clamp(500px, calc(100vh - 220px), 680px) !important;
-    overflow: hidden !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+  }
+}
+
+/* 分类管理：桌面端填满主内容可用高度 */
+
+@media (max-width: 680px) {
+  .category-management-page {
+    height: auto !important;
+    min-height: 0 !important;
+  }
+
+  .category-management-page .category-workspace {
+    grid-template-columns: 1fr !important;
+    grid-template-rows: auto auto !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+  }
+
+  .category-management-page .category-workspace > .category-bookmarks-panel,
+  .category-management-page .category-workspace > .category-tree-panel {
+    grid-column: 1 !important;
+    grid-row: auto !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    flex: none !important;
+  }
+
+  .category-management-page .category-bookmarks-panel .category-bookmark-list {
+    max-height: min(56vh, 560px) !important;
+  }
+
+  .category-management-page .category-tree-panel .organization-tree {
+    height: min(68vh, 620px) !important;
+    min-height: 420px !important;
+  }
+}
+
+@media (min-width: 681px) {
+  .category-management-page {
+    height: 100%;
+    min-height: 0;
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  .category-management-page > .category-workspace {
+    height: 100% !important;
+    min-height: 0 !important;
   }
 }

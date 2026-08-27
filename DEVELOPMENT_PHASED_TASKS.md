@@ -1,10 +1,10 @@
-# Bookmark Vault 分阶段开发任务
+# WOTTY BOOKMARK 分阶段开发任务
 
 ## 1. 文档目的
 
 本文件根据 [`DEVELOPMENT_EXECUTION_PLAN.md`](DEVELOPMENT_EXECUTION_PLAN.md) 将 MVP 拆分为可认领、可验收、可交接的开发任务。阶段顺序、技术边界和完成门槛以执行计划为准；本文件用于日常排期和进度跟踪。
 
-MVP 的最终目标是：用户可以在管理后台注册并创建 WebDAV 应用密码，使用官方 Floccus 在 Chrome、Edge 和 Firefox 之间同步加密 XBEL，并通过 Bookmark Vault 侧边栏操作浏览器原生书签。
+MVP 的最终目标是：用户可以在管理后台注册并创建 WebDAV 应用密码，使用官方 Floccus 在 Chrome、Edge 和 Firefox 之间同步加密 XBEL，并通过 WOTTY BOOKMARK 侧边栏操作浏览器原生书签。
 
 ## 2. 执行规则
 

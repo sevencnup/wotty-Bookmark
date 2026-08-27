@@ -1,14 +1,14 @@
 {$BOOKMARK_VAULT_DOMAIN:localhost} {
   handle /api/* {
-    reverse_proxy api:8080
+    reverse_proxy api:26626
   }
 
   handle /dav/* {
-    reverse_proxy api:8080
+    reverse_proxy api:26626
   }
 
   handle /health/* {
-    reverse_proxy api:8080
+    reverse_proxy api:26626
   }
 
   root * /srv/admin-web

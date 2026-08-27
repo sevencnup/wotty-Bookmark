@@ -13,10 +13,12 @@ idna = "=0.3.0"
 chrono = { version = "0.4", features = ["serde"] }
 httpdate = "1"
 rand = "0.8"
+percent-encoding = "2.3"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = "0.10"
-sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "migrate", "macros"] }
+quick-xml = "0.37"
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio-rustls", "sqlite", "uuid", "chrono", "migrate", "macros"] }
 tokio = { version = "1", features = ["macros", "net", "rt-multi-thread"] }
 tower-http = { version = "0.5.2", features = ["cors", "trace"] }
 tracing = "0.1"

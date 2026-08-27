@@ -2,14 +2,14 @@
 
 日期：2026-08-25  
 任务：`deployment-recovery`  
-结论：`PARTIAL - HISTORY RETENTION BLOCKED`
+结论：`SQLITE MIGRATION - RECOVERY RECHECK REQUIRED`
 
-本文覆盖单机 Docker Compose 部署、Caddy 反向代理、PostgreSQL 元数据和 WebDAV 加密文件的备份恢复边界。备份命令必须针对专用部署或恢复项目执行，不得对生产卷使用宽泛删除命令。
+本文覆盖单机 Docker Compose 部署、Caddy 反向代理、SQLite 元数据和 WebDAV 加密文件的备份恢复边界。备份命令必须针对专用部署或恢复项目执行，不得对生产卷使用宽泛删除命令。
 
 ## 部署文件
 
-- `docker-compose.yml`：开发和协议验收用基础编排，保留 `5433` 和 `8080` 本地端口。
-- `docker-compose.production.yml`：生产覆盖，移除 PostgreSQL/API 公网端口，增加 Caddy，并要求通过环境变量注入数据库、CORS 和域名配置。
+- `docker-compose.yml`：开发和协议验收用基础编排，保留 `26626` 本地 API 端口。
+- `docker-compose.production.yml`：生产覆盖，移除 API 公网端口，增加 Caddy，并要求通过环境变量注入 CORS 和域名配置。
 - `Caddyfile`：将 `/api/*`、`/dav/*`、`/health/*` 代理到 API，并提供管理后台静态文件。
 - `.env.example`：生产变量模板，不包含可用凭据；真实 `.env` 不得提交。
 
@@ -21,7 +21,7 @@
    pnpm --filter @bookmark-vault/admin-web build
    ```
 
-2. 复制 `infra/.env.example` 为部署主机上的私有 `.env`，替换随机数据库密码和正式域名。`DATABASE_URL` 中的保留字符必须 URL 编码。
+2. 复制 `infra/.env.example` 为部署主机上的私有 `.env`，替换正式域名和 CORS 来源。
 3. 使用生产覆盖检查合并配置，并确认没有缺失必需变量：
 
    ```bash
@@ -47,30 +47,26 @@
      -f infra/docker-compose.production.yml ps
    ```
 
-PostgreSQL 和 API 只加入 Compose 内部网络；公网只暴露 Caddy 的 80/443。Caddy 的证书和状态保存在 `caddy-data` 与 `caddy-config` 卷中，也应纳入主机级备份。
+API 只加入 Compose 内部网络；公网只暴露 Caddy 的 80/443。SQLite 数据库和 WebDAV 文件都保存在 `bookmark-data` 卷中。Caddy 的证书和状态保存在 `caddy-data` 与 `caddy-config` 卷中，也应纳入主机级备份。
 
 ## 备份边界
 
 需要分别备份以下内容：
 
-1. PostgreSQL：账户、会话、应用密码哈希和 `dav_files` 元数据。
-2. `bookmark-data`：Floccus 上传的 opaque blob。启用 Floccus passphrase 后，文件本身是客户端加密内容，服务端不解析书签。
-3. `caddy-data` 和 `caddy-config`：HTTPS 证书及 Caddy 状态；也可以在恢复主机上让 Caddy 重新签发证书。
-4. `.env` 中的数据库连接和 Caddy 域名配置：单独使用受控密钥管理，不将其与公开备份放在一起。
+1. `bookmark-data`：SQLite 数据库、账户/应用密码元数据、文件版本和 Floccus 上传的 opaque blob。启用 Floccus passphrase 后，文件本身是客户端加密内容，服务端不解析书签。
+2. `caddy-data` 和 `caddy-config`：HTTPS 证书及 Caddy 状态；也可以在恢复主机上让 Caddy 重新签发证书。
+3. `.env` 中的 CORS 和 Caddy 域名配置：单独使用受控密钥管理，不将其与公开备份放在一起。
 
 示例备份命令（在已配置的 Compose 项目目录执行）：
 
 ```bash
 BACKUP_DIR="$(mktemp -d)"
-docker compose exec -T postgres pg_dump \
-  -U "$POSTGRES_USER" -d "$POSTGRES_DB" --format=custom \
-  > "$BACKUP_DIR/bookmark-vault.dump"
 docker compose cp api:/var/lib/bookmark-vault "$BACKUP_DIR/bookmark-data"
 tar -C "$BACKUP_DIR" -czf "$BACKUP_DIR/bookmark-data.tar.gz" bookmark-data
 openssl enc -aes-256-cbc -pbkdf2 -iter 600000 -salt \
   -in "$BACKUP_DIR/bookmark-data.tar.gz" \
   -out "$BACKUP_DIR/bookmark-data.tar.gz.enc"
-sha256sum "$BACKUP_DIR/bookmark-vault.dump" "$BACKUP_DIR/bookmark-data.tar.gz.enc"
+sha256sum "$BACKUP_DIR/bookmark-data.tar.gz.enc"
 ```
 
 备份加密口令必须通过独立密钥管理系统交付。命令结束后删除临时目录，或将加密文件移动到经过访问控制的备份存储；不要保留未加密的 tar 和临时数据库 dump。
@@ -81,27 +77,21 @@ sha256sum "$BACKUP_DIR/bookmark-vault.dump" "$BACKUP_DIR/bookmark-data.tar.gz.en
 
 ```bash
 RECOVERY_PROJECT="bookmark-vault-recovery-$(date +%s)"
-docker compose -p "$RECOVERY_PROJECT" up -d postgres api
-docker compose -p "$RECOVERY_PROJECT" exec -T postgres \
-  pg_restore --clean --if-exists --no-owner \
-  -U "$POSTGRES_USER" -d "$POSTGRES_DB" < "$BACKUP_DIR/bookmark-vault.dump"
+docker compose -p "$RECOVERY_PROJECT" up -d api
 docker compose -p "$RECOVERY_PROJECT" cp \
   "$BACKUP_DIR/bookmark-data/." api:/var/lib/bookmark-vault/
-docker compose -p "$RECOVERY_PROJECT" exec -T postgres \
-  psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
-  -c 'SELECT COUNT(*) AS restored_dav_files FROM dav_files;'
 docker compose -p "$RECOVERY_PROJECT" exec -T api \
   find /var/lib/bookmark-vault -type f -print -exec sha256sum {} \;
 docker compose -p "$RECOVERY_PROJECT" down -v
 ```
 
-验收证据至少应包含：dump 校验和、恢复后 `dav_files` 行数、恢复后 opaque blob 校验和、`/health/live` 返回 200，以及未影响原部署项目的证明。恢复结束只允许删除本次演练生成的精确项目和卷。
+验收证据至少应包含：备份归档校验和、恢复后 SQLite 文件和 opaque blob 校验和、`/health/live` 返回 200，以及未影响原部署项目的证明。恢复结束只允许删除本次演练生成的精确项目和卷。
 
-本次隔离演练结果：新建恢复项目恢复出 1 条 `dav_files` 记录；解密后的备份文件与恢复容器中的文件 SHA-256 均为 `04f3d98e64dd1d42fd60c12b5e0c00a51ea6a23c6dc012dab744f804becc16a4`。演练使用的两个 Compose 项目、卷和临时备份已清理。
+PostgreSQL 版本的历史演练记录不适用于当前 SQLite 数据格式；切换后需要重新执行一次隔离恢复演练。
 
 ## 历史版本清理状态
 
-历史版本能力已通过 `migrations/0002_file_versions.sql` 补齐。正式 `bookmarks.xbel` 被 PUT 覆盖、被 MOVE 覆盖或执行恢复前，API 会将当前 opaque blob 保存到 `DATA_DIR/.versions/<user-id>/<dav-file-id>/<version-id>.blob`，并在 PostgreSQL `file_versions` 中记录快照元数据。服务端不解析或记录书签明文。
+历史版本能力已通过 `migrations/0002_file_versions.sql` 补齐。正式 `bookmarks.xbel` 被 PUT 覆盖、被 MOVE 覆盖或执行恢复前，API 会将当前 opaque blob 保存到 `DATA_DIR/.versions/<user-id>/<dav-file-id>/<version-id>.blob`，并在 SQLite `file_versions` 中记录快照元数据。服务端不解析或记录书签明文。
 
 管理 API 使用登录会话鉴权：
 

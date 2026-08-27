@@ -671,7 +671,7 @@ pub fn unauthorized_basic() -> Response {
     );
     response.headers_mut().insert(
         header::WWW_AUTHENTICATE,
-        HeaderValue::from_static("Basic realm=\"Bookmark Vault WebDAV\""),
+        HeaderValue::from_static("Basic realm=\"WOTTY BOOKMARK WebDAV\""),
     );
     response
 }

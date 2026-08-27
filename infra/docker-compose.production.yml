@@ -1,19 +1,9 @@
 services:
-  postgres:
-    ports: !reset []
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB must be set}
-      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER must be set}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
-
   api:
     ports: !reset []
     environment:
-      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL must be set}
+      DATABASE_URL: ${DATABASE_URL:-sqlite:///var/lib/bookmark-vault/bookmark-vault.sqlite}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:?CORS_ALLOWED_ORIGINS must be set}
-    depends_on:
-      postgres:
-        condition: service_healthy
 
   caddy:
     image: caddy:2-alpine
