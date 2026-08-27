@@ -1,5 +1,23 @@
 # 管理后台开发记录
 
+## 2026-08-27：`admin-fixed-dev-port`
+
+### 任务
+
+修复开发服务端口漂移导致刷新时打开其他项目或旧实例的问题。
+
+### 进度
+
+- 将 admin-web Vite 开发服务设置为严格使用 4173 端口。
+- 同步更新 TypeScript 和生成的 JavaScript Vite 配置。
+- 确保分类页面刷新时不会因端口自动递增而切换到其他应用。
+
+### 验证
+
+- `pnpm --filter @bookmark-vault/admin-web lint`：通过。
+- `pnpm --filter @bookmark-vault/admin-web test`：13 项通过。
+- `pnpm --filter @bookmark-vault/admin-web build`：通过。
+
 ## 2026-08-27：`admin-category-refresh-reflow`
 
 ### 任务

@@ -172,10 +172,6 @@ export function CategoryManagementPage({ token, onOpenFloccus }: Props) {
   }
 
   return <div className="category-management-page">
-    <section className="category-hero">
-      <div><p className="eyebrow">CATEGORY ORGANIZER</p><h2>拖动书签，整理你的知识结构</h2><p>左侧是待整理书签，右侧是从总目录向下衍生的组织架构。把书签拖入任意层级的文件夹分支即可完成归类。</p></div>
-      <div className="category-hero-stats"><div><strong>{tree?.bookmarks.length ?? '—'}</strong><span>书签总数</span></div><div><strong>{countFolders(allFolders)}</strong><span>文件夹</span></div></div>
-    </section>
     {error && <div aria-live="polite" className="bookmark-alert error"><strong>操作失败</strong><span>{error}</span></div>}
     {notice && <div aria-live="polite" className="bookmark-alert success"><strong>已完成</strong><span>{notice}</span></div>}
     {loading ? <section className="panel category-state"><LoaderCircle className="spin" size={30} /><strong>正在加载书签组织结构…</strong><p>正在读取最新的文件夹和书签索引。</p></section> : tree?.status === 'encrypted' ? <section className="panel category-state"><Sparkles size={30} /><strong>同步文件已加密，暂时无法建立分类树</strong><p>服务器无法读取加密文件中的文件夹和书签。请在 Floccus 或浏览器书签中完成整理。</p><button className="primary-button" onClick={onOpenFloccus} type="button">打开 Floccus 配置</button></section> : tree?.status !== 'ready' ? <section className="panel category-state"><FolderOpen size={30} /><strong>还没有可用的书签索引</strong><p>完成一次明文 XBEL 同步后，这里会显示从总目录衍生的文件夹组织树。</p><button className="primary-button" onClick={onOpenFloccus} type="button">前往同步配置</button></section> : <div className="category-workspace">
@@ -196,7 +192,6 @@ function toggleSet(current: Set<string>, id: string) { const next = new Set(curr
 function allFolderIds(folders: api.BookmarkFolder[]): string[] { return folders.flatMap((folder) => [folder.id, ...allFolderIds(folder.children)]) }
 function findFolder(folders: api.BookmarkFolder[], id: string): api.BookmarkFolder | null { for (const folder of folders) { if (folder.id === id) return folder; const match = findFolder(folder.children, id); if (match) return match } return null }
 function flattenFolders(folders: api.BookmarkFolder[], depth = 0): FlatBookmarkFolder[] { return flattenBookmarkFolders(folders, depth) }
-function countFolders(folders: api.BookmarkFolder[]): number { return folders.reduce((count, folder) => count + 1 + countFolders(folder.children), 0) }
 function getHost(value: string) { try { return new URL(value).hostname.replace(/^www\./, '') } catch { return value } }
 function readableError(error: unknown, fallback: string) { if (error instanceof api.ApiRequestError) { if (error.status === 401) return '登录已过期，请重新登录。'; if (error.status === 409) return '同步文件已变化，请刷新后重试。'; if (error.status === 423) return 'Floccus 正在同步文件，请稍后再试。'; return error.message } return error instanceof Error ? error.message : fallback }
 function ExternalLinkIcon() { return <svg aria-hidden="true" fill="none" height="13" viewBox="0 0 24 24" width="13"><path d="M14 5h5v5M19 5l-8 8" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" /><path d="M18 13v5a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" /></svg>}

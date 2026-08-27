@@ -221,11 +221,6 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   overflow-y: auto;
 }
 
-.bookmark-main-content {
-  padding: 0;
-  background: var(--canvas);
-}
-
 /* ── 顶部栏系统 ───────────────────────────────────────────── */
 .topbar {
   display: flex;
@@ -234,57 +229,9 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   margin-bottom: 28px;
 }
 
-.topbar h1 {
-  margin: 0;
-  color: var(--ink);
-  font-size: clamp(24px, 2.5vw, 30px);
-  font-weight: 700;
-  letter-spacing: -0.03em;
-}
-
-.eyebrow {
-  margin: 0 0 6px;
-  color: var(--primary);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-.bookmark-topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  min-height: 72px;
-  padding: 0 32px;
-  border-bottom: 1px solid var(--line);
-  background: var(--paper);
-}
-
-.page-heading {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-  white-space: nowrap;
-}
-
-.page-heading h1 {
-  margin: 0;
-  color: var(--ink);
-  font-size: 22px;
-  font-weight: 700;
-  letter-spacing: -0.03em;
-}
-
-.page-heading span {
-  color: var(--muted);
-  font-size: 13px;
-}
-
-.bookmark-content {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 28px 32px 36px;
+.storage-content {
+  display: grid;
+  gap: 20px;
 }
 
 /* ── 通用按钮与控制项 ─────────────────────────────────────── */
@@ -2833,8 +2780,6 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   .nav-item { width: auto; white-space: nowrap; padding: 6px 10px; font-size: 12px; }
   .nav-item.active::before { display: none; }
   .main-content { padding: 20px 16px; }
-  .bookmark-topbar { padding: 16px; }
-  .bookmark-content { padding: 16px 12px; }
   .hero-card { padding: 20px; flex-direction: column; text-align: center; }
   .hero-symbol { display: none; }
   .config-field { flex-direction: column; align-items: flex-start; gap: 6px; }
