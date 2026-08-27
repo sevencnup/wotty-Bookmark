@@ -1,5 +1,24 @@
 # 管理后台开发记录
 
+## 2026-08-27：`admin-category-scroll-containers`
+
+### 任务
+
+限制分类管理工作区高度，为书签列表和横向组织树提供独立滚动区域。
+
+### 进度
+
+- 将左右模块限制在视口高度内，避免大量书签把页面无限撑高。
+- 左侧书签列表增加独立纵向滚动和固定表头。
+- 右侧组织树保留独立横向/纵向滚动，平板布局继续维持左右结构。
+- 窄屏场景调整为有限高度的独立滚动容器。
+
+### 验证
+
+- `pnpm --filter @bookmark-vault/admin-web lint`：通过。
+- `pnpm --filter @bookmark-vault/admin-web test`：13 项通过。
+- `pnpm --filter @bookmark-vault/admin-web build`：通过。
+
 ## 2026-08-26：`admin-category-drag-and-drop`
 
 ### 任务
