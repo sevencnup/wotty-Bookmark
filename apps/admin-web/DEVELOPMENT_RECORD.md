@@ -27,7 +27,7 @@
 
 ### 进度
 
-- 将 admin-web Vite 开发服务设置为严格使用 4173 端口。
+- 将 admin-web Vite 开发服务设置为严格使用 56993 端口。
 - 同步更新 TypeScript 和生成的 JavaScript Vite 配置。
 - 确保分类页面刷新时不会因端口自动递增而切换到其他应用。
 
