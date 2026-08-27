@@ -4,7 +4,7 @@ export default defineConfig({
   modules: ['@wxt-dev/module-react'],
   dev: {
     server: {
-      port: 3000,
+      port: 56992,
       strictPort: true,
     },
   },

@@ -24,6 +24,7 @@ pnpm dev
 默认只启动本地 Rust API 和管理后台：
 
 - 管理后台：http://localhost:56993/
+- 侧边栏插件开发页：http://localhost:56992/
 - Rust API：http://127.0.0.1:26626/
 
 侧边栏不是同步链路的必需服务，需要开发侧边栏时另开终端执行：
