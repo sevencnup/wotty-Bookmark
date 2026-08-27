@@ -2090,7 +2090,96 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   line-height: 1.5;
 }
 
-/* ── 分类管理真实组织树工作区 ─────────────────────────────── */
+/* ── 分类管理稳定双栏布局 ─────────────────────────────────── */
+.category-management-page .category-workspace {
+  display: flex !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  height: clamp(560px, calc(100vh - 280px), 820px) !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  gap: 20px;
+  overflow: hidden !important;
+}
+
+.category-management-page .category-bookmarks-panel {
+  display: flex;
+  flex: 0 1 34%;
+  width: 34%;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  height: 100% !important;
+  flex-direction: column;
+  overflow: hidden !important;
+}
+
+.category-management-page .category-tree-panel {
+  display: flex;
+  flex: 1 1 66%;
+  width: 66%;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  height: 100% !important;
+  flex-direction: column;
+  overflow: hidden !important;
+}
+
+.category-management-page .category-bookmark-list {
+  width: 100%;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  flex: 1 1 auto;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+}
+
+.category-management-page .organization-tree {
+  width: 100%;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  flex: 1 1 auto;
+  overflow-x: auto !important;
+  overflow-y: auto !important;
+}
+
+.category-management-page .organization-tree-canvas {
+  width: max-content;
+  min-width: 100%;
+}
+
+@media (max-width: 1120px) {
+  .category-management-page .category-workspace {
+    height: clamp(540px, calc(100vh - 250px), 760px) !important;
+  }
+}
+
+@media (max-width: 680px) {
+  .category-management-page .category-workspace {
+    width: 100% !important;
+    height: auto !important;
+    min-width: 0 !important;
+    flex-direction: column;
+    overflow: visible !important;
+  }
+
+  .category-management-page .category-bookmarks-panel,
+  .category-management-page .category-tree-panel {
+    width: 100%;
+    height: auto !important;
+    flex: none;
+  }
+
+  .category-management-page .category-bookmark-list {
+    max-height: min(56vh, 560px);
+  }
+
+  .category-management-page .organization-tree {
+    height: min(68vh, 620px);
+    min-height: 420px !important;
+  }
+}
+
+
 .category-management-page { display: grid; gap: 20px; }
 .category-hero { display: flex; align-items: center; justify-content: space-between; gap: 28px; min-height: 172px; padding: 30px 34px; border: 1px solid #c7d2fe; border-radius: var(--radius-xl); background: linear-gradient(120deg, #eef2ff 0%, #ffffff 58%, #f0fdf4 100%); box-shadow: var(--shadow-sm); }
 .category-hero h2 { margin: 0 0 8px; color: var(--ink); font-size: clamp(25px, 3vw, 34px); font-weight: 800; letter-spacing: -0.05em; }
@@ -2185,7 +2274,7 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 @media (max-width: 880px) { .category-hero { align-items: flex-start; flex-direction: column; } .category-hero-stats { width: 100%; } .category-hero-stats div { flex: 1; } .category-workspace { grid-template-columns: minmax(250px, 0.75fr) minmax(0, 1.7fr); } .organization-tree { min-height: 520px; } .organization-root-rail { gap: 10px; padding-left: 14px; padding-right: 14px; } .organization-root-rail > .organization-node { min-width: 160px; } }
 @media (max-width: 680px) { .category-hero { padding: 22px; } .category-hero h2 { font-size: 25px; } .category-tree-panel, .category-bookmarks-panel { padding: 17px; } .category-workspace { grid-template-columns: 1fr; } .category-tree-panel { order: 2; } .category-bookmarks-panel { order: 1; } .category-toolbar { align-items: stretch; flex-direction: column; } .category-toolbar .bookmark-search { width: 100%; } .category-toolbar .toolbar-button { width: 100%; } .category-bulk-bar select { width: 100%; margin-left: 0; } .category-bulk-bar button { flex: 1; } .category-list-header, .category-bookmark-row { grid-template-columns: 30px 28px minmax(140px, 1fr) 32px; padding: 0 8px; } .category-list-header > span:nth-of-type(2), .category-list-header > span:nth-of-type(3), .category-location { display: none; } .category-bookmark-info { grid-column: 3; } .category-keyboard-hint { text-align: left; } .organization-tree { min-height: 460px; } .organization-root-rail { justify-content: flex-start; } }
 
-/* ── 分类管理：从总目录向右展开的组织树 ─────────────────────── */
+/* ── 分类管理稳定双栏布局 ─────────────────────────────────── */
 .category-management-page .category-workspace {
   grid-template-columns: minmax(360px, 0.72fr) minmax(720px, 2.28fr);
 }
@@ -2527,24 +2616,143 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 
 @media (max-width: 1120px) {
   .category-management-page .category-workspace {
-    grid-template-columns: minmax(280px, 36%) minmax(0, 1fr) !important;
-    height: clamp(540px, calc(100vh - 250px), 760px);
+    display: flex !important;
+    grid-template-columns: none !important;
+    width: 100% !important;
+    height: clamp(540px, calc(100vh - 250px), 760px) !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
+  }
+
+  .category-management-page .category-bookmarks-panel {
+    flex-basis: 36%;
+    width: 36%;
+  }
+
+  .category-management-page .category-tree-panel {
+    flex-basis: 64%;
+    width: 64%;
   }
 }
 
 @media (max-width: 680px) {
   .category-management-page .category-workspace {
-    grid-template-columns: minmax(250px, 40%) minmax(420px, 60%) !important;
-    width: max-content;
-    max-width: none;
-    overflow-x: auto;
+    display: flex !important;
+    grid-template-columns: none !important;
+    width: 100% !important;
+    height: auto !important;
+    min-width: 0 !important;
+    flex-direction: row;
+    overflow: hidden !important;
   }
 
   .category-management-page .category-bookmarks-panel,
   .category-management-page .category-tree-panel {
-    height: clamp(520px, calc(100vh - 220px), 680px);
+    height: clamp(520px, calc(100vh - 220px), 680px) !important;
+    min-height: 0 !important;
+  }
+
+  .category-management-page .category-bookmarks-panel {
+    flex-basis: 40%;
+    width: 40%;
+  }
+
+  .category-management-page .category-tree-panel {
+    flex-basis: 60%;
+    width: 60%;
+  }
+
+  .category-management-page .category-workspace > .category-bookmarks-panel,
+  .category-management-page .category-workspace > .category-tree-panel {
+    order: initial;
   }
 }
+
+/* ── 分类管理稳定双栏布局 ─────────────────────────────────── */
+.category-management-page .category-workspace {
+  display: flex !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  height: clamp(560px, calc(100vh - 280px), 820px) !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  gap: 20px;
+  overflow: hidden !important;
+}
+
+.category-management-page .category-bookmarks-panel {
+  flex: 0 1 34%;
+  width: 34%;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  height: 100% !important;
+  overflow: hidden !important;
+}
+
+.category-management-page .category-tree-panel {
+  flex: 1 1 66%;
+  width: 66%;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  height: 100% !important;
+  overflow: hidden !important;
+}
+
+.category-management-page .category-bookmark-list {
+  width: 100%;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  flex: 1 1 auto;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+}
+
+.category-management-page .organization-tree {
+  width: 100%;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  flex: 1 1 auto;
+  overflow-x: auto !important;
+  overflow-y: auto !important;
+}
+
+.category-management-page .organization-tree-canvas {
+  width: max-content;
+  min-width: 100%;
+}
+
+@media (max-width: 1120px) {
+  .category-management-page .category-workspace {
+    height: clamp(540px, calc(100vh - 250px), 760px) !important;
+  }
+}
+
+@media (max-width: 680px) {
+  .category-management-page .category-workspace {
+    width: 100% !important;
+    height: auto !important;
+    min-width: 0 !important;
+    flex-direction: column;
+    overflow: visible !important;
+  }
+
+  .category-management-page .category-bookmarks-panel,
+  .category-management-page .category-tree-panel {
+    width: 100%;
+    height: auto !important;
+    flex: none;
+  }
+
+  .category-management-page .category-bookmark-list {
+    max-height: min(56vh, 560px);
+  }
+
+  .category-management-page .organization-tree {
+    height: min(68vh, 620px);
+    min-height: 420px !important;
+  }
+}
+
 
 .modal-backdrop {
   position: fixed;
@@ -2743,4 +2951,117 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   .config-field-label { flex: none; }
   .config-field-value { width: 100%; }
   .auth-card { padding: 24px; }
+}
+
+/* ── 分类管理最终稳定双栏（文件末尾优先级） ─────────────── */
+.category-management-page .category-workspace {
+  display: grid !important;
+  grid-template-columns: minmax(280px, 34%) minmax(0, 1fr) !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  height: clamp(540px, calc(100vh - 280px), 820px) !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  align-items: stretch !important;
+  gap: 20px !important;
+  overflow: hidden !important;
+}
+
+.category-management-page .category-workspace > .category-bookmarks-panel,
+.category-management-page .category-workspace > .category-tree-panel {
+  display: flex !important;
+  width: auto !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  height: 100% !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+}
+
+.category-management-page .category-bookmark-list {
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  flex: 1 1 auto !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+}
+
+.category-management-page .organization-tree {
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  flex: 1 1 auto !important;
+  overflow-x: auto !important;
+  overflow-y: auto !important;
+}
+
+.category-management-page .organization-tree-canvas {
+  width: max-content !important;
+  min-width: 100% !important;
+}
+
+@media (max-width: 1120px) {
+  .category-management-page .category-workspace {
+    grid-template-columns: minmax(250px, 36%) minmax(0, 1fr) !important;
+    height: clamp(520px, calc(100vh - 240px), 760px) !important;
+  }
+}
+
+/* ── 分类管理刷新稳定性最终规则 ───────────────────────────── */
+.category-management-page .category-workspace {
+  display: grid !important;
+  grid-template-columns: minmax(0, 34%) minmax(0, 66%) !important;
+  grid-auto-columns: auto !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  height: clamp(540px, calc(100vh - 280px), 820px) !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  align-items: stretch !important;
+  overflow: hidden !important;
+}
+
+.category-management-page .category-workspace > .category-bookmarks-panel {
+  grid-column: 1 !important;
+  grid-row: 1 !important;
+  width: auto !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  height: 100% !important;
+  overflow: hidden !important;
+}
+
+.category-management-page .category-workspace > .category-tree-panel {
+  grid-column: 2 !important;
+  grid-row: 1 !important;
+  width: auto !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  height: 100% !important;
+  overflow: hidden !important;
+}
+
+.category-management-page .category-bookmarks-panel .category-bookmark-list,
+.category-management-page .category-tree-panel .organization-tree {
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  flex: 1 1 auto !important;
+}
+
+@media (max-width: 1120px) {
+  .category-management-page .category-workspace {
+    grid-template-columns: minmax(0, 36%) minmax(0, 64%) !important;
+    height: clamp(520px, calc(100vh - 240px), 760px) !important;
+  }
+}
+
+@media (max-width: 680px) {
+  .category-management-page .category-workspace {
+    grid-template-columns: minmax(0, 38%) minmax(0, 62%) !important;
+    width: 100% !important;
+    height: clamp(500px, calc(100vh - 220px), 680px) !important;
+    overflow: hidden !important;
+  }
 }

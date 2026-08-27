@@ -1,5 +1,24 @@
 # 管理后台开发记录
 
+## 2026-08-27：`admin-category-refresh-layout`
+
+### 任务
+
+修复分类管理页面刷新后右侧组织树被布局规则推出视口的问题。
+
+### 进度
+
+- 清理重复的分类工作区响应式覆盖规则。
+- 固定左侧书签、右侧组织树的双栏顺序和宽度计算。
+- 保留两个模块各自的内部滚动，避免刷新后的 CSS 重排导致右侧区域消失。
+- 修复 CSS 末尾多余闭合符，确保构建产物样式解析稳定。
+
+### 验证
+
+- `pnpm --filter @bookmark-vault/admin-web lint`：通过。
+- `pnpm --filter @bookmark-vault/admin-web test`：13 项通过。
+- `pnpm --filter @bookmark-vault/admin-web build`：通过。
+
 ## 2026-08-27：`admin-category-layout-overflow`
 
 ### 任务
