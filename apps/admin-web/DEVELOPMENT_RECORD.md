@@ -1,5 +1,24 @@
 # 管理后台开发记录
 
+## 2026-08-27：`admin-category-refresh-reflow`
+
+### 任务
+
+修复分类管理页面刷新后右侧模块消失、工作区发生横向偏移的问题。
+
+### 进度
+
+- 移除刷新后会覆盖分类工作区的重复响应式布局规则。
+- 固定书签面板和组织树面板的网格列位置与可收缩宽度。
+- 禁止工作区自身被内容推出视口，滚动仅发生在两个内部容器。
+- 保留左侧书签、右侧组织树和独立滚动条。
+
+### 验证
+
+- `pnpm --filter @bookmark-vault/admin-web lint`：通过。
+- `pnpm --filter @bookmark-vault/admin-web test`：13 项通过。
+- `pnpm --filter @bookmark-vault/admin-web build`：通过。
+
 ## 2026-08-27：`admin-category-refresh-layout`
 
 ### 任务
