@@ -1,5 +1,23 @@
 # 管理后台开发记录
 
+## 2026-08-27：`admin-category-layout-overflow`
+
+### 任务
+
+修复分类管理页面右侧模块被最小列宽推出视口的问题，确保左右工作区完整显示。
+
+### 进度
+
+- 统一分类工作区为左侧书签列表、右侧组织树的完整两列布局。
+- 移除导致第二列超出视口的固定最小宽度约束。
+- 保留左右模块独立滚动，避免大量书签撑高页面。
+
+### 验证
+
+- `pnpm --filter @bookmark-vault/admin-web lint`：通过。
+- `pnpm --filter @bookmark-vault/admin-web test`：13 项通过。
+- `pnpm --filter @bookmark-vault/admin-web build`：通过。
+
 ## 2026-08-27：`admin-category-scroll-containers`
 
 ### 任务

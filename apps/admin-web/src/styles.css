@@ -2475,6 +2475,77 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   }
 }
 
+
+/* ── 分类管理最终布局约束：左侧书签，右侧组织树 ─────────────── */
+.category-management-page {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.category-management-page .category-workspace {
+  display: grid !important;
+  grid-template-columns: minmax(300px, 34%) minmax(0, 1fr) !important;
+  width: 100%;
+  height: clamp(560px, calc(100vh - 280px), 820px);
+  min-width: 0;
+  min-height: 0;
+  align-items: stretch;
+  overflow: hidden;
+}
+
+.category-management-page .category-bookmarks-panel,
+.category-management-page .category-tree-panel {
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.category-management-page .category-bookmark-list {
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.category-management-page .organization-tree {
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow-x: auto;
+  overflow-y: auto;
+}
+
+.category-management-page .organization-tree-canvas {
+  width: max-content;
+  min-width: 100%;
+}
+
+@media (max-width: 1120px) {
+  .category-management-page .category-workspace {
+    grid-template-columns: minmax(280px, 36%) minmax(0, 1fr) !important;
+    height: clamp(540px, calc(100vh - 250px), 760px);
+  }
+}
+
+@media (max-width: 680px) {
+  .category-management-page .category-workspace {
+    grid-template-columns: minmax(250px, 40%) minmax(420px, 60%) !important;
+    width: max-content;
+    max-width: none;
+    overflow-x: auto;
+  }
+
+  .category-management-page .category-bookmarks-panel,
+  .category-management-page .category-tree-panel {
+    height: clamp(520px, calc(100vh - 220px), 680px);
+  }
+}
+
 .modal-backdrop {
   position: fixed;
   z-index: 50;
