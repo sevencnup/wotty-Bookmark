@@ -1,5 +1,24 @@
 # 管理后台开发记录
 
+## 2026-08-27：`admin-category-left-panel`
+
+### 任务
+
+修复分类管理页面刷新后左侧书签面板消失的问题。
+
+### 进度
+
+- 统一分类页外层容器与双栏布局样式的 class 契约。
+- 左侧书签面板固定为第一列，右侧组织树固定为第二列。
+- 保留书签列表和组织树各自的内部滚动区域。
+
+### 验证
+
+- `pnpm --filter @bookmark-vault/admin-web lint`：通过。
+- `pnpm --filter @bookmark-vault/admin-web test`：13 项通过。
+- `pnpm --filter @bookmark-vault/admin-web build`：通过。
+- Playwright 刷新前后布局检查：左右两个面板均持续可见。
+
 ## 2026-08-27：`admin-fixed-dev-port`
 
 ### 任务
