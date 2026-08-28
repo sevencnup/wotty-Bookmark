@@ -244,7 +244,7 @@ function App() {
     <div className="app-shell">
       <aside className="sidebar">
         <div className="sidebar-brand">
-          <span className="brand-mark"><BrandLogo size={80} src="/logo1.png" /></span>
+          <span className="brand-mark"><BrandLogo size={80} /></span>
         </div>
         <nav className="nav-list" aria-label="管理后台导航">
           {navGroups.map((group, index) => (
