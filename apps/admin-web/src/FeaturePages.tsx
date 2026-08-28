@@ -148,7 +148,7 @@ export function ImportExportPage({ token, navigate }: PageProps) {
 const helpArticles = [
   { id: 'setup', title: '如何配置 Floccus？', keywords: 'floccus webdav 应用密码 配置同步', content: '先在密码管理页创建应用密码，再在 Floccus 中选择 WebDAV（XBEL），填写后台显示的 WebDAV 地址、登录用户名、应用密码和 bookmarks.xbel。Passphrase 由你自行设置并保存在浏览器中。' },
   { id: 'encryption', title: '为什么后台看不到加密书签？', keywords: '加密 passphrase 隐私 xbel', content: '启用 Floccus 客户端加密后，服务器只收到无法解密的文件。后台不会询问或保存 passphrase，因此不会展示书签标题、网址、文件夹或标签。' },
-  { id: 'pairing', title: '侧边栏连接码如何使用？', keywords: '侧边栏 连接码 pairing', content: '在 Floccus 配置页生成一次性连接码，复制到 WOTTY BOOKMARK 侧边栏的连接设置中。连接码 10 分钟内有效且只能使用一次，连接后不会保存应用密码或登录密码。' },
+  { id: 'pairing', title: '侧边栏设备码如何使用？', keywords: '侧边栏 API 地址 设备码 pairing', content: '在 Floccus 配置页生成连接信息，将 API 地址和一次性设备码分别填入 WOTTY BOOKMARK 侧边栏。设备码 10 分钟内有效且只能使用一次，连接后不会保存应用密码或登录密码。' },
   { id: 'versions', title: '如何恢复历史版本？', keywords: '历史版本 恢复 备份 导入导出', content: '每次同步文件被覆盖前，系统会保存一个 opaque 快照。可以在导入/导出页查看并恢复最近版本；恢复前会再次保存当前文件。' },
   { id: 'errors', title: '常见错误状态是什么意思？', keywords: '401 409 422 423 429 错误', content: '401 表示需要重新登录；409 表示文件已被其他同步更新；422 表示文件格式无法识别；423 表示 Floccus 正在持有文件锁；429 表示请求过于频繁。' },
   { id: 'security', title: '服务器会保存哪些数据？', keywords: '安全 隐私 数据 保存 服务器', content: '服务器保存账户和凭据元数据，以及 Floccus 上传的同步文件。启用客户端加密后，服务器不会知道书签标题、URL、文件夹层级、标签和 passphrase。' },

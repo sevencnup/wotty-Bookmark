@@ -15,7 +15,7 @@ export default defineConfig({
     name: 'WOTTY BOOKMARK Sidebar',
     short_name: 'Bookmarks',
     description: 'A focused sidebar for your browser-native bookmarks.',
-    version: '0.1.2',
+    version: '0.1.3',
     permissions: ['bookmarks', 'tabs', 'storage'],
     host_permissions: ['http://*/*', 'https://*/*'],
     action: {

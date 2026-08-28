@@ -89,6 +89,8 @@ pub struct AppPasswordResponse {
 #[serde(rename_all = "camelCase")]
 pub struct SidebarPairingResponse {
     pub code: String,
+    pub server_url: String,
+    pub device_code: String,
     pub expires_at: String,
 }
 
@@ -283,7 +285,7 @@ pub async fn create_sidebar_pairing(
         return error(
             StatusCode::INTERNAL_SERVER_ERROR,
             "pairing_create_failed",
-            "侧边栏连接码创建失败",
+            "侧边栏设备码创建失败",
         );
     }
 
@@ -296,6 +298,8 @@ pub async fn create_sidebar_pairing(
     let encoded = URL_SAFE_NO_PAD.encode(payload.to_string());
     Json(SidebarPairingResponse {
         code: format!("{SIDEBAR_PAIRING_PREFIX}{encoded}"),
+        server_url: server_url.to_string(),
+        device_code: raw_code,
         expires_at: expires_at.to_rfc3339(),
     })
     .into_response()
@@ -305,24 +309,13 @@ pub async fn exchange_sidebar_pairing(
     State(state): State<AppState>,
     Json(payload): Json<SidebarPairingExchangePayload>,
 ) -> Response {
-    let Some(encoded) = payload.code.strip_prefix(SIDEBAR_PAIRING_PREFIX) else {
-        return error(StatusCode::BAD_REQUEST, "invalid_pairing_code", "连接码无效");
-    };
-    let decoded = match URL_SAFE_NO_PAD.decode(encoded) {
-        Ok(value) => value,
-        Err(_) => return error(StatusCode::BAD_REQUEST, "invalid_pairing_code", "连接码无效"),
-    };
-    let envelope: serde_json::Value = match serde_json::from_slice(&decoded) {
-        Ok(value) => value,
-        Err(_) => return error(StatusCode::BAD_REQUEST, "invalid_pairing_code", "连接码无效"),
-    };
-    let Some(secret) = envelope.get("secret").and_then(|value| value.as_str()) else {
-        return error(StatusCode::BAD_REQUEST, "invalid_pairing_code", "连接码无效");
+    let Some(secret) = sidebar_pairing_secret(&payload.code) else {
+        return error(StatusCode::BAD_REQUEST, "invalid_pairing_code", "设备码无效");
     };
     let row = sqlx::query(
         "SELECT id, user_id FROM sidebar_pairings WHERE code_hash = $1 AND used_at IS NULL AND expires_at > CURRENT_TIMESTAMP",
     )
-    .bind(hash_token(secret))
+    .bind(hash_token(&secret))
     .fetch_optional(&state.db)
     .await;
     let Some(row) = (match row {
@@ -332,7 +325,7 @@ pub async fn exchange_sidebar_pairing(
             return error(StatusCode::INTERNAL_SERVER_ERROR, "pairing_exchange_failed", "侧边栏连接失败");
         }
     }) else {
-        return error(StatusCode::UNAUTHORIZED, "pairing_expired", "连接码已失效，请重新生成");
+        return error(StatusCode::UNAUTHORIZED, "pairing_expired", "设备码已失效，请重新生成");
     };
     let pairing_id: Uuid = row.get("id");
     let user_id: Uuid = row.get("user_id");
@@ -350,7 +343,7 @@ pub async fn exchange_sidebar_pairing(
     .execute(&mut *transaction)
     .await;
     if updated.map(|value| value.rows_affected()).unwrap_or(0) != 1 {
-        return error(StatusCode::UNAUTHORIZED, "pairing_expired", "连接码已失效，请重新生成");
+        return error(StatusCode::UNAUTHORIZED, "pairing_expired", "设备码已失效，请重新生成");
     }
     if transaction.commit().await.is_err() {
         return error(StatusCode::INTERNAL_SERVER_ERROR, "pairing_exchange_failed", "侧边栏连接失败");
@@ -621,6 +614,20 @@ fn generate_secret() -> String {
     format!("bv_{}", URL_SAFE_NO_PAD.encode(bytes))
 }
 
+fn sidebar_pairing_secret(value: &str) -> Option<String> {
+    let trimmed = value.trim();
+    if let Some(encoded) = trimmed.strip_prefix(SIDEBAR_PAIRING_PREFIX) {
+        let decoded = URL_SAFE_NO_PAD.decode(encoded).ok()?;
+        let envelope: serde_json::Value = serde_json::from_slice(&decoded).ok()?;
+        return envelope
+            .get("secret")
+            .and_then(|secret| secret.as_str())
+            .filter(|secret| secret.starts_with("bv_"))
+            .map(str::to_owned);
+    }
+    (trimmed.starts_with("bv_") && trimmed.len() <= 128).then(|| trimmed.to_owned())
+}
+
 fn hash_token(value: &str) -> String {
     let mut digest = Sha256::new();
     digest.update(value.as_bytes());
@@ -692,8 +699,9 @@ pub fn rate_limited(retry_after: Duration) -> Response {
 
 #[cfg(test)]
 mod tests {
-    use super::{basic_credentials, bearer_token};
+    use super::{basic_credentials, bearer_token, sidebar_pairing_secret, SIDEBAR_PAIRING_PREFIX};
     use axum::http::{header, HeaderMap, HeaderValue};
+    use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 
     #[test]
     fn basic_credentials_accepts_case_insensitive_scheme_and_password_colons() {
@@ -726,5 +734,21 @@ mod tests {
             HeaderValue::from_static("bEaReR token"),
         );
         assert_eq!(bearer_token(&headers), Some("token".to_owned()));
+    }
+
+    #[test]
+    fn sidebar_pairing_accepts_device_codes_and_legacy_envelopes() {
+        assert_eq!(
+            sidebar_pairing_secret("  bv_device-secret  "),
+            Some("bv_device-secret".to_owned())
+        );
+
+        let encoded = URL_SAFE_NO_PAD
+            .encode(r#"{"serverUrl":"https://example.com","secret":"bv_legacy-secret"}"#);
+        assert_eq!(
+            sidebar_pairing_secret(&format!("{SIDEBAR_PAIRING_PREFIX}{encoded}")),
+            Some("bv_legacy-secret".to_owned())
+        );
+        assert_eq!(sidebar_pairing_secret("invalid"), None);
     }
 }

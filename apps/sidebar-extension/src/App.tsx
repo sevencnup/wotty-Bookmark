@@ -46,7 +46,7 @@ import { loadSiteFavicon } from './lib/site-favicon';
 import type { FlatBookmarkNode, SearchResult } from './lib/bookmark-tree';
 import {
   clearBackendConnection,
-  connectWithPairingCode,
+  connectToBackend,
   getBackendBookmarks,
   loadBackendConnection,
 } from './lib/backend';
@@ -579,7 +579,7 @@ function App() {
 
       <footer className="app-footer">
         <span><span className="footer-dot" /> 仅使用浏览器原生书签</span>
-        <span className="footer-version">v0.1.2</span>
+        <span className="footer-version">v0.1.3</span>
       </footer>
 
       {operationError ? <div className="operation-toast" role="alert"><Icon name="warning" size={14} /> {operationError}</div> : null}
@@ -613,11 +613,11 @@ function App() {
           error={backendError}
           tree={backendTree}
           onClose={() => setConnectionOpen(false)}
-          onConnect={async (code) => {
+          onConnect={async (serverUrl, deviceCode) => {
             setBackendLoading(true);
             setBackendError(null);
             try {
-              const connection = await connectWithPairingCode(code);
+              const connection = await connectToBackend(serverUrl, deviceCode);
               setBackendConnection(connection);
               setBackendTree(await getBackendBookmarks(connection));
             } catch (connectError) {
@@ -851,11 +851,12 @@ function ConnectionModal({
   error: string | null;
   tree: BackendBookmarkTree | null;
   onClose: () => void;
-  onConnect: (code: string) => Promise<void>;
+  onConnect: (serverUrl: string, deviceCode: string) => Promise<void>;
   onDisconnect: () => Promise<void>;
   onRefresh: () => Promise<void>;
 }) {
-  const [code, setCode] = useState('');
+  const [serverUrl, setServerUrl] = useState('');
+  const [deviceCode, setDeviceCode] = useState('');
   const [disconnecting, setDisconnecting] = useState(false);
 
   return (
@@ -878,12 +879,13 @@ function ConnectionModal({
           </div>
         </div>
       ) : (
-        <form className="editor-form connection-form" onSubmit={(event) => { event.preventDefault(); void onConnect(code); }}>
-          <div className="connection-intro"><span className="connection-status-icon"><Icon name="settings" size={18} /></span><div><strong>不用再填写 WebDAV 密码</strong><p>在管理后台的「Floccus 配置」页面生成一次性连接码，复制后粘贴到这里。</p></div></div>
-          <label className="field-label">后台连接码<textarea autoFocus onChange={(event) => setCode(event.target.value)} placeholder="bvpair.v1...." required rows={4} value={code} /></label>
+        <form className="editor-form connection-form" onSubmit={(event) => { event.preventDefault(); void onConnect(serverUrl, deviceCode); }}>
+          <div className="connection-intro"><span className="connection-status-icon"><Icon name="settings" size={18} /></span><div><strong>不用再填写 WebDAV 密码</strong><p>在管理后台的「Floccus 配置」页面生成 API 地址和一次性设备码，然后分别填入下方。</p></div></div>
+          <label className="field-label">API 地址<input autoFocus inputMode="url" onChange={(event) => setServerUrl(event.target.value)} placeholder="https://bookmark.example.com" type="url" value={serverUrl} /></label>
+          <label className="field-label">设备码<input autoComplete="one-time-code" onChange={(event) => setDeviceCode(event.target.value)} placeholder="bv_..." required spellCheck={false} value={deviceCode} /></label>
           {error ? <p className="connection-error" role="alert">{error}</p> : null}
-          <p className="connection-help">连接码 10 分钟内有效，只能使用一次。连接后不会保存 WebDAV 应用密码或登录密码。</p>
-          <div className="modal-actions"><button className="secondary-button" onClick={onClose} type="button">取消</button><button className="primary-button" disabled={busy || !code.trim()} type="submit">{busy ? '连接中…' : '连接后台'}</button></div>
+          <p className="connection-help">设备码 10 分钟内有效，只能使用一次。连接后不会保存 WebDAV 应用密码或登录密码。</p>
+          <div className="modal-actions"><button className="secondary-button" onClick={onClose} type="button">取消</button><button className="primary-button" disabled={busy || !deviceCode.trim()} type="submit">{busy ? '连接中…' : '连接后台'}</button></div>
         </form>
       )}
     </ModalFrame>

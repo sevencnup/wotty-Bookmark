@@ -56,6 +56,8 @@ export type MoveBookmarksResponse = {
 
 export type SidebarPairing = {
   code: string
+  serverUrl: string
+  deviceCode: string
   expiresAt: string
 }
 

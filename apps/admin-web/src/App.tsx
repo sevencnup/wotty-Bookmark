@@ -720,7 +720,7 @@ function FloccusGuide({ token, loginIdentifier }: { token: string; loginIdentifi
   const [createdSecret, setCreatedSecret] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState('')
-  const [sidebarCode, setSidebarCode] = useState<string | null>(null)
+  const [sidebarPairing, setSidebarPairing] = useState<api.SidebarPairing | null>(null)
   const [pairing, setPairing] = useState(false)
 
   async function handleCreate() {
@@ -742,9 +742,9 @@ function FloccusGuide({ token, loginIdentifier }: { token: string; loginIdentifi
     setError('')
     try {
       const result = await api.createSidebarPairing(token)
-      setSidebarCode(result.code)
+      setSidebarPairing(result)
     } catch (pairingError) {
-      setError(pairingError instanceof Error ? pairingError.message : '连接码创建失败')
+      setError(pairingError instanceof Error ? pairingError.message : '设备码创建失败')
     } finally {
       setPairing(false)
     }
@@ -758,7 +758,7 @@ function FloccusGuide({ token, loginIdentifier }: { token: string; loginIdentifi
           <h3>Floccus 配置向导</h3>
         </div>
       </div>
-      <p className="floccus-intro">先完成 Floccus 的 WebDAV 配置，再用一次性连接码把侧边栏接入当前后台。侧边栏不需要再次填写 WebDAV 账号。</p>
+      <p className="floccus-intro">先完成 Floccus 的 WebDAV 配置，再用 API 地址和一次性设备码把侧边栏接入当前后台。侧边栏不需要再次填写 WebDAV 账号。</p>
 
       <div className="guide-step-card">
         <div className="guide-step-num">1</div>
@@ -827,16 +827,18 @@ function FloccusGuide({ token, loginIdentifier }: { token: string; loginIdentifi
         <div className="guide-step-num">↗</div>
         <div className="guide-step-body">
           <h4>连接 WOTTY BOOKMARK 侧边栏</h4>
-          <p>侧边栏不需要再次填写 WebDAV 地址或应用密码。生成一次性连接码，在侧边栏粘贴即可读取当前后台书签索引。</p>
-          {sidebarCode ? (
+          <p>生成连接信息后，将 API 地址和设备码分别填入侧边栏，即可读取当前后台书签索引。</p>
+          {sidebarPairing ? (
             <div className="secret-box">
-              <strong>连接码有效期 10 分钟，只能使用一次</strong>
-              <code>{sidebarCode}</code>
-              <button className="ghost-button" onClick={() => { void navigator.clipboard?.writeText(sidebarCode) }} type="button">复制连接码</button>
+              <strong>设备码有效期 10 分钟，只能使用一次</strong>
+              <div className="config-fields">
+                <ConfigField label="API 地址" value={sidebarPairing.serverUrl} />
+                <ConfigField label="设备码" value={sidebarPairing.deviceCode} />
+              </div>
             </div>
           ) : (
             <button className="primary-button compact" disabled={pairing} onClick={() => { void handleSidebarPairing() }} type="button">
-              {pairing ? '生成中…' : '生成侧边栏连接码'}
+              {pairing ? '生成中…' : '生成侧边栏设备码'}
             </button>
           )}
         </div>

@@ -1,7 +1,7 @@
 import { browser } from 'wxt/browser';
+import { resolvePairingRequest } from './backend-connection';
 
 const CONNECTION_KEY = 'bookmark-vault.sidebar-connection';
-const PAIRING_PREFIX = 'bvpair.v1.';
 
 export interface BackendConnection {
   serverUrl: string;
@@ -16,11 +16,6 @@ export interface BackendBookmarkTree {
   version: number | null;
   folders: Array<{ id: string; title: string; bookmarkCount: number; children: unknown[] }>;
   bookmarks: Array<{ id: string; title: string; url: string; parentId: string | null; folderPath: string }>;
-}
-
-interface PairingEnvelope {
-  serverUrl?: string;
-  secret?: string;
 }
 
 interface SessionResponse {
@@ -41,34 +36,8 @@ export async function clearBackendConnection(): Promise<void> {
   await browser.storage.local.remove(CONNECTION_KEY);
 }
 
-function parsePairingCode(value: string): { serverUrl: string; code: string } {
-  const trimmed = value.trim();
-  if (!trimmed.startsWith(PAIRING_PREFIX)) {
-    throw new Error('连接码格式不正确');
-  }
-  let envelope: PairingEnvelope;
-  try {
-    const encoded = trimmed.slice(PAIRING_PREFIX.length);
-    const decoded = atob(encoded.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((encoded.length + 3) % 4));
-    envelope = JSON.parse(decoded) as PairingEnvelope;
-  } catch {
-    throw new Error('连接码格式不正确');
-  }
-  const serverUrl = envelope.serverUrl?.trim().replace(/\/$/, '');
-  if (!serverUrl || !envelope.secret) {
-    throw new Error('连接码内容不完整');
-  }
-  try {
-    const url = new URL(serverUrl);
-    if (!['http:', 'https:'].includes(url.protocol)) throw new Error('unsupported protocol');
-  } catch {
-    throw new Error('连接码中的后台地址无效');
-  }
-  return { serverUrl, code: trimmed };
-}
-
-export async function connectWithPairingCode(value: string): Promise<BackendConnection> {
-  const { serverUrl, code } = parsePairingCode(value);
+export async function connectToBackend(serverUrlValue: string, deviceCodeValue: string): Promise<BackendConnection> {
+  const { serverUrl, code } = resolvePairingRequest(serverUrlValue, deviceCodeValue);
   const response = await fetch(`${serverUrl}/api/v1/sidebar/exchange`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
