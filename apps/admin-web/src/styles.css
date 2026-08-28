@@ -3112,12 +3112,7 @@ a:focus-visible {
 }
 
 .nav-item.active::before {
-  top: 8px;
-  bottom: 8px;
-  left: -3px;
-  width: 3px;
-  border-radius: 3px;
-  background: var(--primary);
+  display: none;
 }
 
 .nav-icon {
@@ -3357,7 +3352,7 @@ a:focus-visible {
   border: 1px solid #ccd8ef;
   border-radius: var(--radius-lg);
   background: #eaf0fb;
-  box-shadow: inset 4px 0 0 var(--primary), var(--shadow-xs);
+  box-shadow: var(--shadow-xs);
 }
 
 .hero-card::before,

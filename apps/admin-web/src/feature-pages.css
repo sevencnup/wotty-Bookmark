@@ -257,7 +257,7 @@ html.reduce-motion *, html.reduce-motion *::before, html.reduce-motion *::after 
   padding: 22px;
   border-color: #ccd8ef;
   background: #eaf0fb;
-  box-shadow: inset 4px 0 0 var(--primary);
+  box-shadow: var(--shadow-xs);
 }
 
 .about-logo {
