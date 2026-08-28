@@ -30,6 +30,7 @@ import {
   Activity,
   CheckCircle2,
   Lock,
+  LogOut,
 } from 'lucide-react'
 import {
   TrashPage,
@@ -262,29 +263,56 @@ function App() {
             </div>
           ))}
         </nav>
-        <button className="sidebar-logout" onClick={() => void handleLogout()} type="button">退出登录</button>
+        <div className="sidebar-footer">
+          <div className="sidebar-user" title={session.user.loginIdentifier}>
+            <span className="sidebar-user-avatar">{session.user.loginIdentifier.charAt(0).toUpperCase()}</span>
+            <div>
+              <strong>管理员</strong>
+              <small>{session.user.loginIdentifier}</small>
+            </div>
+          </div>
+          <button className="sidebar-logout" onClick={() => void handleLogout()} type="button">
+            <LogOut size={16} strokeWidth={1.8} />
+            <span>退出登录</span>
+          </button>
+        </div>
       </aside>
       <main className={`main-content ${isCategoryWorkspace ? 'category-main-content' : ''}`}>
-        {isStorageWorkspace ? (
-          <StorageFiles token={session.token} onOpenFloccus={() => navigate('floccus')} />
-        ) : (
-          <>
-              {activeSection === 'overview' && <Overview token={session.token} />}
-              {activeSection === 'app-passwords' && <AppPasswords token={session.token} />}
-              {activeSection === 'categories' && <CategoryManagementPage token={session.token} onOpenFloccus={() => navigate('floccus')} />}
-              {activeSection === 'floccus' && <FloccusGuide token={session.token} loginIdentifier={session.user.loginIdentifier} />}
-              {activeSection === 'account' && <AccountSettings loginIdentifier={session.user.loginIdentifier} onOpenAppPasswords={() => navigate('app-passwords')} />}
-              {activeSection === 'security' && <Security />}
-              {activeSection === 'trash' && <TrashPage navigate={navigate} token={session.token} />}
-              {activeSection === 'tags' && <TagsPage navigate={navigate} token={session.token} />}
-              {activeSection === 'devices' && <DevicesPage navigate={navigate} onSessionRevoked={() => handleSessionChange(null)} token={session.token} />}
-              {activeSection === 'preferences' && <PreferencesPage onChange={handlePreferencesChange} preferences={preferences} />}
-              {activeSection === 'import-export' && <ImportExportPage navigate={navigate} token={session.token} />}
-              {activeSection === 'help' && <HelpPage navigate={navigate} token={session.token} />}
-              {activeSection === 'about' && <AboutPage />}
-              {!['overview', 'app-passwords', 'account', 'categories', 'floccus', 'security', 'trash', 'tags', 'devices', 'preferences', 'import-export', 'help', 'about'].includes(activeSection) && <ComingSoon label={activeLabel} />}
-          </>
-        )}
+        <header className="workspace-header">
+          <div>
+            <p>ADMIN CONSOLE</p>
+            <h1>{activeLabel}</h1>
+          </div>
+          <div className="workspace-service-status">
+            <span />
+            <div>
+              <strong>服务正常</strong>
+              <small>管理控制台</small>
+            </div>
+          </div>
+        </header>
+        <div className={`workspace-content ${isCategoryWorkspace ? 'category-workspace-content' : ''}`}>
+          {isStorageWorkspace ? (
+            <StorageFiles token={session.token} onOpenFloccus={() => navigate('floccus')} />
+          ) : (
+            <>
+                {activeSection === 'overview' && <Overview token={session.token} />}
+                {activeSection === 'app-passwords' && <AppPasswords token={session.token} />}
+                {activeSection === 'categories' && <CategoryManagementPage token={session.token} onOpenFloccus={() => navigate('floccus')} />}
+                {activeSection === 'floccus' && <FloccusGuide token={session.token} loginIdentifier={session.user.loginIdentifier} />}
+                {activeSection === 'account' && <AccountSettings loginIdentifier={session.user.loginIdentifier} onOpenAppPasswords={() => navigate('app-passwords')} />}
+                {activeSection === 'security' && <Security />}
+                {activeSection === 'trash' && <TrashPage navigate={navigate} token={session.token} />}
+                {activeSection === 'tags' && <TagsPage navigate={navigate} token={session.token} />}
+                {activeSection === 'devices' && <DevicesPage navigate={navigate} onSessionRevoked={() => handleSessionChange(null)} token={session.token} />}
+                {activeSection === 'preferences' && <PreferencesPage onChange={handlePreferencesChange} preferences={preferences} />}
+                {activeSection === 'import-export' && <ImportExportPage navigate={navigate} token={session.token} />}
+                {activeSection === 'help' && <HelpPage navigate={navigate} token={session.token} />}
+                {activeSection === 'about' && <AboutPage />}
+                {!['overview', 'app-passwords', 'account', 'categories', 'floccus', 'security', 'trash', 'tags', 'devices', 'preferences', 'import-export', 'help', 'about'].includes(activeSection) && <ComingSoon label={activeLabel} />}
+            </>
+          )}
+        </div>
       </main>
     </div>
   )

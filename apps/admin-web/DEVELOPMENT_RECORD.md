@@ -1,5 +1,26 @@
 # 管理后台开发记录
 
+## 2026-08-28：`admin-ui-visual-upgrade`
+
+### 任务
+
+升级管理后台整体 UI 视觉，在不改变业务逻辑和数据边界的前提下统一桌面端与移动端体验。
+
+### 进度
+
+- 建立统一的颜色、圆角、阴影、间距和焦点态设计令牌。
+- 升级侧边栏导航、账户区、退出入口、页面标题栏和服务状态展示。
+- 统一面板、统计卡片、按钮、表单、表格、提示状态和功能页组件。
+- 收敛概览页视觉层级，并校准分类管理双栏、内部滚动和移动端回流。
+- 保留现有 API、书签操作逻辑、固定桌面应用壳和用户 Logo 资源改动。
+
+### 验证
+
+- `pnpm --filter @bookmark-vault/admin-web lint`：通过。
+- `pnpm --filter @bookmark-vault/admin-web test`：13 项通过。
+- `pnpm --filter @bookmark-vault/admin-web build`：通过。
+- 开发服务器 `http://127.0.0.1:56993/`：返回 `200`。
+
 ## 2026-08-28：`admin-page-state-centering`
 
 ### 任务

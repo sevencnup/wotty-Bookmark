@@ -145,3 +145,141 @@ html.reduce-motion *, html.reduce-motion *::before, html.reduce-motion *::after 
   .about-hero { align-items: flex-start; flex-direction: column; }
   .panel-heading { align-items: flex-start; gap: 12px; flex-direction: column; }
 }
+
+/* ── 2026 管理后台功能页视觉升级 ─────────────────────────── */
+.feature-page {
+  gap: 14px;
+}
+
+.page-alert {
+  padding: 11px 13px;
+  border-radius: var(--radius-md);
+}
+
+.trash-list,
+.device-list,
+.version-list {
+  gap: 8px;
+}
+
+.trash-item,
+.device-card,
+.version-row {
+  padding: 14px 15px;
+  border-color: var(--line);
+  border-radius: var(--radius-md);
+  background: #ffffff;
+}
+
+.trash-item:hover,
+.device-card:hover,
+.version-row:hover {
+  border-color: #cbd2dd;
+  background: #f9fafc;
+}
+
+.trash-item-icon,
+.device-icon,
+.transfer-icon,
+.about-logo {
+  border-radius: var(--radius-md);
+}
+
+.device-card.current {
+  border-color: var(--primary-border);
+  background: #f3f6ff;
+}
+
+.settings-panel {
+  padding: 0 22px;
+}
+
+.preference-row {
+  min-height: 68px;
+  padding: 13px 0;
+}
+
+.preference-row select {
+  min-width: 164px;
+}
+
+.import-export-grid,
+.about-grid {
+  gap: 14px;
+}
+
+.transfer-card h3 {
+  font-size: 16px;
+}
+
+.file-picker {
+  border-color: #bfcbed;
+  border-radius: var(--radius-md);
+  background: #f5f7ff;
+}
+
+.help-search-panel {
+  padding: 20px;
+}
+
+.help-layout {
+  grid-template-columns: 200px minmax(0, 1fr);
+  gap: 20px;
+}
+
+.help-topics button,
+.faq-item,
+.panel-link {
+  border-radius: var(--radius-md);
+}
+
+.faq-item {
+  background: #ffffff;
+}
+
+.faq-item.open {
+  border-color: var(--primary-border);
+  background: #f5f7ff;
+}
+
+.panel-link {
+  background: #ffffff;
+  box-shadow: none;
+}
+
+.panel-link:hover {
+  border-color: #b9c5e8;
+  background: #f6f8ff;
+  transform: none;
+}
+
+.about-hero {
+  padding: 22px;
+  border-color: #ccd8ef;
+  background: #eaf0fb;
+  box-shadow: inset 4px 0 0 var(--primary);
+}
+
+.about-logo {
+  color: var(--primary);
+  background: rgba(255, 255, 255, 0.8);
+  box-shadow: none;
+}
+
+.about-hero h3 {
+  font-size: 19px;
+}
+
+.about-note {
+  background: #f5f7ff;
+}
+
+@media (max-width: 680px) {
+  .settings-panel {
+    padding: 0 18px;
+  }
+
+  .help-search-panel {
+    padding: 16px;
+  }
+}
