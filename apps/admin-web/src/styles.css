@@ -2142,7 +2142,7 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 .category-empty strong { margin: 10px 0 4px; color: var(--ink); font-size: 15px; }
 .category-empty p, .category-keyboard-hint { margin: 0; color: var(--muted); font-size: 12px; }
 .category-keyboard-hint { margin: 11px 2px 0; color: var(--soft-muted); text-align: right; }
-.category-state { display: grid; place-items: center; min-height: 340px; text-align: center; }
+.category-state { display: flex; min-height: 340px; align-items: center; justify-content: center; flex-direction: column; text-align: center; }
 .category-state > svg { color: var(--primary); }
 .category-state strong { margin: 14px 0 5px; color: var(--ink); font-size: 17px; }
 .category-state p { max-width: 600px; margin: 0; color: var(--muted); font-size: 13px; line-height: 1.7; }
