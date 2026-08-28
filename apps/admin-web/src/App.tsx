@@ -165,13 +165,13 @@ function NavIcon({ name, size = 18 }: { name: NavIconName; size?: number }) {
   }
 }
 
-function BrandLogo({ size = 20 }: { size?: number }) {
+function BrandLogo({ size = 20, src = '/logo.png' }: { size?: number; src?: string }) {
   return (
     <img
       alt="Wotty Bookmark Logo"
       className="brand-logo-img"
       height={size}
-      src="/logo.png"
+      src={src}
       width={size}
     />
   )
@@ -244,7 +244,7 @@ function App() {
     <div className="app-shell">
       <aside className="sidebar">
         <div className="sidebar-brand">
-          <span className="brand-mark"><BrandLogo size={80} /></span>
+          <span className="brand-mark"><BrandLogo size={80} src="/logo1.png" /></span>
         </div>
         <nav className="nav-list" aria-label="管理后台导航">
           {navGroups.map((group, index) => (
