@@ -789,6 +789,20 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   gap: 20px;
 }
 
+.bookmark-organizer.full-page-state {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.bookmark-organizer.full-page-state > .bookmark-loading,
+.bookmark-organizer.full-page-state > .bookmark-encrypted-state,
+.bookmark-organizer.full-page-state > .bookmark-empty {
+  min-height: 0;
+  flex: 1;
+}
+
 .bookmark-alert {
   display: flex;
   align-items: center;
@@ -1184,8 +1198,10 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 
 /* ── 空状态与加载状态 ─────────────────────────────────────── */
 .bookmark-empty, .empty-state, .bookmark-loading, .bookmark-encrypted-state {
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
   padding: 60px 24px;
   text-align: center;
   color: var(--muted);
@@ -1210,14 +1226,14 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   border-color: var(--purple-border);
 }
 
-.empty-state h4, .bookmark-empty strong, .bookmark-encrypted-state strong {
+.empty-state h4, .bookmark-empty strong, .bookmark-loading strong, .bookmark-encrypted-state strong {
   margin: 0 0 6px;
   color: var(--ink);
   font-size: 16px;
   font-weight: 600;
 }
 
-.empty-state p, .bookmark-empty p, .bookmark-encrypted-state > p {
+.empty-state p, .bookmark-empty p, .bookmark-loading p, .bookmark-encrypted-state > p {
   max-width: 520px;
   margin: 0 auto;
   color: var(--muted);
@@ -2750,9 +2766,12 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 }
 
 .coming-soon {
-  display: grid;
-  place-items: center;
-  min-height: 320px;
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
   text-align: center;
 }
 

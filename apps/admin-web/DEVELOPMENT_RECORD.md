@@ -1,5 +1,26 @@
 # 管理后台开发记录
 
+## 2026-08-28：`admin-page-state-centering`
+
+### 任务
+
+统一其他后台页面的整页提示状态，使其与分类管理空状态一样在右侧内容区居中。
+
+### 进度
+
+- 为书签整理、回收站和标签页增加明确的整页提示布局状态。
+- 将备份、操作日志等待开发页面的提示统一为纵向居中布局。
+- 保留应用密码、设备列表、历史版本、帮助搜索和存储摘要中的局部空状态位置。
+- 保持移动端自然文档流，避免固定高度裁切内容。
+
+### 验证
+
+- Playwright 整页提示布局检查：4 项通过。
+- Playwright 局部空状态位置检查：1 项通过。
+- `pnpm --filter @bookmark-vault/admin-web lint`：通过。
+- `pnpm --filter @bookmark-vault/admin-web test`：13 项通过。
+- `pnpm --filter @bookmark-vault/admin-web build`：通过。
+
 ## 2026-08-28：`admin-category-page-scroll-lock`
 
 ### 任务

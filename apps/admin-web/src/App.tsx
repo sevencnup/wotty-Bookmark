@@ -508,6 +508,7 @@ function BookmarkOrganizer({ token, onOpenFloccus, mode = 'organizer' }: { token
     return inFolder && (!normalizedQuery || searchable.includes(normalizedQuery))
   })
   const allVisibleSelected = visibleBookmarks.length > 0 && visibleBookmarks.every((bookmark) => selectedIds.has(bookmark.id))
+  const isFullPageState = loading || tree?.status !== 'ready'
 
   function toggleSelection(id: string) {
     setSelectedIds((current) => {
@@ -604,7 +605,7 @@ function BookmarkOrganizer({ token, onOpenFloccus, mode = 'organizer' }: { token
   }
 
   return (
-    <div className={`bookmark-organizer ${isCategoriesMode ? 'categories-page' : ''}`}>
+    <div className={`bookmark-organizer ${isCategoriesMode ? 'categories-page' : ''} ${isFullPageState ? 'full-page-state' : ''}`}>
       {error && <div className="bookmark-alert error"><strong>读取失败</strong><span>{error}</span></div>}
       {notice && <div className="bookmark-alert success"><strong>操作完成</strong><span>{notice}</span></div>}
 

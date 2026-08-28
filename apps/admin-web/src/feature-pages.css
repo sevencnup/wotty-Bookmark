@@ -2,11 +2,13 @@
 /* ── 功能页面 ─────────────────────────────────────────────── */
 .feature-page { display: grid; gap: 20px; }
 .feature-page > .panel { margin-bottom: 0; }
+.feature-page.full-page-state { display: flex; height: 100%; min-height: 0; flex-direction: column; }
+.feature-page.full-page-state > .feature-loading, .feature-page.full-page-state > .feature-empty, .feature-page.full-page-state > .capability-state { min-height: 0; flex: 1; }
 .page-alert { display: flex; align-items: center; gap: 10px; padding: 12px 15px; border: 1px solid var(--danger-border); border-radius: var(--radius-md); color: var(--danger); background: var(--danger-soft); font-size: 13px; }
 .page-alert.success { border-color: var(--success-border); color: var(--success); background: var(--success-soft); }
 .page-alert.warning { border-color: var(--warning-border); color: var(--warning); background: var(--warning-soft); }
 .page-alert.info { border-color: var(--primary-border); color: var(--primary); background: var(--primary-soft); }
-.feature-loading, .feature-empty, .capability-state { display: grid; place-items: center; min-height: 240px; padding: 36px 24px; text-align: center; }
+.feature-loading, .feature-empty, .capability-state { display: flex; min-height: 240px; padding: 36px 24px; align-items: center; justify-content: center; flex-direction: column; text-align: center; }
 .feature-loading { color: var(--primary); }
 .feature-loading strong, .feature-empty h3, .capability-state h3 { margin: 12px 0 5px; color: var(--ink); font-size: 17px; }
 .feature-loading p, .feature-empty p, .capability-state p { max-width: 640px; margin: 0; color: var(--muted); font-size: 13px; line-height: 1.65; }
