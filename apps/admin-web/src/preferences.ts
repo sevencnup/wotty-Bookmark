@@ -23,9 +23,12 @@ export function loadPreferences(storage: Storage | null = typeof window === 'und
     if (!raw) return { ...defaultPreferences }
     const value = JSON.parse(raw) as Partial<Preferences> & { version?: number }
     if (value.version !== 1) return { ...defaultPreferences }
+    const storedDefaultSection = typeof value.defaultSection === 'string' && value.defaultSection
+      ? value.defaultSection
+      : defaultPreferences.defaultSection
     return {
       density: value.density === 'compact' ? 'compact' : 'comfortable',
-      defaultSection: typeof value.defaultSection === 'string' && value.defaultSection ? value.defaultSection : defaultPreferences.defaultSection,
+      defaultSection: storedDefaultSection === 'bookmark-organizer' ? 'categories' : storedDefaultSection,
       reduceMotion: value.reduceMotion === true,
       confirmDangerousActions: value.confirmDangerousActions !== false,
     }

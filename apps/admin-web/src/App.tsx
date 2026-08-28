@@ -48,7 +48,6 @@ import { descendantFolderIds, flattenFolders, findFolder, folderHasChildren, res
 type AdminSection =
   | 'overview'
   | 'storage'
-  | 'bookmark-organizer'
   | 'categories'
   | 'tags'
   | 'trash'
@@ -91,7 +90,6 @@ const navGroups: NavGroup[] = [
     label: '数据管理',
     items: [
       { id: 'storage', label: '存储文件', icon: 'storage' },
-      { id: 'bookmark-organizer', label: '书签整理', icon: 'categories' },
       { id: 'categories', label: '分类管理', icon: 'categories' },
       { id: 'tags', label: '标签管理', icon: 'tags' },
       { id: 'trash', label: '回收站', icon: 'trash' },
@@ -273,7 +271,6 @@ function App() {
           <>
               {activeSection === 'overview' && <Overview token={session.token} />}
               {activeSection === 'app-passwords' && <AppPasswords token={session.token} />}
-              {activeSection === 'bookmark-organizer' && <BookmarkOrganizer mode="organizer" token={session.token} onOpenFloccus={() => navigate('floccus')} />}
               {activeSection === 'categories' && <CategoryManagementPage token={session.token} onOpenFloccus={() => navigate('floccus')} />}
               {activeSection === 'floccus' && <FloccusGuide token={session.token} loginIdentifier={session.user.loginIdentifier} />}
               {activeSection === 'account' && <AccountSettings loginIdentifier={session.user.loginIdentifier} onOpenAppPasswords={() => navigate('app-passwords')} />}
@@ -285,7 +282,7 @@ function App() {
               {activeSection === 'import-export' && <ImportExportPage navigate={navigate} token={session.token} />}
               {activeSection === 'help' && <HelpPage navigate={navigate} token={session.token} />}
               {activeSection === 'about' && <AboutPage />}
-              {!['overview', 'app-passwords', 'account', 'bookmark-organizer', 'categories', 'floccus', 'security', 'trash', 'tags', 'devices', 'preferences', 'import-export', 'help', 'about'].includes(activeSection) && <ComingSoon label={activeLabel} />}
+              {!['overview', 'app-passwords', 'account', 'categories', 'floccus', 'security', 'trash', 'tags', 'devices', 'preferences', 'import-export', 'help', 'about'].includes(activeSection) && <ComingSoon label={activeLabel} />}
           </>
         )}
       </main>
