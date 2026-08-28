@@ -1,5 +1,23 @@
 # 管理后台开发记录
 
+## 2026-08-28：`admin-category-page-scroll-lock`
+
+### 任务
+
+修复桌面端分类管理页面可以整体滚动、应用壳滑出视口并露出空白区域的问题。
+
+### 进度
+
+- 固定桌面端根节点与应用壳的高度链，禁止页面级滚动。
+- 保留主内容区、侧边导航、书签列表和组织树的内部滚动。
+- 在窄屏断点恢复自然页面滚动，避免移动端内容被裁切。
+
+### 验证
+
+- `pnpm --filter @bookmark-vault/admin-web lint`：通过。
+- `pnpm --filter @bookmark-vault/admin-web test`：13 项通过。
+- `pnpm --filter @bookmark-vault/admin-web build`：通过。
+
 ## 2026-08-27：`admin-category-left-panel`
 
 ### 任务
