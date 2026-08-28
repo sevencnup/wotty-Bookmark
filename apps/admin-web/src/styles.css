@@ -135,6 +135,10 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   height: 92px;
 }
 
+.sidebar-brand .brand-logo-img {
+  transform: scale(1.14);
+}
+
 .brand-mark {
   display: grid;
   place-items: center;
