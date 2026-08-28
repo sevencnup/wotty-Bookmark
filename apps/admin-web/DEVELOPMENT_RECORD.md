@@ -8,15 +8,18 @@
 
 ### 进度
 
-- 固定桌面端根节点与应用壳的高度链，禁止页面级滚动。
-- 保留主内容区、侧边导航、书签列表和组织树的内部滚动。
-- 在窄屏断点恢复自然页面滚动，避免移动端内容被裁切。
+- 首轮百分比高度锁定经用户复验仍会发生整页滚动，未作为最终结果。
+- 将桌面端应用壳固定到视口四边，并禁止分类页主内容区滚动穿透。
+- 保留侧边导航、书签列表和组织树的内部滚动。
+- 在窄屏断点恢复静态布局和自然页面滚动，避免移动端内容被裁切。
 
 ### 验证
 
 - `pnpm --filter @bookmark-vault/admin-web lint`：通过。
 - `pnpm --filter @bookmark-vault/admin-web test`：13 项通过。
 - `pnpm --filter @bookmark-vault/admin-web build`：通过。
+- Playwright 桌面端滚轮穿透检查：应用壳、主内容区和左右面板坐标保持不变。
+- Playwright 移动端回流检查：固定定位解除，页面保持自然滚动。
 
 ## 2026-08-27：`admin-category-left-panel`
 

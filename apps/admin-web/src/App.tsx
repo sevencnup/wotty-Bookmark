@@ -238,6 +238,7 @@ function App() {
 
   const activeLabel = allNavItems().find((item) => item.id === activeSection)?.label ?? '管理后台'
   const isStorageWorkspace = activeSection === 'storage'
+  const isCategoryWorkspace = activeSection === 'categories'
 
   return (
     <div className="app-shell">
@@ -265,7 +266,7 @@ function App() {
         </nav>
         <button className="sidebar-logout" onClick={() => void handleLogout()} type="button">退出登录</button>
       </aside>
-      <main className="main-content">
+      <main className={`main-content ${isCategoryWorkspace ? 'category-main-content' : ''}`}>
         {isStorageWorkspace ? (
           <StorageFiles token={session.token} onOpenFloccus={() => navigate('floccus')} />
         ) : (
