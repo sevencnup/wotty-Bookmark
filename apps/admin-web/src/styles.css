@@ -2985,7 +2985,7 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 .category-management-page .category-bookmark-group > .category-bookmark-group-header {
   border-right: 1px solid #c9d8f2 !important;
   border-bottom: 1px solid #b9ccec !important;
-  border-left: 4px solid #4f75d8 !important;
+  border-left: 1px solid #c9d8f2 !important;
   background: linear-gradient(90deg, #dce9ff 0%, #e8f1ff 58%, #f0f5ff 100%) !important;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72), 0 2px 7px rgba(63, 91, 153, 0.08) !important;
 }
@@ -2995,7 +2995,6 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 }
 
 .category-management-page .category-bookmark-group.collapsed > .category-bookmark-group-header {
-  border-left-color: #7894d7 !important;
   background: linear-gradient(90deg, #e8f0ff 0%, #f0f5ff 62%, #f6f8fc 100%) !important;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.76) !important;
 }
@@ -3016,6 +3015,53 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 .category-management-page .category-bookmark-group > .category-group-items,
 .category-management-page .category-bookmark-group > .category-group-items .category-bookmark-row {
   background-color: #ffffff;
+}
+
+/* 分类管理：连续划选、圆角树线与搜索框焦点收敛 */
+.category-management-page .category-bookmark-row {
+  cursor: default;
+  user-select: none;
+}
+
+.category-management-page .bookmark-search input:focus,
+.category-management-page .bookmark-search input:focus-visible {
+  border: 0 !important;
+  outline: 0 !important;
+  box-shadow: none !important;
+}
+
+.category-management-page .organization-root-rail-line,
+.category-management-page .organization-children::before {
+  border-radius: 999px;
+}
+
+.category-management-page .organization-root-rail > .organization-node::before,
+.category-management-page .organization-children > .organization-node::before {
+  top: calc(50% - 14px);
+  left: -38px;
+  width: 38px;
+  height: 14px;
+  border-bottom: 2px solid #b9c8e4;
+  border-right: 2px solid #b9c8e4;
+  border-radius: 0 0 14px 0;
+  background: transparent;
+  transform: none;
+}
+
+.category-management-page .organization-children > .organization-node::before {
+  border-color: #d1dced;
+}
+
+.category-management-page .organization-root-rail::before {
+  border-radius: 999px;
+}
+
+@media (max-width: 1120px) {
+  .category-management-page .organization-root-rail > .organization-node::before,
+  .category-management-page .organization-children > .organization-node::before {
+    left: -28px;
+    width: 28px;
+  }
 }
 
 /* 分类管理：左侧书签按文件夹分组 */

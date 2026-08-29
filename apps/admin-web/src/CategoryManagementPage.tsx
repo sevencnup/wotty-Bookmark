@@ -1,5 +1,5 @@
 import { ChevronDown, ChevronRight, Folder, FolderOpen, Folders, GripVertical, Home, Link2, LoaderCircle, RefreshCw, Search, Sparkles } from 'lucide-react'
-import type { DragEvent } from 'react'
+import type { DragEvent, MouseEvent as ReactMouseEvent } from 'react'
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as api from './api'
 import { descendantFolderIds, flattenFolders as flattenBookmarkFolders, folderHasChildren, groupBookmarksByFolder, resolveDraggedBookmarkIds, type FlatBookmarkFolder } from './bookmark-tree'
@@ -12,6 +12,11 @@ type Props = {
 type DragState = {
   ids: string[]
   sourceFolderIds: Set<string>
+} | null
+
+type SelectionPaintState = {
+  selected: boolean
+  visitedIds: Set<string>
 } | null
 
 const EMPTY_FOLDERS: api.BookmarkFolder[] = []
@@ -34,6 +39,7 @@ export function CategoryManagementPage({ token, onOpenFloccus }: Props) {
   const [notice, setNotice] = useState('')
   const treeCanvasRef = useRef<HTMLDivElement>(null)
   const expandedInitializedRef = useRef(false)
+  const selectionPaintRef = useRef<SelectionPaintState>(null)
 
   const load = useCallback(async (showRefreshing = false) => {
     if (showRefreshing) setRefreshing(true)
@@ -55,6 +61,25 @@ export function CategoryManagementPage({ token, onOpenFloccus }: Props) {
   }, [token])
 
   useEffect(() => { void load() }, [load])
+
+  useEffect(() => {
+    const stopSelectionPaint = () => {
+      const paint = selectionPaintRef.current
+      selectionPaintRef.current = null
+      if (!paint) return
+      setSelectedIds((current) => {
+        const next = new Set(current)
+        paint.visitedIds.forEach((id) => paint.selected ? next.add(id) : next.delete(id))
+        return next
+      })
+    }
+    window.addEventListener('mouseup', stopSelectionPaint)
+    window.addEventListener('blur', stopSelectionPaint)
+    return () => {
+      window.removeEventListener('mouseup', stopSelectionPaint)
+      window.removeEventListener('blur', stopSelectionPaint)
+    }
+  }, [])
 
   const selectedFolder = useMemo(() => {
     if (!tree || selectedFolderId === 'all') return null
@@ -80,6 +105,23 @@ export function CategoryManagementPage({ token, onOpenFloccus }: Props) {
       else next.add(id)
       return next
     })
+  }, [])
+
+  const beginSelectionPaint = useCallback((event: ReactMouseEvent<HTMLDivElement>, id: string) => {
+    const target = event.target as HTMLElement
+    if (event.button !== 0 || target.closest('a, button, input, label, select, textarea')) return
+    const selected = !selectedIds.has(id)
+    selectionPaintRef.current = { selected, visitedIds: new Set([id]) }
+    event.currentTarget.classList.toggle('selected', selected)
+    event.preventDefault()
+  }, [selectedIds])
+
+  const continueSelectionPaint = useCallback((event: ReactMouseEvent<HTMLDivElement>, id: string) => {
+    const paint = selectionPaintRef.current
+    if (!paint) return
+    if (paint.visitedIds.has(id)) return
+    paint.visitedIds.add(id)
+    event.currentTarget.classList.toggle('selected', paint.selected)
   }, [])
 
   function toggleAll() {
@@ -224,16 +266,16 @@ export function CategoryManagementPage({ token, onOpenFloccus }: Props) {
         {selectedIds.size > 0 && <div className="category-bulk-bar"><strong>已选择 {selectedIds.size} 个</strong><span>也可以拖动其中一个批量归类</span><select aria-label="将选中的书签移动到文件夹" onChange={(event) => { if (event.target.value) void moveBookmarks([...selectedIds], event.target.value) }} value=""><option value="">选择目标文件夹…</option>{flatFolders.map((folder) => <option key={folder.id} value={folder.id}>{'　'.repeat(folder.depth)}{folder.title}</option>)}</select><button className="toolbar-button" onClick={() => setSelectedIds(new Set())} type="button">取消选择</button></div>}
         <div className="category-bookmark-list category-layout-bookmark-list">
           <div className="category-list-header"><label className="checkbox-wrap"><input checked={visibleBookmarks.length > 0 && visibleBookmarks.every((bookmark) => selectedIds.has(bookmark.id))} onChange={toggleAll} type="checkbox" /><span /></label><span className="category-list-title"><Folders size={14} />按文件夹分类</span><span>操作</span></div>
-          {visibleBookmarks.length === 0 ? <div className="category-empty"><Search size={25} /><strong>没有匹配的书签</strong><p>换个搜索关键词，或先在右侧选择其他文件夹。</p></div> : bookmarkGroups.map((group) => <BookmarkGroup collapsed={!normalizedQuery && collapsedGroupIds.has(group.id)} draggedIds={draggedIds} group={group} key={group.id} moving={moving} onDragEnd={endDrag} onDragStart={beginDrag} onToggle={toggleGroup} onToggleGroupSelection={toggleGroupSelection} onToggleSelected={toggleSelected} selectedIds={selectedIds} />)}
+          {visibleBookmarks.length === 0 ? <div className="category-empty"><Search size={25} /><strong>没有匹配的书签</strong><p>换个搜索关键词，或先在右侧选择其他文件夹。</p></div> : bookmarkGroups.map((group) => <BookmarkGroup collapsed={!normalizedQuery && collapsedGroupIds.has(group.id)} draggedIds={draggedIds} group={group} key={group.id} moving={moving} onDragEnd={endDrag} onDragStart={beginDrag} onSelectionMouseDown={beginSelectionPaint} onSelectionMouseOver={continueSelectionPaint} onToggle={toggleGroup} onToggleGroupSelection={toggleGroupSelection} onToggleSelected={toggleSelected} selectedIds={selectedIds} />)}
         </div>
-        <p className="category-keyboard-hint">书签已按当前文件夹分组；拖动书签右侧的手柄，可放入右侧组织树的任意文件夹。</p>
+        <p className="category-keyboard-hint">按住书签行并上下滑动可连续多选；拖动右侧手柄，可将选中的书签放入组织树文件夹。</p>
       </section>
       {organizationPanel}
     </div>}
   </div>
 }
 
-const BookmarkGroup = memo(function BookmarkGroup({ group, collapsed, selectedIds, draggedIds, moving, onToggle, onToggleGroupSelection, onToggleSelected, onDragStart, onDragEnd }: { group: ReturnType<typeof groupBookmarksByFolder>[number]; collapsed: boolean; selectedIds: Set<string>; draggedIds: string[]; moving: boolean; onToggle: (id: string) => void; onToggleGroupSelection: (bookmarks: api.BookmarkItem[]) => void; onToggleSelected: (id: string) => void; onDragStart: (event: DragEvent<HTMLButtonElement>, id: string) => void; onDragEnd: () => void }) {
+const BookmarkGroup = memo(function BookmarkGroup({ group, collapsed, selectedIds, draggedIds, moving, onToggle, onToggleGroupSelection, onToggleSelected, onSelectionMouseDown, onSelectionMouseOver, onDragStart, onDragEnd }: { group: ReturnType<typeof groupBookmarksByFolder>[number]; collapsed: boolean; selectedIds: Set<string>; draggedIds: string[]; moving: boolean; onToggle: (id: string) => void; onToggleGroupSelection: (bookmarks: api.BookmarkItem[]) => void; onToggleSelected: (id: string) => void; onSelectionMouseDown: (event: ReactMouseEvent<HTMLDivElement>, id: string) => void; onSelectionMouseOver: (event: ReactMouseEvent<HTMLDivElement>, id: string) => void; onDragStart: (event: DragEvent<HTMLButtonElement>, id: string) => void; onDragEnd: () => void }) {
   const groupSelectedCount = group.bookmarks.filter((bookmark) => selectedIds.has(bookmark.id)).length
   const groupAllSelected = groupSelectedCount === group.bookmarks.length
   const groupPartiallySelected = groupSelectedCount > 0 && !groupAllSelected
@@ -244,7 +286,7 @@ const BookmarkGroup = memo(function BookmarkGroup({ group, collapsed, selectedId
       <button className="category-group-summary organization-folder-button" onClick={() => onToggle(group.id)} type="button"><span className="category-group-icon">{collapsed ? <Folder size={15} /> : <FolderOpen size={15} />}</span><span><strong>{group.title}</strong><small title={group.path}>{group.path}</small></span></button>
       <span className="category-group-count">{group.bookmarks.length}</span>
     </div>
-    {!collapsed && <div className="category-group-items">{group.bookmarks.map((bookmark, index) => <div className={`category-bookmark-row ${selectedIds.has(bookmark.id) ? 'selected' : ''} ${draggedIds.includes(bookmark.id) ? 'dragging' : ''}`} key={bookmark.id}><label className="checkbox-wrap"><input checked={selectedIds.has(bookmark.id)} onChange={() => onToggleSelected(bookmark.id)} type="checkbox" /><span /></label><button aria-label={`拖动 ${bookmark.title || bookmark.url}`} className="category-drag-handle" draggable={!moving} onDragEnd={onDragEnd} onDragStart={(event) => onDragStart(event, bookmark.id)} title="拖动到右侧文件夹" type="button"><GripVertical size={16} /></button><div className="category-bookmark-info"><span className={`site-mark site-mark-${index % 4}`}>{(bookmark.title || '?').charAt(0).toUpperCase()}</span><div><strong title={bookmark.title}>{bookmark.title || '未命名书签'}</strong><small>{getHost(bookmark.url)}</small></div></div><a aria-label={`打开 ${bookmark.title || bookmark.url}`} className="bookmark-open-link" href={bookmark.url} rel="noreferrer" target="_blank"><ExternalLinkIcon /></a></div>)}</div>}
+    {!collapsed && <div className="category-group-items">{group.bookmarks.map((bookmark, index) => <div className={`category-bookmark-row ${selectedIds.has(bookmark.id) ? 'selected' : ''} ${draggedIds.includes(bookmark.id) ? 'dragging' : ''}`} data-bookmark-id={bookmark.id} key={bookmark.id} onMouseDown={(event) => onSelectionMouseDown(event, bookmark.id)} onMouseOver={(event) => onSelectionMouseOver(event, bookmark.id)}><label className="checkbox-wrap"><input checked={selectedIds.has(bookmark.id)} onChange={() => onToggleSelected(bookmark.id)} type="checkbox" /><span /></label><button aria-label={`拖动 ${bookmark.title || bookmark.url}`} className="category-drag-handle" draggable={!moving} onDragEnd={onDragEnd} onDragStart={(event) => onDragStart(event, bookmark.id)} title="拖动到右侧文件夹" type="button"><GripVertical size={16} /></button><div className="category-bookmark-info"><span className={`site-mark site-mark-${index % 4}`}>{(bookmark.title || '?').charAt(0).toUpperCase()}</span><div><strong title={bookmark.title}>{bookmark.title || '未命名书签'}</strong><small>{getHost(bookmark.url)}</small></div></div><a aria-label={`打开 ${bookmark.title || bookmark.url}`} className="bookmark-open-link" href={bookmark.url} rel="noreferrer" target="_blank"><ExternalLinkIcon /></a></div>)}</div>}
   </section>
 })
 
