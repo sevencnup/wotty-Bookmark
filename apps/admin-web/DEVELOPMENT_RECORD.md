@@ -1,5 +1,26 @@
 # 管理后台开发记录
 
+## 2026-08-29：`admin-bookmark-folder-groups`
+
+### 任务
+
+将分类管理页面左侧书签列表由平铺展示改为按实际文件夹分类展示。
+
+### 进度
+
+- 根目录、一级目录和嵌套目录分别显示文件夹分组标题、路径与书签数量。
+- 增加单组折叠、全部展开/收起和整组选择，并保留搜索、单项选择、批量移动与拖拽归类。
+- 右侧总目录卡片支持点击返回全部书签，右侧选择文件夹时左侧继续按实际子目录分组。
+- 增加分组工具函数，按组织树顺序输出分组，并保留暂时不存在于树中的文件夹书签。
+
+### 验证
+
+- `pnpm --filter @bookmark-vault/admin-web lint`：通过。
+- `pnpm --filter @bookmark-vault/admin-web test`：15 项通过。
+- `pnpm --filter @bookmark-vault/admin-web build`：通过。
+- Chromium 分组验收：5 个分组、7 条书签完整展示，折叠状态和 `aria-expanded` 同步正确。
+- 314px 列表可用宽度下无横向溢出；临时浏览器会话、截图和开发服务已清理。
+
 ## 2026-08-28：`admin-ui-visual-upgrade`
 
 ### 任务

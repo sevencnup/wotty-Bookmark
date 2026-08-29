@@ -1,8 +1,8 @@
-import { Folder, FolderOpen, GripVertical, Home, Link2, LoaderCircle, RefreshCw, Search, Sparkles } from 'lucide-react'
+import { ChevronDown, ChevronRight, Folder, FolderOpen, Folders, GripVertical, Home, Link2, LoaderCircle, RefreshCw, Search, Sparkles } from 'lucide-react'
 import type { DragEvent } from 'react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import * as api from './api'
-import { descendantFolderIds, flattenFolders as flattenBookmarkFolders, folderHasChildren, resolveDraggedBookmarkIds, type FlatBookmarkFolder } from './bookmark-tree'
+import { descendantFolderIds, flattenFolders as flattenBookmarkFolders, folderHasChildren, groupBookmarksByFolder, resolveDraggedBookmarkIds, type FlatBookmarkFolder } from './bookmark-tree'
 
 type Props = {
   token: string
@@ -23,6 +23,7 @@ export function CategoryManagementPage({ token, onOpenFloccus }: Props) {
   const [selectedFolderId, setSelectedFolderId] = useState('all')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
+  const [collapsedGroupIds, setCollapsedGroupIds] = useState<Set<string>>(new Set())
   const [drag, setDrag] = useState<DragState>(null)
   const [dropFolderId, setDropFolderId] = useState<string | null>(null)
   const [treeZoom, setTreeZoom] = useState(1)
@@ -64,6 +65,7 @@ export function CategoryManagementPage({ token, onOpenFloccus }: Props) {
     return inFolder && (!normalizedQuery || searchable.includes(normalizedQuery))
   })
   const allFolders = tree?.folders ?? []
+  const bookmarkGroups = groupBookmarksByFolder(visibleBookmarks, allFolders)
   const ready = tree?.status === 'ready'
 
   function toggleSelected(id: string) {
@@ -80,6 +82,37 @@ export function CategoryManagementPage({ token, onOpenFloccus }: Props) {
       const next = new Set(current)
       const allSelected = visibleBookmarks.length > 0 && visibleBookmarks.every((bookmark) => next.has(bookmark.id))
       visibleBookmarks.forEach((bookmark) => allSelected ? next.delete(bookmark.id) : next.add(bookmark.id))
+      return next
+    })
+  }
+
+  function toggleGroup(groupId: string) {
+    setCollapsedGroupIds((current) => toggleSet(current, groupId))
+  }
+
+  function toggleGroupSelection(bookmarks: api.BookmarkItem[]) {
+    setSelectedIds((current) => {
+      const next = new Set(current)
+      const allSelected = bookmarks.length > 0 && bookmarks.every((bookmark) => next.has(bookmark.id))
+      bookmarks.forEach((bookmark) => allSelected ? next.delete(bookmark.id) : next.add(bookmark.id))
+      return next
+    })
+  }
+
+  function expandBookmarkGroups() {
+    setCollapsedGroupIds(new Set())
+  }
+
+  function collapseBookmarkGroups() {
+    setCollapsedGroupIds(new Set(bookmarkGroups.map((group) => group.id)))
+  }
+
+  function selectFolder(folderId: string) {
+    setSelectedFolderId(folderId)
+    setCollapsedGroupIds((current) => {
+      if (!current.has(folderId)) return current
+      const next = new Set(current)
+      next.delete(folderId)
       return next
     })
   }
@@ -175,8 +208,34 @@ export function CategoryManagementPage({ token, onOpenFloccus }: Props) {
     {error && <div aria-live="polite" className="bookmark-alert error"><strong>操作失败</strong><span>{error}</span></div>}
     {notice && <div aria-live="polite" className="bookmark-alert success"><strong>已完成</strong><span>{notice}</span></div>}
     {loading ? <section className="panel category-state"><LoaderCircle className="spin" size={30} /><strong>正在加载书签组织结构…</strong><p>正在读取最新的文件夹和书签索引。</p></section> : tree?.status === 'encrypted' ? <section className="panel category-state"><Sparkles size={30} /><strong>同步文件已加密，暂时无法建立分类树</strong><p>服务器无法读取加密文件中的文件夹和书签。请在 Floccus 或浏览器书签中完成整理。</p><button className="primary-button" onClick={onOpenFloccus} type="button">打开 Floccus 配置</button></section> : tree?.status !== 'ready' ? <section className="panel category-state"><FolderOpen size={30} /><strong>还没有可用的书签索引</strong><p>完成一次明文 XBEL 同步后，这里会显示从总目录衍生的文件夹组织树。</p><button className="primary-button" onClick={onOpenFloccus} type="button">前往同步配置</button></section> : <div className="category-workspace">
-      <section className="panel category-bookmarks-panel category-layout-bookmarks"><div className="category-panel-title"><div><p className="eyebrow">BOOKMARKS TO ORGANIZE</p><h3>{selectedFolder ? selectedFolder.title : '全部书签'}</h3></div><span className="category-result-count">{visibleBookmarks.length} 个结果</span></div><div className="category-toolbar"><label className="bookmark-search"><Search size={15} /><input onChange={(event) => setQuery(event.target.value)} placeholder="搜索书签、网址或文件夹" type="search" value={query} /></label><button className="toolbar-button" disabled={refreshing || moving} onClick={() => void load(true)} type="button">{refreshing ? '刷新中…' : '刷新'}</button></div>{selectedIds.size > 0 && <div className="category-bulk-bar"><strong>已选择 {selectedIds.size} 个</strong><span>也可以拖动其中一个批量归类</span><select aria-label="将选中的书签移动到文件夹" onChange={(event) => { if (event.target.value) void moveBookmarks([...selectedIds], event.target.value) }} value=""><option value="">选择目标文件夹…</option>{flattenBookmarkFolders(allFolders).map((folder) => <option key={folder.id} value={folder.id}>{'　'.repeat(folder.depth)}{folder.title}</option>)}</select><button className="toolbar-button" onClick={() => setSelectedIds(new Set())} type="button">取消选择</button></div>}<div className="category-bookmark-list category-layout-bookmark-list"><div className="category-list-header"><label className="checkbox-wrap"><input checked={visibleBookmarks.length > 0 && visibleBookmarks.every((bookmark) => selectedIds.has(bookmark.id))} onChange={toggleAll} type="checkbox" /><span /></label><span>书签</span><span>当前文件夹</span><span>操作</span></div>{visibleBookmarks.length === 0 ? <div className="category-empty"><Search size={25} /><strong>没有匹配的书签</strong><p>换个搜索关键词，或先在左侧选择其他文件夹。</p></div> : visibleBookmarks.map((bookmark, index) => <div className={`category-bookmark-row ${selectedIds.has(bookmark.id) ? 'selected' : ''} ${drag?.ids.includes(bookmark.id) ? 'dragging' : ''}`} key={bookmark.id}><label className="checkbox-wrap"><input checked={selectedIds.has(bookmark.id)} onChange={() => toggleSelected(bookmark.id)} type="checkbox" /><span /></label><button aria-label={`拖动 ${bookmark.title || bookmark.url}`} className="category-drag-handle" draggable={!moving} onDragEnd={endDrag} onDragStart={(event) => beginDrag(event, bookmark.id)} title="拖动到右侧文件夹" type="button"><GripVertical size={16} /></button><div className="category-bookmark-info"><span className={`site-mark site-mark-${index % 4}`}>{(bookmark.title || '?').charAt(0).toUpperCase()}</span><div><strong title={bookmark.title}>{bookmark.title || '未命名书签'}</strong><small>{getHost(bookmark.url)}</small></div></div><span className="category-location" title={bookmark.folderPath}>{bookmark.folderPath || '根目录'}</span><a aria-label={`打开 ${bookmark.title || bookmark.url}`} className="bookmark-open-link" href={bookmark.url} rel="noreferrer" target="_blank"><ExternalLinkIcon /></a></div>)}</div><p className="category-keyboard-hint">拖动书签右侧的手柄，把它放入右侧组织树的任意文件夹。</p></section>
-      <aside className="panel category-tree-panel category-layout-tree"><div className="category-panel-title"><div><p className="eyebrow">ORGANIZATION TREE</p><h3>书签组织架构</h3></div><div className="category-tree-actions"><button className="tree-action-button" onClick={collapseAll} type="button">收起</button><button className="tree-action-button" onClick={expandAll} type="button">展开</button><button aria-label="重置组织树视图" className="tree-control-button" onClick={resetTreeView} type="button">⌖</button><button aria-label="刷新分类树" className="icon-button" disabled={refreshing || moving} onClick={() => void load(true)} type="button"><RefreshCw className={refreshing ? 'spin' : ''} size={16} /></button></div></div><p className="category-tree-description">从一个总目录向下衍生分支；每个文件夹节点都可以接收书签</p><div className="organization-tree category-layout-tree-canvas" ref={treeCanvasRef}><div className="organization-tree-canvas" style={{ transform: `scale(${treeZoom})`, transformOrigin: 'top left' }}><div className="organization-root-node"><div className="organization-root-card"><span className="organization-root-symbol"><Home size={18} /></span><div><strong>全部书签</strong><small>{tree.bookmarks.length} 个书签 · 总目录</small></div></div>{allFolders.length > 0 && <div className="organization-root-rail"><div className="organization-root-rail-line" />{allFolders.map((folder) => <FolderTreeNode drag={drag} dropFolderId={dropFolderId} expandedIds={expandedIds} folder={folder} key={folder.id} moving={moving} onDragLeave={() => setDropFolderId(null)} onDragOver={allowDrop} onDrop={dropOnFolder} onSelect={setSelectedFolderId} onToggle={toggleFolder} selectedFolderId={selectedFolderId} />)}</div>}</div></div></div><div className="organization-tree-controls"><button aria-label="缩小组织树" disabled={treeZoom <= 0.65} onClick={() => zoomTree(-0.1)} type="button">−</button><span>{Math.round(treeZoom * 100)}%</span><button aria-label="放大组织树" disabled={treeZoom >= 1.2} onClick={() => zoomTree(0.1)} type="button">＋</button></div><div className="tree-drop-guide"><Link2 size={15} /><span>把左侧书签拖入任意分支文件夹</span></div></aside>
+      <section className="panel category-bookmarks-panel category-layout-bookmarks">
+        <div className="category-panel-title">
+          <div><p className="eyebrow">BOOKMARKS TO ORGANIZE</p><h3>{selectedFolder ? selectedFolder.title : '全部书签'}</h3></div>
+          <div className="category-result-summary"><span className="category-result-count">{visibleBookmarks.length} 个结果 · {bookmarkGroups.length} 个文件夹</span><div className="category-group-actions"><button disabled={bookmarkGroups.length === 0} onClick={expandBookmarkGroups} type="button">展开全部</button><button disabled={bookmarkGroups.length === 0} onClick={collapseBookmarkGroups} type="button">收起全部</button></div></div>
+        </div>
+        <div className="category-toolbar"><label className="bookmark-search"><Search size={15} /><input onChange={(event) => setQuery(event.target.value)} placeholder="搜索书签、网址或文件夹" type="search" value={query} /></label><button className="toolbar-button" disabled={refreshing || moving} onClick={() => void load(true)} type="button">{refreshing ? '刷新中…' : '刷新'}</button></div>
+        {selectedIds.size > 0 && <div className="category-bulk-bar"><strong>已选择 {selectedIds.size} 个</strong><span>也可以拖动其中一个批量归类</span><select aria-label="将选中的书签移动到文件夹" onChange={(event) => { if (event.target.value) void moveBookmarks([...selectedIds], event.target.value) }} value=""><option value="">选择目标文件夹…</option>{flattenBookmarkFolders(allFolders).map((folder) => <option key={folder.id} value={folder.id}>{'　'.repeat(folder.depth)}{folder.title}</option>)}</select><button className="toolbar-button" onClick={() => setSelectedIds(new Set())} type="button">取消选择</button></div>}
+        <div className="category-bookmark-list category-layout-bookmark-list">
+          <div className="category-list-header"><label className="checkbox-wrap"><input checked={visibleBookmarks.length > 0 && visibleBookmarks.every((bookmark) => selectedIds.has(bookmark.id))} onChange={toggleAll} type="checkbox" /><span /></label><span className="category-list-title"><Folders size={14} />按文件夹分类</span><span>操作</span></div>
+          {visibleBookmarks.length === 0 ? <div className="category-empty"><Search size={25} /><strong>没有匹配的书签</strong><p>换个搜索关键词，或先在右侧选择其他文件夹。</p></div> : bookmarkGroups.map((group) => {
+            const groupSelectedCount = group.bookmarks.filter((bookmark) => selectedIds.has(bookmark.id)).length
+            const groupAllSelected = groupSelectedCount === group.bookmarks.length
+            const groupPartiallySelected = groupSelectedCount > 0 && !groupAllSelected
+            const collapsed = !normalizedQuery && collapsedGroupIds.has(group.id)
+            return <section className={`category-bookmark-group ${collapsed ? 'collapsed' : ''}`} key={group.id}>
+              <div className="category-bookmark-group-header" style={{ paddingLeft: `${12 + Math.min(group.depth, 4) * 10}px` }}>
+                <label className={`checkbox-wrap category-group-checkbox ${groupPartiallySelected ? 'partial' : ''}`}><input aria-label={`选择 ${group.path} 中的全部书签`} checked={groupAllSelected} onChange={() => toggleGroupSelection(group.bookmarks)} ref={(node) => { if (node) node.indeterminate = groupPartiallySelected }} type="checkbox" /><span /></label>
+                <button aria-expanded={!collapsed} aria-label={`${collapsed ? '展开' : '收起'} ${group.path}`} className="category-group-toggle" onClick={() => toggleGroup(group.id)} type="button">{collapsed ? <ChevronRight size={15} /> : <ChevronDown size={15} />}</button>
+                <button className="category-group-summary" onClick={() => toggleGroup(group.id)} type="button"><span className="category-group-icon">{collapsed ? <Folder size={15} /> : <FolderOpen size={15} />}</span><span><strong>{group.title}</strong><small title={group.path}>{group.path}</small></span></button>
+                <span className="category-group-count">{group.bookmarks.length}</span>
+              </div>
+              {!collapsed && <div className="category-group-items">{group.bookmarks.map((bookmark, index) => <div className={`category-bookmark-row ${selectedIds.has(bookmark.id) ? 'selected' : ''} ${drag?.ids.includes(bookmark.id) ? 'dragging' : ''}`} key={bookmark.id}><label className="checkbox-wrap"><input checked={selectedIds.has(bookmark.id)} onChange={() => toggleSelected(bookmark.id)} type="checkbox" /><span /></label><button aria-label={`拖动 ${bookmark.title || bookmark.url}`} className="category-drag-handle" draggable={!moving} onDragEnd={endDrag} onDragStart={(event) => beginDrag(event, bookmark.id)} title="拖动到右侧文件夹" type="button"><GripVertical size={16} /></button><div className="category-bookmark-info"><span className={`site-mark site-mark-${index % 4}`}>{(bookmark.title || '?').charAt(0).toUpperCase()}</span><div><strong title={bookmark.title}>{bookmark.title || '未命名书签'}</strong><small>{getHost(bookmark.url)}</small></div></div><a aria-label={`打开 ${bookmark.title || bookmark.url}`} className="bookmark-open-link" href={bookmark.url} rel="noreferrer" target="_blank"><ExternalLinkIcon /></a></div>)}</div>}
+            </section>
+          })}
+        </div>
+        <p className="category-keyboard-hint">书签已按当前文件夹分组；拖动书签右侧的手柄，可放入右侧组织树的任意文件夹。</p>
+      </section>
+      <aside className="panel category-tree-panel category-layout-tree"><div className="category-panel-title"><div><p className="eyebrow">ORGANIZATION TREE</p><h3>书签组织架构</h3></div><div className="category-tree-actions"><button className="tree-action-button" onClick={collapseAll} type="button">收起</button><button className="tree-action-button" onClick={expandAll} type="button">展开</button><button aria-label="重置组织树视图" className="tree-control-button" onClick={resetTreeView} type="button">⌖</button><button aria-label="刷新分类树" className="icon-button" disabled={refreshing || moving} onClick={() => void load(true)} type="button"><RefreshCw className={refreshing ? 'spin' : ''} size={16} /></button></div></div><p className="category-tree-description">从一个总目录向下衍生分支；每个文件夹节点都可以接收书签</p><div className="organization-tree category-layout-tree-canvas" ref={treeCanvasRef}><div className="organization-tree-canvas" style={{ transform: `scale(${treeZoom})`, transformOrigin: 'top left' }}><div className="organization-root-node"><button aria-current={selectedFolderId === 'all' ? 'page' : undefined} className={`organization-root-card ${selectedFolderId === 'all' ? 'active' : ''}`} onClick={() => selectFolder('all')} type="button"><span className="organization-root-symbol"><Home size={18} /></span><span><strong>全部书签</strong><small>{tree.bookmarks.length} 个书签 · 总目录</small></span></button>{allFolders.length > 0 && <div className="organization-root-rail"><div className="organization-root-rail-line" />{allFolders.map((folder) => <FolderTreeNode drag={drag} dropFolderId={dropFolderId} expandedIds={expandedIds} folder={folder} key={folder.id} moving={moving} onDragLeave={() => setDropFolderId(null)} onDragOver={allowDrop} onDrop={dropOnFolder} onSelect={selectFolder} onToggle={toggleFolder} selectedFolderId={selectedFolderId} />)}</div>}</div></div></div><div className="organization-tree-controls"><button aria-label="缩小组织树" disabled={treeZoom <= 0.65} onClick={() => zoomTree(-0.1)} type="button">−</button><span>{Math.round(treeZoom * 100)}%</span><button aria-label="放大组织树" disabled={treeZoom >= 1.2} onClick={() => zoomTree(0.1)} type="button">＋</button></div><div className="tree-drop-guide"><Link2 size={15} /><span>把左侧书签拖入任意分支文件夹</span></div></aside>
     </div>}
   </div>
 }

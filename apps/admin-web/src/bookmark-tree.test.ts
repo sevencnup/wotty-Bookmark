@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { BookmarkFolder, BookmarkItem } from './api'
-import { descendantFolderIds, flattenFolders, folderHasChildren, resolveDraggedBookmarkIds, visibleFolders } from './bookmark-tree'
+import { descendantFolderIds, flattenFolders, folderHasChildren, groupBookmarksByFolder, resolveDraggedBookmarkIds, ROOT_BOOKMARK_GROUP_ID, visibleFolders } from './bookmark-tree'
 
 const folders: BookmarkFolder[] = [
   { id: 'work', title: '工作', bookmarkCount: 3, children: [
@@ -10,6 +10,7 @@ const folders: BookmarkFolder[] = [
 ]
 
 const bookmarks: BookmarkItem[] = [
+  { id: 'root', title: 'Root', url: 'https://root.test', parentId: null, folderPath: '' },
   { id: 'one', title: 'One', url: 'https://one.test', parentId: 'work', folderPath: '工作' },
   { id: 'two', title: 'Two', url: 'https://two.test', parentId: 'docs', folderPath: '工作 / 文档' },
 ]
@@ -39,5 +40,26 @@ describe('bookmark tree helpers', () => {
   it('detects folders with children', () => {
     expect(folderHasChildren(folders[0])).toBe(true)
     expect(folderHasChildren(folders[1])).toBe(false)
+  })
+
+  it('groups bookmarks by their actual folder in tree order', () => {
+    const groups = groupBookmarksByFolder(bookmarks, folders)
+
+    expect(groups.map(({ id, title, path, depth, bookmarks: items }) => ({
+      id, title, path, depth, bookmarkIds: items.map((bookmark) => bookmark.id),
+    }))).toEqual([
+      { id: ROOT_BOOKMARK_GROUP_ID, title: '根目录', path: '根目录', depth: 0, bookmarkIds: ['root'] },
+      { id: 'work', title: '工作', path: '工作', depth: 0, bookmarkIds: ['one'] },
+      { id: 'docs', title: '文档', path: '工作 / 文档', depth: 1, bookmarkIds: ['two'] },
+    ])
+  })
+
+  it('keeps bookmarks whose folder is missing from the current tree', () => {
+    const groups = groupBookmarksByFolder([
+      { id: 'legacy', title: 'Legacy', url: 'https://legacy.test', parentId: 'missing', folderPath: '归档 / 旧资料' },
+    ], folders)
+
+    expect(groups[0]).toMatchObject({ id: 'missing', title: '旧资料', path: '归档 / 旧资料', depth: 1 })
+    expect(groups[0].bookmarks.map((bookmark) => bookmark.id)).toEqual(['legacy'])
   })
 })

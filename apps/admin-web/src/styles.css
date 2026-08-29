@@ -2981,6 +2981,248 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   }
 }
 
+/* 分类管理：左侧书签按文件夹分组 */
+.category-result-summary {
+  display: grid;
+  justify-items: end;
+  gap: 5px;
+}
+
+.category-group-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.category-group-actions button {
+  min-height: 24px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 6px;
+  color: var(--soft-muted);
+  background: transparent;
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.category-group-actions button:hover:not(:disabled),
+.category-group-actions button:focus-visible {
+  color: var(--primary);
+  background: var(--primary-soft);
+  outline: 0;
+}
+
+.category-group-actions button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.category-management-page .category-list-header {
+  grid-template-columns: 34px minmax(0, 1fr) 34px;
+}
+
+.category-list-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.category-list-title svg {
+  color: var(--primary);
+}
+
+.category-bookmark-group {
+  border-bottom: 1px solid var(--line);
+  background: var(--paper);
+}
+
+.category-bookmark-group:last-child {
+  border-bottom: 0;
+}
+
+.category-bookmark-group-header {
+  position: sticky;
+  z-index: 1;
+  top: 43px;
+  display: grid;
+  grid-template-columns: 24px 26px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px;
+  min-height: 48px;
+  padding: 6px 12px;
+  border-bottom: 1px solid #dce6f3;
+  background:
+    linear-gradient(90deg, rgba(219, 234, 254, 0.72), rgba(244, 248, 255, 0.96) 52%, rgba(248, 250, 252, 0.98));
+  box-shadow: 0 2px 8px rgba(30, 64, 175, 0.045);
+}
+
+.category-bookmark-group.collapsed .category-bookmark-group-header {
+  border-bottom: 0;
+  background: linear-gradient(90deg, #f1f5fb, #f8fafc);
+  box-shadow: none;
+}
+
+.category-group-checkbox {
+  justify-self: center;
+}
+
+.category-group-toggle {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  color: #6b7f9e;
+  background: transparent;
+  cursor: pointer;
+}
+
+.category-group-toggle:hover,
+.category-group-toggle:focus-visible {
+  color: var(--primary);
+  background: rgba(255, 255, 255, 0.72);
+  outline: 0;
+}
+
+.category-group-summary {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 9px;
+  padding: 2px 0;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.category-group-summary > span:last-child {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+}
+
+.category-group-summary strong {
+  overflow: hidden;
+  color: #263b5f;
+  font-size: 12px;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.category-group-summary small {
+  overflow: hidden;
+  color: #7b8ca8;
+  font-size: 10px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.category-group-icon {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid rgba(96, 136, 204, 0.18);
+  border-radius: 8px;
+  color: #356fc8;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.category-group-count {
+  min-width: 25px;
+  padding: 3px 7px;
+  border: 1px solid rgba(96, 136, 204, 0.18);
+  border-radius: 999px;
+  color: #52709f;
+  background: rgba(255, 255, 255, 0.76);
+  font-size: 10px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.category-group-items {
+  background: #fff;
+}
+
+.category-management-page .category-bookmark-row {
+  grid-template-columns: 34px 30px minmax(0, 1fr) 34px;
+}
+
+.category-bookmark-group .category-bookmark-row:last-child {
+  border-bottom: 0;
+}
+
+.category-bookmark-group .category-bookmark-row:hover,
+.category-bookmark-group .category-bookmark-row.selected {
+  background: linear-gradient(90deg, rgba(239, 246, 255, 0.76), #fff 58%);
+}
+
+.category-management-page .organization-root-card {
+  border: 1px solid #b8c8ec;
+  color: inherit;
+  cursor: pointer;
+}
+
+.category-management-page .organization-root-card:hover,
+.category-management-page .organization-root-card:focus-visible,
+.category-management-page .organization-root-card.active {
+  border-color: var(--primary);
+  background: linear-gradient(145deg, #e2ebff, #ffffff);
+  box-shadow: 0 0 0 4px var(--primary-glow), 0 10px 24px rgba(37, 99, 235, 0.14);
+  outline: 0;
+}
+
+.category-management-page .organization-root-card > span:last-child {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  text-align: left;
+}
+
+@media (max-width: 880px) {
+  .category-result-summary {
+    justify-items: start;
+  }
+
+  .category-management-page .category-bookmark-group-header {
+    top: 43px;
+  }
+}
+
+@media (max-width: 680px) {
+  .category-panel-title {
+    align-items: flex-start;
+  }
+
+  .category-result-summary {
+    justify-items: end;
+  }
+
+  .category-management-page .category-list-header {
+    grid-template-columns: 30px minmax(0, 1fr) 32px;
+  }
+
+  .category-management-page .category-bookmark-row {
+    grid-template-columns: 30px 28px minmax(0, 1fr) 32px;
+  }
+
+  .category-bookmark-group-header {
+    grid-template-columns: 22px 24px minmax(0, 1fr) auto;
+    padding-right: 8px;
+  }
+
+  .category-group-summary small {
+    max-width: 190px;
+  }
+}
+
 /* ── 2026 管理后台视觉升级覆盖层 ─────────────────────────── */
 :root {
   --ink: #172033;
