@@ -684,12 +684,28 @@ async fn check_lock_owner(
 }
 
 async fn acquire_lock(target: &DavTarget, owner_id: uuid::Uuid) -> Response {
+    let marker = format!("bookmark-vault-lock:{owner_id}");
     if let Ok(metadata) = fs::metadata(&target.file_path).await {
         if let Ok(modified) = metadata.modified() {
             if modified.elapsed().unwrap_or_default() > LOCK_TIMEOUT {
                 let _ = fs::remove_file(&target.file_path).await;
             } else {
-                return StatusCode::LOCKED.into_response();
+                return match fs::read(&target.file_path).await {
+                    Ok(contents) if contents == marker.as_bytes() => {
+                        match fs::write(&target.file_path, marker.as_bytes()).await {
+                            Ok(()) => StatusCode::NO_CONTENT.into_response(),
+                            Err(error) => {
+                                tracing::error!(?error, "refresh WebDAV lock failed");
+                                StatusCode::INTERNAL_SERVER_ERROR.into_response()
+                            }
+                        }
+                    }
+                    Ok(_) => StatusCode::LOCKED.into_response(),
+                    Err(error) => {
+                        tracing::error!(?error, "read existing WebDAV lock failed");
+                        StatusCode::INTERNAL_SERVER_ERROR.into_response()
+                    }
+                };
             }
         }
     }
@@ -706,7 +722,6 @@ async fn acquire_lock(target: &DavTarget, owner_id: uuid::Uuid) -> Response {
         .await
     {
         Ok(mut file) => {
-            let marker = format!("bookmark-vault-lock:{owner_id}");
             if file.write_all(marker.as_bytes()).await.is_err() || file.flush().await.is_err() {
                 let _ = fs::remove_file(&target.file_path).await;
                 return StatusCode::INTERNAL_SERVER_ERROR.into_response();
@@ -1216,7 +1231,11 @@ fn xml_escape(value: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{check_lock_owner, normalize_destination, xml_escape, DavResource, DavTarget};
+    use super::{
+        acquire_lock, check_lock_owner, normalize_destination, xml_escape, DavResource, DavTarget,
+    };
+    use axum::http::StatusCode;
+    use axum::response::IntoResponse;
     use std::fs;
     use std::path::Path;
     use uuid::Uuid;
@@ -1295,6 +1314,39 @@ mod tests {
         assert!(check_lock_owner(&target, Some(Uuid::new_v4()))
             .await
             .is_err());
+
+        fs::remove_dir_all(data_root).expect("remove test WebDAV directory");
+    }
+
+    #[tokio::test]
+    async fn same_owner_can_reacquire_floccus_lock() {
+        let user_id = Uuid::new_v4();
+        let data_root = std::env::temp_dir().join(format!("bookmark-vault-lock-reentry-{user_id}"));
+        let user_directory = data_root.join(user_id.to_string());
+        fs::create_dir_all(&user_directory).expect("create test WebDAV directory");
+        let target = DavTarget {
+            user_id,
+            relative_path: "alice/bookmarks.xbel.lock".to_owned(),
+            file_path: user_directory.join("bookmarks.xbel.lock"),
+            data_root: data_root.clone(),
+        };
+        let owner = Uuid::new_v4();
+
+        assert_eq!(
+            acquire_lock(&target, owner).await.into_response().status(),
+            StatusCode::CREATED
+        );
+        assert_eq!(
+            acquire_lock(&target, owner).await.into_response().status(),
+            StatusCode::NO_CONTENT
+        );
+        assert_eq!(
+            acquire_lock(&target, Uuid::new_v4())
+                .await
+                .into_response()
+                .status(),
+            StatusCode::LOCKED
+        );
 
         fs::remove_dir_all(data_root).expect("remove test WebDAV directory");
     }
