@@ -20,6 +20,10 @@
 - 文件夹标题左右边框均为 1px 同色边框，不再出现侧边色条。
 - 搜索输入聚焦后的 `outline` 与 `box-shadow` 均为 `none`。
 - 组织树分支接头使用 14px 圆角和透明背景，形成弯曲连接。
+- 补齐父文件夹右侧到子级竖向主干的圆角出线，修复多层分支悬空。
+- 统一所有递归层级的父子间距，覆盖旧样式中的顶层 `margin-left: 0` 和深层 `18px` 规则。
+- Chromium 几何回归检查覆盖 45 个展开分支：父卡片端压入 2px、子级主干端重叠 2px、断线 0 项。
+- 本轮 `lint`、17 项测试与生产构建全部通过，临时会话、验证脚本、截图和隔离浏览器已清理。
 - `pnpm --filter @bookmark-vault/admin-web lint`：通过。
 - `pnpm --filter @bookmark-vault/admin-web test`：17 项通过。
 - `pnpm --filter @bookmark-vault/admin-web build`：通过。
