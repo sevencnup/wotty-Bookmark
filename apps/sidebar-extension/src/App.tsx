@@ -349,6 +349,14 @@ function App() {
     }
   }, [reload]);
 
+  const handleOpenBookmark = useCallback(async (url: string) => {
+    try {
+      await openBookmark(url);
+    } catch (openError) {
+      setOperationError(openError instanceof Error ? openError.message : '无法打开书签');
+    }
+  }, []);
+
   const handleEditorSubmit = useCallback(
     async (values: EditorValues) => {
       if (!values.title.trim() || (values.kind === 'bookmark' && !values.url.trim())) {
@@ -537,7 +545,7 @@ function App() {
             results={searchResults}
             onEdit={(nodeId) => setModal({ type: 'edit', nodeId })}
             onMove={(nodeId) => setModal({ type: 'move', nodeId })}
-            onOpen={(url) => void openBookmark(url)}
+            onOpen={handleOpenBookmark}
             onDelete={(nodeId) => setModal({ type: 'delete', nodeId })}
           />
         ) : visibleNodes.length ? (
@@ -558,7 +566,7 @@ function App() {
                 onDrop={(target) => void handleDrop(draggedId!, target)}
                 onEdit={(nodeId) => setModal({ type: 'edit', nodeId })}
                 onMove={(nodeId) => setModal({ type: 'move', nodeId })}
-                onOpen={(url) => void openBookmark(url)}
+                onOpen={handleOpenBookmark}
                 onToggle={(nodeId) => {
                   setExpanded((current) => {
                     const next = new Set(current);
