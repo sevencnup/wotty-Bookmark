@@ -3041,9 +3041,9 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 }
 
 .category-bookmark-group-header {
-  position: sticky;
+  position: relative;
   z-index: 1;
-  top: 43px;
+  top: auto;
   display: grid;
   grid-template-columns: 24px 26px minmax(0, 1fr) auto;
   align-items: center;
@@ -3194,9 +3194,6 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
     justify-items: start;
   }
 
-  .category-management-page .category-bookmark-group-header {
-    top: 43px;
-  }
 }
 
 @media (max-width: 680px) {
@@ -3245,6 +3242,8 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 }
 
 .category-management-page .category-bookmark-group-header {
+  position: relative !important;
+  top: auto !important;
   display: grid !important;
   grid-template-columns: 24px 26px minmax(0, 1fr) auto !important;
   align-items: center !important;

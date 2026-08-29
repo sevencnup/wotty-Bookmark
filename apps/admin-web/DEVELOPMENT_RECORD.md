@@ -1,5 +1,26 @@
 # 管理后台开发记录
 
+## 2026-08-29：`admin-category-group-height`
+
+### 任务
+
+修复分类管理文件夹分组滚动后出现顶部半格空白和高度不一致的问题。
+
+### 进度
+
+- 移除文件夹分组标题的 sticky 定位，恢复普通文档流。
+- 保留列表列标题 sticky，继续提供滚动表头。
+- 增加最终样式覆盖，避免旧样式重新启用 sticky。
+
+### 验证
+
+- 真实 1017 条书签下全部收起并滚动 2400px，连续 10 个分组顶边差值均为 0px。
+- 所有抽检分组统一为 53px。
+- `pnpm --filter @bookmark-vault/admin-web lint`：通过。
+- `pnpm --filter @bookmark-vault/admin-web test`：17 项通过。
+- `pnpm --filter @bookmark-vault/admin-web build`：通过。
+- 临时会话、浏览器和测试脚本已清理。
+
 ## 2026-08-29：`admin-category-interaction-performance`
 
 ### 任务
