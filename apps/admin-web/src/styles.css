@@ -2981,6 +2981,43 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   }
 }
 
+/* 分类管理：文件夹目录带，与白底书签内容建立清晰层级 */
+.category-management-page .category-bookmark-group > .category-bookmark-group-header {
+  border-right: 1px solid #c9d8f2 !important;
+  border-bottom: 1px solid #b9ccec !important;
+  border-left: 4px solid #4f75d8 !important;
+  background: linear-gradient(90deg, #dce9ff 0%, #e8f1ff 58%, #f0f5ff 100%) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72), 0 2px 7px rgba(63, 91, 153, 0.08) !important;
+}
+
+.category-management-page .category-bookmark-group > .category-bookmark-group-header:hover {
+  background: linear-gradient(90deg, #d2e3ff 0%, #e1edff 58%, #edf4ff 100%) !important;
+}
+
+.category-management-page .category-bookmark-group.collapsed > .category-bookmark-group-header {
+  border-left-color: #7894d7 !important;
+  background: linear-gradient(90deg, #e8f0ff 0%, #f0f5ff 62%, #f6f8fc 100%) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.76) !important;
+}
+
+.category-management-page .category-bookmark-group > .category-bookmark-group-header .category-group-icon {
+  border-color: #b2c7ee !important;
+  color: #2f5fbd !important;
+  background: #ffffff !important;
+  box-shadow: 0 2px 5px rgba(47, 95, 189, 0.1);
+}
+
+.category-management-page .category-bookmark-group > .category-bookmark-group-header .category-group-count {
+  border-color: #b4c8ec !important;
+  color: #2f559d !important;
+  background: rgba(255, 255, 255, 0.84) !important;
+}
+
+.category-management-page .category-bookmark-group > .category-group-items,
+.category-management-page .category-bookmark-group > .category-group-items .category-bookmark-row {
+  background-color: #ffffff;
+}
+
 /* 分类管理：左侧书签按文件夹分组 */
 .category-result-summary {
   display: grid;
