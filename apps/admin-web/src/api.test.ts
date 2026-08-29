@@ -16,6 +16,7 @@ import {
   permanentlyDeleteTrashItem,
   register,
   registerDevice,
+  resetSyncBaseline,
   restoreFileVersion,
   restoreTrashItem,
   revokeAppPassword,
@@ -103,6 +104,19 @@ describe('admin API contract', () => {
       body: expect.any(Blob),
     }))
     expect(new Headers(fetchMock.mock.calls[1][1].headers).get('content-type')).toBe('application/octet-stream')
+  })
+
+  it('requests a fast Floccus baseline reset with the session token', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(response({ reset: true, backupCreated: true }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await resetSyncBaseline('session-token')
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/v1/storage/reset-sync-baseline',
+      expect.objectContaining({ method: 'POST' }),
+    )
+    expect(new Headers(fetchMock.mock.calls[0][1].headers).get('authorization')).toBe('Bearer session-token')
   })
 
 

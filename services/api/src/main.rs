@@ -125,6 +125,10 @@ fn app_router(state: AppState) -> Router {
         .route("/api/v1/devices/:id/revoke", post(devices::revoke))
         .route("/api/v1/storage/export", get(webdav::export_file))
         .route("/api/v1/storage/import", post(webdav::import_file))
+        .route(
+            "/api/v1/storage/reset-sync-baseline",
+            post(webdav::reset_sync_baseline),
+        )
         .route("/api/v1/storage/versions", get(webdav::list_versions))
         .route(
             "/api/v1/storage/versions/cleanup",

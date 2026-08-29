@@ -1,5 +1,26 @@
 # 管理后台开发记录
 
+## 2026-08-29：`floccus-fast-recovery`
+
+### 任务
+
+优化旧 XBEL 缺少 Floccus 节点 ID 时的首次恢复同步速度。
+
+### 进度
+
+- 迁移提示增加“备份并快速重建同步文件”操作和二次确认。
+- 后端先保存旧文件历史版本，再移除当前基线和失效索引。
+- 活跃 Floccus 锁阻止重建，重建自身也持有独占锁避免并发写入。
+- 当前同步状态按正式 XBEL 的实际存在情况计算，历史版本仍可恢复。
+- 重建后保留现有 Floccus 配置，只需执行一次“向上推一次”。
+
+### 验证
+
+- `cargo test --manifest-path services/api/Cargo.toml`：26 项通过。
+- `pnpm --filter @bookmark-vault/admin-web lint`：通过。
+- `pnpm --filter @bookmark-vault/admin-web test`：19 项通过。
+- `pnpm --filter @bookmark-vault/admin-web build`：通过。
+
 ## 2026-08-29：`floccus-lock-reentry`
 
 ### 任务

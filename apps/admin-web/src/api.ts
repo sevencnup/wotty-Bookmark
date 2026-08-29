@@ -118,6 +118,11 @@ export class ApiRequestError extends Error {
   }
 }
 
+export type ResetSyncBaselineResult = {
+  reset: boolean
+  backupCreated: boolean
+}
+
 export type MoveFolderResponse = {
   moved: boolean
   unchanged?: boolean
@@ -289,6 +294,10 @@ export function importStorageFile(token: string, file: Blob) {
     headers: { 'content-type': 'application/octet-stream' },
     body: file,
   }, token)
+}
+
+export function resetSyncBaseline(token: string) {
+  return request<ResetSyncBaselineResult>('/api/v1/storage/reset-sync-baseline', { method: 'POST' }, token)
 }
 
 export function createSidebarPairing(token: string) {

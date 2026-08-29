@@ -48,6 +48,7 @@ export function CategoryManagementPage({ token, onOpenFloccus }: Props) {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [moving, setMoving] = useState(false)
+  const [resettingBaseline, setResettingBaseline] = useState(false)
   const [query, setQuery] = useState('')
   const [selectedFolderId, setSelectedFolderId] = useState('all')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -86,6 +87,30 @@ export function CategoryManagementPage({ token, onOpenFloccus }: Props) {
   }, [token])
 
   useEffect(() => { void load() }, [load])
+
+  async function resetSyncBaseline() {
+    if (resettingBaseline) return
+    const confirmed = window.confirm(
+      '请先取消当前 Floccus 同步。此操作会备份服务器旧文件，然后移除远端同步基线；不会删除浏览器本地书签。继续吗？',
+    )
+    if (!confirmed) return
+    setResettingBaseline(true)
+    setError('')
+    setNotice('')
+    try {
+      const result = await api.resetSyncBaseline(token)
+      setNotice(result.backupCreated
+        ? '旧同步文件已备份并移除。现在请在 Floccus 执行一次“向上推一次”。'
+        : '服务器同步基线已清空。现在请在 Floccus 执行一次“向上推一次”。')
+      await load()
+    } catch (requestError) {
+      setError(requestError instanceof api.ApiRequestError && requestError.status === 423
+        ? 'Floccus 仍在同步，请先取消并等待停止后再试。'
+        : readableError(requestError, '同步基线重建失败，请稍后重试'))
+    } finally {
+      setResettingBaseline(false)
+    }
+  }
 
   useEffect(() => {
     const stopSelectionPaint = () => {
@@ -429,7 +454,7 @@ export function CategoryManagementPage({ token, onOpenFloccus }: Props) {
   return <div className="category-management-page">
     {error && tree && <div aria-live="polite" className="bookmark-alert error"><strong>操作失败</strong><span>{error}</span></div>}
     {notice && <div aria-live="polite" className="bookmark-alert success"><strong>已完成</strong><span>{notice}</span></div>}
-    {loading ? <section className="panel category-state"><LoaderCircle className="spin" size={30} /><strong>正在加载书签组织结构…</strong><p>正在读取最新的文件夹和书签索引。</p></section> : error && !tree ? <section className="panel category-state"><RefreshCw size={30} /><strong>书签服务暂时无法连接</strong><p>{error}</p><button className="primary-button" onClick={() => void load(true)} type="button"><RefreshCw size={15} /> 重新连接</button></section> : tree?.status === 'encrypted' ? <section className="panel category-state"><Sparkles size={30} /><strong>同步文件已加密，暂时无法建立分类树</strong><p>服务器无法读取加密文件中的文件夹和书签。请在 Floccus 或浏览器书签中完成整理。</p><button className="primary-button" onClick={onOpenFloccus} type="button">打开 Floccus 配置</button></section> : tree?.status !== 'ready' ? <section className="panel category-state"><FolderOpen size={30} /><strong>还没有可用的书签索引</strong><p>完成一次明文 XBEL 同步后，这里会显示从总目录衍生的文件夹组织树。</p><button className="primary-button" onClick={onOpenFloccus} type="button">前往同步配置</button></section> : <div className="category-workspace">
+    {loading ? <section className="panel category-state"><LoaderCircle className="spin" size={30} /><strong>正在加载书签组织结构…</strong><p>正在读取最新的文件夹和书签索引。</p></section> : error && !tree ? <section className="panel category-state"><RefreshCw size={30} /><strong>书签服务暂时无法连接</strong><p>{error}</p><button className="primary-button" onClick={() => void load(true)} type="button"><RefreshCw size={15} /> 重新连接</button></section> : tree?.status === 'encrypted' ? <section className="panel category-state"><Sparkles size={30} /><strong>同步文件已加密，暂时无法建立分类树</strong><p>服务器无法读取加密文件中的文件夹和书签。请在 Floccus 或浏览器书签中完成整理。</p><button className="primary-button" onClick={onOpenFloccus} type="button">打开 Floccus 配置</button></section> : tree?.status === 'migrationRequired' ? <section className="panel category-state"><FolderOpen size={30} /><strong>需要由浏览器重新建立同步身份</strong><p>当前 XBEL 缺少 Floccus 节点 ID，直接推送会先对旧树执行耗时的完整比较。请先取消当前同步，再让后台备份并移除旧基线；浏览器本地书签不会被删除。</p><div className="bookmark-encrypted-actions bookmark-recovery-actions"><button className="danger-button" disabled={resettingBaseline} onClick={() => void resetSyncBaseline()} type="button">{resettingBaseline ? '正在安全备份…' : '备份并快速重建同步文件'}</button><button className="toolbar-button" disabled={resettingBaseline || refreshing} onClick={() => void load(true)} type="button">{refreshing ? '正在检查…' : '我已推送，重新检查'}</button></div><small className="bookmark-recovery-hint">重建完成后，只需在 Floccus 执行一次“向上推一次”，无需删除配置。</small></section> : tree?.status !== 'ready' ? <section className="panel category-state"><FolderOpen size={30} /><strong>还没有可用的书签索引</strong><p>完成一次明文 XBEL 同步后，这里会显示从总目录衍生的文件夹组织树。</p><button className="primary-button" onClick={onOpenFloccus} type="button">前往同步配置</button></section> : <div className="category-workspace">
       <section className="panel category-bookmarks-panel category-layout-bookmarks">
         <div className="category-panel-title">
           <div><p className="eyebrow">BOOKMARKS TO ORGANIZE</p><h3>{selectedFolder ? selectedFolder.title : '全部书签'}</h3></div>

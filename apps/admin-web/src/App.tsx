@@ -652,7 +652,7 @@ function BookmarkOrganizer({ token, onOpenFloccus, mode = 'organizer' }: { token
         <section className="panel bookmark-encrypted-state">
           <span className="bookmark-encrypted-icon">!</span>
           <strong>需要由浏览器重新建立同步身份</strong>
-          <p>当前 XBEL 缺少 Floccus 节点 ID，后台已暂停移动和删除，避免产生大量误删。请先备份浏览器书签，再在 Floccus 中对该配置执行一次“向上推一次”；完成后刷新本页。</p>
+          <p>当前 XBEL 缺少 Floccus 节点 ID，后台已暂停移动和删除，避免产生大量误删。请在分类管理页面使用快速重建入口，或先在 Floccus 中执行一次“向上推一次”。</p>
           <button className="primary-button compact" onClick={() => void loadBookmarks(true)} type="button">我已推送，重新检查</button>
         </section>
       ) : tree?.status !== 'ready' ? (

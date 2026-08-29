@@ -491,27 +491,42 @@ pub async fn storage_status(State(state): State<AppState>, headers: HeaderMap) -
     let Some(user) = authenticate_session(&state, &headers).await else {
         return error(StatusCode::UNAUTHORIZED, "unauthorized", "请先登录");
     };
+    let file_exists = tokio::fs::try_exists(
+        state
+            .data_dir
+            .join(user.id.to_string())
+            .join("bookmarks.xbel"),
+    )
+    .await
+    .unwrap_or(false);
     let row = sqlx::query(
-        "SELECT COUNT(*) AS files,
-                COALESCE(SUM(byte_size), 0) AS bytes,
-                MAX(last_modified_at) AS last_modified_at
+        "SELECT byte_size, last_modified_at
          FROM dav_files
-         WHERE user_id = $1",
+         WHERE user_id = $1 AND path = $2",
     )
     .bind(user.id)
-    .fetch_one(&state.db)
+    .bind(format!("{}/bookmarks.xbel", user.login_identifier))
+    .fetch_optional(&state.db)
     .await;
     match row {
-        Ok(row) => Json(json!({
-            "files": row.get::<i64, _>("files"),
-            "bytes": row.get::<i64, _>("bytes"),
-            "lastModifiedAt": row
-                .try_get::<chrono::DateTime<chrono::Utc>, _>("last_modified_at")
-                .ok()
-                .map(|value| value.to_rfc3339()),
-            "maxFileBytes": 10 * 1024 * 1024,
-        }))
-        .into_response(),
+        Ok(row) => {
+            let bytes = row
+                .as_ref()
+                .map(|row| row.get::<i64, _>("byte_size"))
+                .unwrap_or(0);
+            let last_modified_at = row.as_ref().and_then(|row| {
+                row.try_get::<chrono::DateTime<chrono::Utc>, _>("last_modified_at")
+                    .ok()
+                    .map(|value| value.to_rfc3339())
+            });
+            Json(json!({
+                "files": i64::from(file_exists),
+                "bytes": if file_exists { bytes } else { 0 },
+                "lastModifiedAt": if file_exists { last_modified_at } else { None },
+                "maxFileBytes": 10 * 1024 * 1024,
+            }))
+            .into_response()
+        }
         Err(db_error) => {
             tracing::error!(?db_error, "storage status lookup failed");
             error(

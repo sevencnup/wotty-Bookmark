@@ -188,6 +188,141 @@ struct FileVersionResponse {
     created_at: String,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ResetSyncBaselineResponse {
+    reset: bool,
+    backup_created: bool,
+}
+
+#[derive(Debug)]
+enum ResetSyncBaselineError {
+    Locked,
+    Failed(String),
+}
+
+pub async fn reset_sync_baseline(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+) -> Response {
+    let Some(user) = auth::authenticate_session(&state, &headers).await else {
+        return auth::error(StatusCode::UNAUTHORIZED, "unauthorized", "请先登录");
+    };
+    let target = DavTarget {
+        user_id: user.id,
+        relative_path: format!("{}/bookmarks.xbel", user.login_identifier),
+        file_path: state.data_dir.join(user.id.to_string()).join("bookmarks.xbel"),
+        data_root: state.data_dir.clone(),
+    };
+    match reset_sync_baseline_for_target(&state.db, &target).await {
+        Ok(result) => Json(result).into_response(),
+        Err(ResetSyncBaselineError::Locked) => auth::error(
+            StatusCode::LOCKED,
+            "sync_in_progress",
+            "Floccus 仍在同步，请先取消并等待停止后再试",
+        ),
+        Err(ResetSyncBaselineError::Failed(error)) => {
+            tracing::error!(?error, "reset Floccus sync baseline failed");
+            auth::error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "sync_baseline_reset_failed",
+                "同步基线重建失败，旧文件未被静默丢弃",
+            )
+        }
+    }
+}
+
+async fn reset_sync_baseline_for_target(
+    db: &SqlitePool,
+    target: &DavTarget,
+) -> Result<ResetSyncBaselineResponse, ResetSyncBaselineError> {
+    let owner_id = uuid::Uuid::new_v4();
+    let lock_target = DavTarget {
+        user_id: target.user_id,
+        relative_path: target.relative_path.replace("bookmarks.xbel", "bookmarks.xbel.lock"),
+        file_path: target.file_path.with_file_name("bookmarks.xbel.lock"),
+        data_root: target.data_root.clone(),
+    };
+    let lock_response = acquire_lock(&lock_target, owner_id).await;
+    if lock_response.status() == StatusCode::LOCKED {
+        return Err(ResetSyncBaselineError::Locked);
+    }
+    if !matches!(lock_response.status(), StatusCode::CREATED | StatusCode::NO_CONTENT) {
+        return Err(ResetSyncBaselineError::Failed(format!(
+            "acquire recovery lock: {}",
+            lock_response.status()
+        )));
+    }
+
+    let result = reset_sync_baseline_while_locked(db, target).await;
+    release_lock_if_owner(&lock_target.file_path, owner_id).await;
+    result
+}
+
+async fn reset_sync_baseline_while_locked(
+    db: &SqlitePool,
+    target: &DavTarget,
+) -> Result<ResetSyncBaselineResponse, ResetSyncBaselineError> {
+    let current_body = match fs::read(&target.file_path).await {
+        Ok(body) => Some(body),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+        Err(error) => {
+            return Err(ResetSyncBaselineError::Failed(format!(
+                "read current baseline: {error}"
+            )))
+        }
+    };
+    let backup_created = current_body.is_some();
+    if backup_created {
+        snapshot_existing_file(db, target)
+            .await
+            .map_err(ResetSyncBaselineError::Failed)?;
+        fs::remove_file(&target.file_path)
+            .await
+            .map_err(|error| ResetSyncBaselineError::Failed(format!("remove baseline: {error}")))?;
+    }
+
+    let clear_result = async {
+        let mut transaction = db.begin().await?;
+        sqlx::query("DELETE FROM bookmark_nodes WHERE user_id = $1")
+            .bind(target.user_id)
+            .execute(&mut *transaction)
+            .await?;
+        sqlx::query("DELETE FROM bookmark_sync_state WHERE user_id = $1")
+            .bind(target.user_id)
+            .execute(&mut *transaction)
+            .await?;
+        transaction.commit().await
+    }
+    .await;
+
+    if let Err(error) = clear_result {
+        if let Some(body) = current_body {
+            if let Err(restore_error) = replace_file(&target.file_path, &body).await {
+                return Err(ResetSyncBaselineError::Failed(format!(
+                    "clear index: {error}; restore baseline: {restore_error}"
+                )));
+            }
+        }
+        return Err(ResetSyncBaselineError::Failed(format!("clear index: {error}")));
+    }
+
+    Ok(ResetSyncBaselineResponse {
+        reset: true,
+        backup_created,
+    })
+}
+
+async fn release_lock_if_owner(lock_path: &FsPath, owner_id: uuid::Uuid) {
+    let marker = format!("bookmark-vault-lock:{owner_id}");
+    if fs::read(lock_path)
+        .await
+        .is_ok_and(|contents| contents == marker.as_bytes())
+    {
+        let _ = fs::remove_file(lock_path).await;
+    }
+}
+
 pub async fn list_versions(State(state): State<AppState>, headers: HeaderMap) -> Response {
     let Some(user) = auth::authenticate_session(&state, &headers).await else {
         return auth::error(StatusCode::UNAUTHORIZED, "unauthorized", "请先登录");
@@ -1232,13 +1367,43 @@ fn xml_escape(value: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        acquire_lock, check_lock_owner, normalize_destination, xml_escape, DavResource, DavTarget,
+        acquire_lock, check_lock_owner, normalize_destination, read_file, record_file,
+        reset_sync_baseline_for_target, write_file, xml_escape, DavResource, DavTarget,
+        ResetSyncBaselineError,
     };
-    use axum::http::StatusCode;
+    use axum::{
+        body::Body,
+        http::{Request, StatusCode},
+    };
     use axum::response::IntoResponse;
+    use sqlx::{sqlite::SqlitePoolOptions, Row};
     use std::fs;
     use std::path::Path;
     use uuid::Uuid;
+
+    async fn test_db() -> sqlx::SqlitePool {
+        let db = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .expect("test database");
+        sqlx::migrate!("../../migrations")
+            .run(&db)
+            .await
+            .expect("test migrations");
+        db
+    }
+
+    async fn create_test_user(db: &sqlx::SqlitePool, user_id: Uuid) {
+        sqlx::query(
+            "INSERT INTO users (id, login_identifier, password_hash) VALUES ($1, $2, 'hash')",
+        )
+        .bind(user_id)
+        .bind("alice")
+        .execute(db)
+        .await
+        .expect("test user");
+    }
 
     #[test]
     fn parses_collection_and_supported_file_paths() {
@@ -1349,5 +1514,135 @@ mod tests {
         );
 
         fs::remove_dir_all(data_root).expect("remove test WebDAV directory");
+    }
+
+    #[tokio::test]
+    async fn active_floccus_lock_blocks_fast_baseline_reset() {
+        let db = test_db().await;
+        let user_id = Uuid::new_v4();
+        create_test_user(&db, user_id).await;
+        let data_root = std::env::temp_dir().join(format!("bookmark-vault-reset-locked-{user_id}"));
+        let user_directory = data_root.join(user_id.to_string());
+        fs::create_dir_all(&user_directory).expect("create reset directory");
+        let target = DavTarget {
+            user_id,
+            relative_path: "alice/bookmarks.xbel".to_owned(),
+            file_path: user_directory.join("bookmarks.xbel"),
+            data_root: data_root.clone(),
+        };
+        let original = b"<xbel></xbel>";
+        fs::write(&target.file_path, original).expect("write baseline");
+        fs::write(
+            user_directory.join("bookmarks.xbel.lock"),
+            format!("bookmark-vault-lock:{}", Uuid::new_v4()),
+        )
+        .expect("write active lock");
+
+        assert!(matches!(
+            reset_sync_baseline_for_target(&db, &target).await,
+            Err(ResetSyncBaselineError::Locked)
+        ));
+        assert_eq!(fs::read(&target.file_path).expect("baseline remains"), original);
+        assert!(user_directory.join("bookmarks.xbel.lock").exists());
+
+        fs::remove_dir_all(data_root).expect("remove reset directory");
+    }
+
+    #[tokio::test]
+    async fn fast_baseline_reset_preserves_history_and_accepts_fresh_upload() {
+        let db = test_db().await;
+        let user_id = Uuid::new_v4();
+        create_test_user(&db, user_id).await;
+        let data_root = std::env::temp_dir().join(format!("bookmark-vault-reset-{user_id}"));
+        let user_directory = data_root.join(user_id.to_string());
+        fs::create_dir_all(&user_directory).expect("create reset directory");
+        let target = DavTarget {
+            user_id,
+            relative_path: "alice/bookmarks.xbel".to_owned(),
+            file_path: user_directory.join("bookmarks.xbel"),
+            data_root: data_root.clone(),
+        };
+        let old_body = br#"<xbel><bookmark href="https://old.example"><title>Old</title></bookmark></xbel>"#;
+        fs::write(&target.file_path, old_body).expect("write old baseline");
+        record_file(&db, &target, old_body)
+            .await
+            .expect("record old baseline");
+        sqlx::query("INSERT INTO bookmark_nodes (id, user_id, node_type, title, url, position, floccus_id) VALUES ($1, $2, 'bookmark', 'Old', 'https://old.example', 0, 1)")
+            .bind(Uuid::new_v4())
+            .bind(user_id)
+            .execute(&db)
+            .await
+            .expect("old bookmark index");
+        sqlx::query("INSERT INTO bookmark_sync_state (user_id, highest_id) VALUES ($1, 1)")
+            .bind(user_id)
+            .execute(&db)
+            .await
+            .expect("old sync state");
+
+        let reset = reset_sync_baseline_for_target(&db, &target)
+            .await
+            .expect("fast reset succeeds");
+        assert!(reset.reset);
+        assert!(reset.backup_created);
+        assert!(!target.file_path.exists());
+        assert_eq!(read_file(&target, false).await.status(), StatusCode::NOT_FOUND);
+        assert_eq!(
+            sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM bookmark_nodes WHERE user_id = $1")
+                .bind(user_id)
+                .fetch_one(&db)
+                .await
+                .expect("bookmark count"),
+            0
+        );
+        assert_eq!(
+            sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM bookmark_sync_state WHERE user_id = $1")
+                .bind(user_id)
+                .fetch_one(&db)
+                .await
+                .expect("sync state count"),
+            0
+        );
+        let version = sqlx::query(
+            "SELECT fv.storage_key FROM file_versions fv JOIN dav_files df ON df.id = fv.dav_file_id WHERE df.user_id = $1",
+        )
+        .bind(user_id)
+        .fetch_one(&db)
+        .await
+        .expect("history row");
+        let snapshot_path: String = version.get("storage_key");
+        assert_eq!(fs::read(snapshot_path).expect("history bytes"), old_body);
+        assert_eq!(
+            sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM dav_files WHERE user_id = $1")
+                .bind(user_id)
+                .fetch_one(&db)
+                .await
+                .expect("metadata count"),
+            1
+        );
+        assert!(!user_directory.join("bookmarks.xbel.lock").exists());
+
+        let new_body = br#"<xbel><!--- highestId :1: for Floccus bookmark sync browser extension --><bookmark href="https://new.example" id="1"><title>New</title></bookmark></xbel>"#;
+        let response = write_file(
+            &target,
+            Request::builder()
+                .method("PUT")
+                .body(Body::from(new_body.as_slice()))
+                .expect("upload request"),
+            &db,
+            None,
+        )
+        .await;
+        assert_eq!(response.status(), StatusCode::CREATED);
+        assert_eq!(fs::read(&target.file_path).expect("new baseline"), new_body);
+        assert_eq!(
+            sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM bookmark_nodes WHERE user_id = $1")
+                .bind(user_id)
+                .fetch_one(&db)
+                .await
+                .expect("new bookmark count"),
+            1
+        );
+
+        fs::remove_dir_all(data_root).expect("remove reset directory");
     }
 }

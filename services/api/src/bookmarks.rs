@@ -519,13 +519,7 @@ pub async fn current_bookmark_status(
         .join(user_id.to_string())
         .join("bookmarks.xbel");
     if !fs::try_exists(&file_path).await.unwrap_or(false) {
-        let has_nodes =
-            sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM bookmark_nodes WHERE user_id = $1")
-                .bind(user_id)
-                .fetch_one(&state.db)
-                .await?
-                > 0;
-        return Ok(if has_nodes { "ready" } else { "notReady" });
+        return Ok("notReady");
     }
     let bytes = fs::read(file_path).await.map_err(sqlx::Error::Io)?;
     Ok(if is_encrypted_sync_file(&bytes) {
@@ -588,17 +582,20 @@ async fn load_bookmark_tree(
             position: row.get("position"),
         })
         .collect::<Vec<_>>();
-    let metadata =
-        sqlx::query("SELECT etag, version FROM dav_files WHERE user_id = $1 AND path = $2")
-            .bind(user_id)
-            .bind(format!("{login_identifier}/bookmarks.xbel"))
-            .fetch_optional(&state.db)
-            .await?;
     let file_path = state
         .data_dir
         .join(user_id.to_string())
         .join("bookmarks.xbel");
     let file_exists = fs::try_exists(&file_path).await.unwrap_or(false);
+    let metadata = if file_exists {
+        sqlx::query("SELECT etag, version FROM dav_files WHERE user_id = $1 AND path = $2")
+            .bind(user_id)
+            .bind(format!("{login_identifier}/bookmarks.xbel"))
+            .fetch_optional(&state.db)
+            .await?
+    } else {
+        None
+    };
     let status = if file_exists {
         match fs::read(&file_path).await {
             Ok(bytes) if is_encrypted_sync_file(&bytes) => "encrypted",
@@ -608,8 +605,6 @@ async fn load_bookmark_tree(
             },
             Err(_) => "notReady",
         }
-    } else if !nodes.is_empty() {
-        "ready"
     } else {
         "notReady"
     };
