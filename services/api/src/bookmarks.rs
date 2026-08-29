@@ -80,21 +80,11 @@ pub fn parse_xbel(bytes: &[u8]) -> Result<Vec<XbelNode>, XbelError> {
                 }
 
                 let node_index = match name.as_str() {
-                    "folder" => Some(push_node(
-                        &mut nodes,
-                        NodeKind::Folder,
-                        None,
-                        &stack,
-                    )),
+                    "folder" => Some(push_node(&mut nodes, NodeKind::Folder, None, &stack)),
                     "bookmark" => {
                         let url = attribute_value(&start, b"href")?
                             .ok_or_else(|| XbelError("书签缺少 href 属性".into()))?;
-                        Some(push_node(
-                            &mut nodes,
-                            NodeKind::Bookmark,
-                            Some(url),
-                            &stack,
-                        ))
+                        Some(push_node(&mut nodes, NodeKind::Bookmark, Some(url), &stack))
                     }
                     _ => None,
                 };
@@ -174,7 +164,8 @@ pub fn parse_xbel(bytes: &[u8]) -> Result<Vec<XbelNode>, XbelError> {
 
 pub fn render_xbel(nodes: &[XbelNode]) -> Result<Vec<u8>, XbelError> {
     validate_nodes(nodes)?;
-    let mut output = String::from("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<xbel version=\"1.0\">\n");
+    let mut output =
+        String::from("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<xbel version=\"1.0\">\n");
     let roots = child_indices(nodes, None);
     render_children(nodes, &roots, 1, &mut output);
     output.push_str("</xbel>\n");
@@ -188,10 +179,7 @@ fn push_node(
     stack: &[OpenElement],
 ) -> usize {
     let parent = stack.iter().rev().find_map(|element| element.node_index);
-    let position = nodes
-        .iter()
-        .filter(|node| node.parent == parent)
-        .count();
+    let position = nodes.iter().filter(|node| node.parent == parent).count();
     let index = nodes.len();
     nodes.push(XbelNode {
         kind,
@@ -368,12 +356,19 @@ pub async fn load_node_for_user(
             position: row.get("position"),
         })
         .collect::<Vec<_>>();
-    let by_id = nodes.iter().map(|node| (node.id, node)).collect::<HashMap<_, _>>();
+    let by_id = nodes
+        .iter()
+        .map(|node| (node.id, node))
+        .collect::<HashMap<_, _>>();
     let Some(node) = nodes.iter().find(|node| node.id == node_id) else {
         return Ok(None);
     };
     Ok(Some(BookmarkNodeForTrash {
-        node_type: match node.kind { NodeKind::Folder => "folder", NodeKind::Bookmark => "bookmark" }.into(),
+        node_type: match node.kind {
+            NodeKind::Folder => "folder",
+            NodeKind::Bookmark => "bookmark",
+        }
+        .into(),
         title: node.title.clone(),
         url: node.url.clone(),
         folder_path: folder_path(node.parent_id, &by_id),
@@ -386,14 +381,17 @@ pub async fn current_bookmark_status(
     user_id: Uuid,
     _login_identifier: &str,
 ) -> Result<&'static str, sqlx::Error> {
-    let file_path = state.data_dir.join(user_id.to_string()).join("bookmarks.xbel");
+    let file_path = state
+        .data_dir
+        .join(user_id.to_string())
+        .join("bookmarks.xbel");
     if !fs::try_exists(&file_path).await.unwrap_or(false) {
-        let has_nodes = sqlx::query_scalar::<_, i64>(
-            "SELECT COUNT(*) FROM bookmark_nodes WHERE user_id = $1",
-        )
-        .bind(user_id)
-        .fetch_one(&state.db)
-        .await? > 0;
+        let has_nodes =
+            sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM bookmark_nodes WHERE user_id = $1")
+                .bind(user_id)
+                .fetch_one(&state.db)
+                .await?
+                > 0;
         return Ok(if has_nodes { "ready" } else { "notReady" });
     }
     let bytes = fs::read(file_path).await.map_err(sqlx::Error::Io)?;
@@ -456,14 +454,16 @@ async fn load_bookmark_tree(
             position: row.get("position"),
         })
         .collect::<Vec<_>>();
-    let metadata = sqlx::query(
-        "SELECT etag, version FROM dav_files WHERE user_id = $1 AND path = $2",
-    )
-    .bind(user_id)
-    .bind(format!("{login_identifier}/bookmarks.xbel"))
-    .fetch_optional(&state.db)
-    .await?;
-    let file_path = state.data_dir.join(user_id.to_string()).join("bookmarks.xbel");
+    let metadata =
+        sqlx::query("SELECT etag, version FROM dav_files WHERE user_id = $1 AND path = $2")
+            .bind(user_id)
+            .bind(format!("{login_identifier}/bookmarks.xbel"))
+            .fetch_optional(&state.db)
+            .await?;
+    let file_path = state
+        .data_dir
+        .join(user_id.to_string())
+        .join("bookmarks.xbel");
     let file_exists = fs::try_exists(&file_path).await.unwrap_or(false);
     let status = if file_exists {
         match fs::read(&file_path).await {
@@ -495,8 +495,14 @@ fn is_encrypted_sync_file(bytes: &[u8]) -> bool {
     let Some(object) = value.as_object() else {
         return false;
     };
-    object.get("ciphertext").and_then(serde_json::Value::as_str).is_some()
-        && object.get("salt").and_then(serde_json::Value::as_str).is_some()
+    object
+        .get("ciphertext")
+        .and_then(serde_json::Value::as_str)
+        .is_some()
+        && object
+            .get("salt")
+            .and_then(serde_json::Value::as_str)
+            .is_some()
 }
 
 fn build_response_nodes(
@@ -507,11 +513,16 @@ fn build_response_nodes(
         .iter()
         .map(|node| (node.id, node))
         .collect::<HashMap<_, _>>();
-    let normalized_query = query.map(str::trim).filter(|value| !value.is_empty()).map(str::to_lowercase);
+    let normalized_query = query
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_lowercase);
     let mut bookmarks = nodes
         .iter()
         .filter_map(|node| {
-            let NodeKind::Bookmark = node.kind else { return None };
+            let NodeKind::Bookmark = node.kind else {
+                return None;
+            };
             let url = node.url.clone()?;
             let folder_path = folder_path(node.parent_id, &by_id);
             let searchable = format!("{} {} {}", node.title, url, folder_path).to_lowercase();
@@ -540,8 +551,12 @@ fn folder_path(parent_id: Option<Uuid>, by_id: &HashMap<Uuid, &StoredNode>) -> S
     let mut current = parent_id;
     let mut seen = HashSet::new();
     while let Some(id) = current {
-        if !seen.insert(id) { break; }
-        let Some(node) = by_id.get(&id) else { break; };
+        if !seen.insert(id) {
+            break;
+        }
+        let Some(node) = by_id.get(&id) else {
+            break;
+        };
         path.push(node.title.clone());
         current = node.parent_id;
     }
@@ -573,9 +588,13 @@ fn count_descendant_bookmarks(
     nodes: &[StoredNode],
     by_id: &HashMap<Uuid, &StoredNode>,
 ) -> usize {
-    nodes.iter().filter(|node| {
-        matches!(node.kind, NodeKind::Bookmark) && is_descendant(node.parent_id, folder_id, by_id)
-    }).count()
+    nodes
+        .iter()
+        .filter(|node| {
+            matches!(node.kind, NodeKind::Bookmark)
+                && is_descendant(node.parent_id, folder_id, by_id)
+        })
+        .count()
 }
 
 fn is_descendant(
@@ -585,9 +604,32 @@ fn is_descendant(
 ) -> bool {
     let mut seen = HashSet::new();
     while let Some(id) = current {
-        if id == ancestor { return true; }
-        if !seen.insert(id) { return false; }
+        if id == ancestor {
+            return true;
+        }
+        if !seen.insert(id) {
+            return false;
+        }
         current = by_id.get(&id).and_then(|node| node.parent_id);
+    }
+    false
+}
+
+fn folder_move_creates_cycle(
+    folder_id: Uuid,
+    target_parent_id: Option<Uuid>,
+    parent_by_id: &HashMap<Uuid, Option<Uuid>>,
+) -> bool {
+    let mut current = target_parent_id;
+    let mut seen = HashSet::new();
+    while let Some(id) = current {
+        if id == folder_id {
+            return true;
+        }
+        if !seen.insert(id) {
+            return true;
+        }
+        current = parent_by_id.get(&id).copied().flatten();
     }
     false
 }
@@ -607,12 +649,27 @@ pub struct MoveBatchPayload {
     pub expected_etag: Option<String>,
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MoveFolderPayload {
+    pub folder_id: Uuid,
+    pub parent_id: Option<Uuid>,
+    pub expected_etag: Option<String>,
+}
+
 pub async fn move_bookmark(
     State(state): State<AppState>,
     headers: HeaderMap,
     Json(payload): Json<MovePayload>,
 ) -> Response {
-    move_bookmarks_impl(&state, &headers, vec![payload.bookmark_id], payload.parent_id, payload.expected_etag).await
+    move_bookmarks_impl(
+        &state,
+        &headers,
+        vec![payload.bookmark_id],
+        payload.parent_id,
+        payload.expected_etag,
+    )
+    .await
 }
 
 pub async fn move_bookmarks_batch(
@@ -621,9 +678,167 @@ pub async fn move_bookmarks_batch(
     Json(payload): Json<MoveBatchPayload>,
 ) -> Response {
     if payload.bookmark_ids.is_empty() {
-        return auth::error(StatusCode::BAD_REQUEST, "empty_selection", "至少选择一个书签");
+        return auth::error(
+            StatusCode::BAD_REQUEST,
+            "empty_selection",
+            "至少选择一个书签",
+        );
     }
-    move_bookmarks_impl(&state, &headers, payload.bookmark_ids, payload.parent_id, payload.expected_etag).await
+    move_bookmarks_impl(
+        &state,
+        &headers,
+        payload.bookmark_ids,
+        payload.parent_id,
+        payload.expected_etag,
+    )
+    .await
+}
+
+pub async fn move_folder(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(payload): Json<MoveFolderPayload>,
+) -> Response {
+    let Some(user) = auth::authenticate_session(&state, &headers).await else {
+        return auth::error(StatusCode::UNAUTHORIZED, "unauthorized", "请先登录");
+    };
+    if payload.parent_id == Some(payload.folder_id) {
+        return auth::error(
+            StatusCode::BAD_REQUEST,
+            "invalid_target",
+            "不能将文件夹移动到自身",
+        );
+    }
+    if let Err(response) = crate::webdav::ensure_bookmark_editable(
+        &state,
+        user.id,
+        &user.login_identifier,
+        payload.expected_etag.as_deref(),
+    )
+    .await
+    {
+        return response;
+    }
+
+    let mut transaction = match state.db.begin().await {
+        Ok(transaction) => transaction,
+        Err(error) => {
+            tracing::error!(?error, "start folder move transaction failed");
+            return auth::error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "folder_move_failed",
+                "文件夹移动失败",
+            );
+        }
+    };
+    let source = sqlx::query(
+        "SELECT parent_id FROM bookmark_nodes WHERE id = $1 AND user_id = $2 AND node_type = 'folder'",
+    )
+    .bind(payload.folder_id)
+    .bind(user.id)
+    .fetch_optional(&mut *transaction)
+    .await;
+    let Ok(Some(source)) = source else {
+        return auth::error(StatusCode::NOT_FOUND, "folder_not_found", "源文件夹不存在");
+    };
+    let current_parent_id = source.get::<Option<Uuid>, _>("parent_id");
+    if current_parent_id == payload.parent_id {
+        return Json(json!({ "moved": true, "unchanged": true, "etag": payload.expected_etag }))
+            .into_response();
+    }
+
+    if let Some(parent_id) = payload.parent_id {
+        let target = sqlx::query(
+            "SELECT 1 FROM bookmark_nodes WHERE id = $1 AND user_id = $2 AND node_type = 'folder'",
+        )
+        .bind(parent_id)
+        .bind(user.id)
+        .fetch_optional(&mut *transaction)
+        .await;
+        if !matches!(target, Ok(Some(_))) {
+            return auth::error(
+                StatusCode::NOT_FOUND,
+                "folder_not_found",
+                "目标文件夹不存在",
+            );
+        }
+        let folder_rows = sqlx::query(
+            "SELECT id, parent_id FROM bookmark_nodes WHERE user_id = $1 AND node_type = 'folder'",
+        )
+        .bind(user.id)
+        .fetch_all(&mut *transaction)
+        .await;
+        let Ok(folder_rows) = folder_rows else {
+            return auth::error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "folder_move_failed",
+                "文件夹关系检查失败",
+            );
+        };
+        let parent_by_id = folder_rows
+            .into_iter()
+            .map(|row| {
+                (
+                    row.get::<Uuid, _>("id"),
+                    row.get::<Option<Uuid>, _>("parent_id"),
+                )
+            })
+            .collect::<HashMap<_, _>>();
+        if folder_move_creates_cycle(payload.folder_id, Some(parent_id), &parent_by_id) {
+            return auth::error(
+                StatusCode::BAD_REQUEST,
+                "folder_cycle",
+                "不能将文件夹移动到自己的子文件夹中",
+            );
+        }
+    }
+
+    let next_position = match payload.parent_id {
+        Some(parent_id) => sqlx::query_scalar::<_, i32>(
+            "SELECT COALESCE(MAX(position), -1) + 1 FROM bookmark_nodes WHERE user_id = $1 AND parent_id = $2",
+        )
+        .bind(user.id)
+        .bind(parent_id)
+        .fetch_one(&mut *transaction)
+        .await,
+        None => sqlx::query_scalar::<_, i32>(
+            "SELECT COALESCE(MAX(position), -1) + 1 FROM bookmark_nodes WHERE user_id = $1 AND parent_id IS NULL",
+        )
+        .bind(user.id)
+        .fetch_one(&mut *transaction)
+        .await,
+    };
+    let Ok(next_position) = next_position else {
+        return auth::error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "folder_move_failed",
+            "目标位置读取失败",
+        );
+    };
+    if sqlx::query(
+        "UPDATE bookmark_nodes SET parent_id = $1, position = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3 AND user_id = $4 AND node_type = 'folder'",
+    )
+    .bind(payload.parent_id)
+    .bind(next_position)
+    .bind(payload.folder_id)
+    .bind(user.id)
+    .execute(&mut *transaction)
+    .await
+    .is_err()
+    {
+        return auth::error(StatusCode::INTERNAL_SERVER_ERROR, "folder_move_failed", "文件夹移动失败");
+    }
+    if transaction.commit().await.is_err() {
+        return auth::error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "folder_move_failed",
+            "文件夹移动失败",
+        );
+    }
+    match crate::webdav::rewrite_bookmark_file(&state, user.id, &user.login_identifier).await {
+        Ok(response) => Json(json!({ "moved": true, "folderId": payload.folder_id, "parentId": payload.parent_id, "etag": response.0, "version": response.1 })).into_response(),
+        Err(response) => response,
+    }
 }
 
 async fn move_bookmarks_impl(
@@ -637,7 +852,11 @@ async fn move_bookmarks_impl(
         return auth::error(StatusCode::UNAUTHORIZED, "unauthorized", "请先登录");
     };
     if bookmark_ids.iter().any(|id| *id == parent_id) {
-        return auth::error(StatusCode::BAD_REQUEST, "invalid_target", "不能将书签移动到自身");
+        return auth::error(
+            StatusCode::BAD_REQUEST,
+            "invalid_target",
+            "不能将书签移动到自身",
+        );
     }
     if let Err(response) = crate::webdav::ensure_bookmark_editable(
         state,
@@ -653,7 +872,11 @@ async fn move_bookmarks_impl(
         Ok(transaction) => transaction,
         Err(error) => {
             tracing::error!(?error, "start bookmark move transaction failed");
-            return auth::error(StatusCode::INTERNAL_SERVER_ERROR, "move_failed", "书签移动失败");
+            return auth::error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "move_failed",
+                "书签移动失败",
+            );
         }
     };
     let parent_exists = sqlx::query(
@@ -664,11 +887,19 @@ async fn move_bookmarks_impl(
     .fetch_optional(&mut *transaction)
     .await;
     if !matches!(parent_exists, Ok(Some(_))) {
-        return auth::error(StatusCode::NOT_FOUND, "folder_not_found", "目标文件夹不存在");
+        return auth::error(
+            StatusCode::NOT_FOUND,
+            "folder_not_found",
+            "目标文件夹不存在",
+        );
     }
     let ids = bookmark_ids.iter().copied().collect::<HashSet<_>>();
     if ids.len() != bookmark_ids.len() {
-        return auth::error(StatusCode::BAD_REQUEST, "duplicate_selection", "书签选择不能重复");
+        return auth::error(
+            StatusCode::BAD_REQUEST,
+            "duplicate_selection",
+            "书签选择不能重复",
+        );
     }
     let placeholders = std::iter::repeat_n("?", bookmark_ids.len())
         .collect::<Vec<_>>()
@@ -682,12 +913,22 @@ async fn move_bookmarks_impl(
     }
     let rows = rows_query.fetch_all(&mut *transaction).await;
     let Ok(rows) = rows else {
-        return auth::error(StatusCode::INTERNAL_SERVER_ERROR, "move_failed", "书签读取失败");
+        return auth::error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "move_failed",
+            "书签读取失败",
+        );
     };
     if rows.len() != bookmark_ids.len()
-        || rows.iter().any(|row| row.get::<String, _>("node_type") != "bookmark")
+        || rows
+            .iter()
+            .any(|row| row.get::<String, _>("node_type") != "bookmark")
     {
-        return auth::error(StatusCode::NOT_FOUND, "bookmark_not_found", "部分书签不存在");
+        return auth::error(
+            StatusCode::NOT_FOUND,
+            "bookmark_not_found",
+            "部分书签不存在",
+        );
     }
     let next_position = sqlx::query_scalar::<_, i32>(
         "SELECT COALESCE(MAX(position), -1) + 1 FROM bookmark_nodes WHERE user_id = $1 AND parent_id = $2",
@@ -697,7 +938,11 @@ async fn move_bookmarks_impl(
     .fetch_one(&mut *transaction)
     .await;
     let Ok(mut position) = next_position else {
-        return auth::error(StatusCode::INTERNAL_SERVER_ERROR, "move_failed", "目标文件夹读取失败");
+        return auth::error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "move_failed",
+            "目标文件夹读取失败",
+        );
     };
     for bookmark_id in bookmark_ids {
         if sqlx::query(
@@ -716,10 +961,17 @@ async fn move_bookmarks_impl(
         position += 1;
     }
     if transaction.commit().await.is_err() {
-        return auth::error(StatusCode::INTERNAL_SERVER_ERROR, "move_failed", "书签移动失败");
+        return auth::error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "move_failed",
+            "书签移动失败",
+        );
     }
     match crate::webdav::rewrite_bookmark_file(state, user.id, &user.login_identifier).await {
-        Ok(response) => Json(json!({ "moved": true, "count": ids.len(), "etag": response.0, "version": response.1 })).into_response(),
+        Ok(response) => Json(
+            json!({ "moved": true, "count": ids.len(), "etag": response.0, "version": response.1 }),
+        )
+        .into_response(),
         Err(response) => response,
     }
 }
@@ -745,7 +997,10 @@ pub async fn replace_index(
         .bind(id)
         .bind(user_id)
         .bind(parent_id)
-        .bind(match node.kind { NodeKind::Folder => "folder", NodeKind::Bookmark => "bookmark" })
+        .bind(match node.kind {
+            NodeKind::Folder => "folder",
+            NodeKind::Bookmark => "bookmark",
+        })
         .bind(&node.title)
         .bind(&node.url)
         .bind(node.position as i32)
@@ -771,16 +1026,47 @@ pub async fn load_index(db: &SqlitePool, user_id: Uuid) -> Result<Vec<XbelNode>,
     Ok(rows
         .iter()
         .map(|row| XbelNode {
-            kind: if row.get::<String, _>("node_type") == "folder" { NodeKind::Folder } else { NodeKind::Bookmark },
+            kind: if row.get::<String, _>("node_type") == "folder" {
+                NodeKind::Folder
+            } else {
+                NodeKind::Bookmark
+            },
             title: row.get("title"),
             url: row.get("url"),
-            parent: row.get::<Option<Uuid>, _>("parent_id").and_then(|id| index_by_id.get(&id).copied()),
+            parent: row
+                .get::<Option<Uuid>, _>("parent_id")
+                .and_then(|id| index_by_id.get(&id).copied()),
             position: row.get::<i32, _>("position") as usize,
         })
         .collect())
-}#[cfg(test)]
+}
+#[cfg(test)]
 mod tests {
-    use super::{is_encrypted_sync_file, parse_xbel, render_xbel, NodeKind};
+    use super::{
+        folder_move_creates_cycle, is_encrypted_sync_file, parse_xbel, render_xbel, NodeKind,
+    };
+    use std::collections::HashMap;
+    use uuid::Uuid;
+
+    #[test]
+    fn rejects_folder_moves_into_self_or_descendants() {
+        let root = Uuid::new_v4();
+        let child = Uuid::new_v4();
+        let grandchild = Uuid::new_v4();
+        let sibling = Uuid::new_v4();
+        let parents = HashMap::from([
+            (root, None),
+            (child, Some(root)),
+            (grandchild, Some(child)),
+            (sibling, None),
+        ]);
+
+        assert!(folder_move_creates_cycle(root, Some(root), &parents));
+        assert!(folder_move_creates_cycle(root, Some(child), &parents));
+        assert!(folder_move_creates_cycle(root, Some(grandchild), &parents));
+        assert!(!folder_move_creates_cycle(child, Some(sibling), &parents));
+        assert!(!folder_move_creates_cycle(child, None, &parents));
+    }
 
     #[test]
     fn parses_nested_folders_and_preserves_sibling_order() {
@@ -812,7 +1098,9 @@ mod tests {
     #[test]
     fn rejects_encrypted_or_invalid_documents() {
         assert!(parse_xbel(b"encrypted-bookmarks").is_err());
-        assert!(parse_xbel(br#"<xbel><bookmark><title>Missing URL</title></bookmark></xbel>"#).is_err());
+        assert!(
+            parse_xbel(br#"<xbel><bookmark><title>Missing URL</title></bookmark></xbel>"#).is_err()
+        );
     }
 
     #[test]

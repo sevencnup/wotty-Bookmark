@@ -1,5 +1,29 @@
 # 管理后台开发记录
 
+## 2026-08-29：`admin-folder-subtree-drag-move`
+
+### 任务
+
+支持在右侧组织树中拖动文件夹，完成整棵文件夹分支的层级调整。
+
+### 进度
+
+- 新增文件夹移动 API，复用登录鉴权、ETag 并发校验、事务更新和 XBEL 文件重写流程。
+- 文件夹可拖入其他文件夹，内部子文件夹与书签随父文件夹整体移动。
+- “全部书签”根卡片可接收文件夹，将嵌套文件夹移回顶级目录。
+- 前后端同时阻止移动到自身或子孙文件夹，并禁止拖回当前父级的无效操作。
+- 增加来源、合法目标和禁止目标的拖动反馈，折叠目标停留后自动展开。
+- 移动成功后刷新树数据，已有 SVG 曲线连接层按新节点坐标自动重绘。
+
+### 验证
+
+- `cargo test --manifest-path services/api/Cargo.toml`：20 项通过。
+- `pnpm --filter @bookmark-vault/admin-web lint`：通过。
+- `pnpm --filter @bookmark-vault/admin-web test`：18 项通过。
+- `pnpm --filter @bookmark-vault/admin-web build`：通过。
+- 独立 Chromium 可打开管理后台；因不复用用户登录态，未对真实书签执行移动操作。
+- 临时浏览器与验证脚本已清理，未停止用户现有开发服务。
+
 ## 2026-08-29：`admin-category-interaction-polish`
 
 ### 任务

@@ -35,6 +35,19 @@ export function descendantFolderIds(folder: BookmarkFolder): string[] {
   return [folder.id, ...folder.children.flatMap(descendantFolderIds)]
 }
 
+export function findFolderParentId(
+  folders: BookmarkFolder[],
+  targetId: string,
+  parentId: string | null = null,
+): string | null | undefined {
+  for (const folder of folders) {
+    if (folder.id === targetId) return parentId
+    const match = findFolderParentId(folder.children, targetId, folder.id)
+    if (match !== undefined) return match
+  }
+  return undefined
+}
+
 export function findFolder(folders: BookmarkFolder[], id: string): BookmarkFolder | null {
   for (const folder of folders) {
     if (folder.id === id) return folder

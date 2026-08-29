@@ -12,6 +12,7 @@ import {
   login,
   moveBookmark,
   moveBookmarks,
+  moveFolder,
   permanentlyDeleteTrashItem,
   register,
   registerDevice,
@@ -70,16 +71,20 @@ describe('admin API contract', () => {
       .mockResolvedValueOnce(response({ status: 'ready', etag: 'etag-1', version: 2, folders: [], bookmarks: [] }))
       .mockResolvedValueOnce(response({ moved: true, count: 1, etag: 'etag-2', version: 3 }))
       .mockResolvedValueOnce(response({ moved: true, count: 2, etag: 'etag-3', version: 4 }))
+      .mockResolvedValueOnce(response({ moved: true, folderId: 'folder-3', parentId: null, etag: 'etag-4', version: 5 }))
     vi.stubGlobal('fetch', fetchMock)
 
     await getBookmarks('session-token', 'Rust docs / 中文')
     await moveBookmark('session-token', 'bookmark-1', 'folder-1', 'etag-1')
     await moveBookmarks('session-token', ['bookmark-1', 'bookmark-2'], 'folder-2', 'etag-2')
+    await moveFolder('session-token', 'folder-3', null, 'etag-3')
 
     expect(fetchMock.mock.calls[0][0]).toBe('/api/v1/bookmarks?q=Rust%20docs%20%2F%20%E4%B8%AD%E6%96%87')
     expect(new Headers(fetchMock.mock.calls[0][1].headers).get('authorization')).toBe('Bearer session-token')
     expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({ bookmarkId: 'bookmark-1', parentId: 'folder-1', expectedEtag: 'etag-1' })
     expect(JSON.parse(fetchMock.mock.calls[2][1].body)).toEqual({ bookmarkIds: ['bookmark-1', 'bookmark-2'], parentId: 'folder-2', expectedEtag: 'etag-2' })
+    expect(fetchMock.mock.calls[3][0]).toBe('/api/v1/bookmarks/folders/move')
+    expect(JSON.parse(fetchMock.mock.calls[3][1].body)).toEqual({ folderId: 'folder-3', parentId: null, expectedEtag: 'etag-3' })
   })
   it('uses binary requests for storage import and export', async () => {
     const fetchMock = vi.fn()

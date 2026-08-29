@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { BookmarkFolder, BookmarkItem } from './api'
-import { descendantFolderIds, flattenFolders, folderHasChildren, groupBookmarksByFolder, resolveDraggedBookmarkIds, ROOT_BOOKMARK_GROUP_ID, visibleFolders } from './bookmark-tree'
+import { descendantFolderIds, findFolderParentId, flattenFolders, folderHasChildren, groupBookmarksByFolder, resolveDraggedBookmarkIds, ROOT_BOOKMARK_GROUP_ID, visibleFolders } from './bookmark-tree'
 
 const folders: BookmarkFolder[] = [
   { id: 'work', title: '工作', bookmarkCount: 3, children: [
@@ -29,6 +29,12 @@ describe('bookmark tree helpers', () => {
 
   it('collects a folder and all descendants', () => {
     expect(descendantFolderIds(folders[0])).toEqual(['work', 'docs'])
+  })
+
+  it('finds root and nested folder parents without confusing a missing folder with root', () => {
+    expect(findFolderParentId(folders, 'work')).toBeNull()
+    expect(findFolderParentId(folders, 'docs')).toBe('work')
+    expect(findFolderParentId(folders, 'missing')).toBeUndefined()
   })
 
   it('resolves selected and unselected drag operations', () => {

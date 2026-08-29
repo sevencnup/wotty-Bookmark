@@ -118,6 +118,15 @@ export class ApiRequestError extends Error {
   }
 }
 
+export type MoveFolderResponse = {
+  moved: boolean
+  unchanged?: boolean
+  folderId?: string
+  parentId?: string | null
+  etag: string | null
+  version?: number
+}
+
 function networkRequestError(error: unknown): ApiRequestError | null {
   if (!(error instanceof TypeError) || !/fetch|network|failed|connection/i.test(error.message)) return null
   return new ApiRequestError('开发服务连接已断开，请重新运行 pnpm dev 后点击刷新重试。', 0, 'network_error')
@@ -191,6 +200,13 @@ export function getStorageStatus(token: string) {
 
 export function getHealth() {
   return request<HealthResponse>('/health/live')
+}
+
+export function moveFolder(token: string, folderId: string, parentId: string | null, expectedEtag: string | null) {
+  return request<MoveFolderResponse>('/api/v1/bookmarks/folders/move', {
+    method: 'POST',
+    body: JSON.stringify({ folderId, parentId, expectedEtag }),
+  }, token)
 }
 
 export function logout(token: string) {

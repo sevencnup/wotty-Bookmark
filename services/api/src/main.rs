@@ -97,6 +97,10 @@ fn app_router(state: AppState) -> Router {
             post(bookmarks::move_bookmarks_batch),
         )
         .route(
+            "/api/v1/bookmarks/folders/move",
+            post(bookmarks::move_folder),
+        )
+        .route(
             "/api/v1/bookmarks/trash",
             get(trash::list).post(trash::create),
         )

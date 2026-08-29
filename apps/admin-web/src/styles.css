@@ -3007,6 +3007,70 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   }
 }
 
+/* 分类管理：文件夹整棵分支拖动 */
+.category-management-page .organization-folder-button[draggable='true'] {
+  cursor: grab;
+}
+
+.category-management-page .organization-folder-button[draggable='true']:active {
+  cursor: grabbing;
+}
+
+.category-management-page .organization-folder-row,
+.category-management-page .organization-root-card {
+  transition: border-color 140ms ease, background-color 140ms ease, box-shadow 140ms ease, opacity 140ms ease, transform 140ms ease;
+}
+
+.category-management-page .organization-folder-row.folder-drop-target,
+.category-management-page .organization-root-card.folder-drop-target {
+  border-color: #4f74d9 !important;
+  background: #edf3ff !important;
+  box-shadow: 0 0 0 4px rgba(79, 116, 217, 0.16), 0 10px 24px rgba(37, 75, 160, 0.15) !important;
+  transform: translateY(-1px);
+}
+
+.category-management-page .organization-folder-row.folder-drag-source {
+  border-style: dashed;
+  border-color: #8ea3c8;
+  opacity: 0.52;
+}
+
+.category-management-page .organization-folder-row.folder-drop-disabled,
+.category-management-page .organization-root-card.folder-drop-disabled {
+  filter: saturate(0.35);
+  opacity: 0.52;
+}
+
+.category-management-page .organization-folder-row.folder-drop-disabled .organization-folder-button,
+.category-management-page .organization-root-card.folder-drop-disabled {
+  cursor: not-allowed;
+}
+
+.category-management-page .folder-drop-label,
+.category-management-page .root-folder-drop-label {
+  position: absolute;
+  z-index: 4;
+  display: inline-flex;
+  align-items: center;
+  min-height: 25px;
+  padding: 0 9px;
+  border: 1px solid #a9bcea;
+  border-radius: 999px;
+  color: #315aaa;
+  background: #ffffff;
+  box-shadow: 0 5px 14px rgba(49, 90, 170, 0.14);
+  font-size: 11px;
+  font-weight: 700;
+  pointer-events: none;
+}
+
+.category-management-page .root-folder-drop-label {
+  top: 50%;
+  left: calc(100% + 10px);
+  white-space: nowrap;
+  transform: translateY(-50%);
+}
+
 /* 分类管理：文件夹目录带，与白底书签内容建立清晰层级 */
 .category-management-page .category-bookmark-group > .category-bookmark-group-header {
   border-right: 1px solid #c9d8f2 !important;
