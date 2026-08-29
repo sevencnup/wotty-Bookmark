@@ -1,5 +1,27 @@
 # 管理后台开发记录
 
+## 2026-08-29：`admin-category-interaction-performance`
+
+### 任务
+
+修复大量书签下分类管理分组收起、展开和打开书签出现约一秒延迟的问题。
+
+### 进度
+
+- 缓存可见书签、文件夹列表和书签分组计算。
+- 将书签分组拆为记忆化组件，避免单组操作重渲染全部 1017 条书签。
+- 缓存右侧组织树，避免左侧操作重新协调 274 个文件夹节点。
+- 使用 `content-visibility` 隔离屏幕外分组的布局与绘制。
+
+### 验证
+
+- Chromium 真实数据基准：单组操作由 688～1316ms 降至 19～53ms。
+- 书签链接点击事件约 0.8ms。
+- `pnpm --filter @bookmark-vault/admin-web lint`：通过。
+- `pnpm --filter @bookmark-vault/admin-web test`：17 项通过。
+- `pnpm --filter @bookmark-vault/admin-web build`：通过。
+- 临时会话、数据库副本、浏览器、脚本和调试进程已清理。
+
 ## 2026-08-29：`admin-runtime-connection-recovery`
 
 ### 任务

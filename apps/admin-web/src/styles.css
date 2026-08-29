@@ -3149,6 +3149,9 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 
 .category-group-items {
   background: #fff;
+  contain: layout style paint;
+  content-visibility: auto;
+  contain-intrinsic-block-size: auto 124px;
 }
 
 .category-management-page .category-bookmark-row {
