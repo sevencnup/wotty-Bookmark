@@ -2221,6 +2221,7 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 }
 
 .category-management-page .organization-tree-canvas {
+  position: relative;
   display: inline-flex;
   min-width: max-content;
   min-height: 100%;
@@ -2229,7 +2230,32 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   transition: transform var(--duration) var(--ease);
 }
 
+.category-management-page .organization-tree-connections {
+  position: absolute;
+  z-index: 0;
+  top: 0;
+  left: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.category-management-page .organization-tree-connection {
+  fill: none;
+  stroke: #b8c9e8;
+  stroke-linecap: round;
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.category-management-page .organization-tree-connection[data-tree-parent-id='root'] {
+  opacity: 0.42;
+  stroke: #c5d2e8;
+  stroke-width: 1.5;
+}
+
 .category-management-page .organization-root-node {
+  position: relative;
+  z-index: 1;
   display: flex;
   min-width: max-content;
   align-items: center;
@@ -3030,52 +3056,20 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   box-shadow: none !important;
 }
 
-.category-management-page .organization-root-rail-line,
-.category-management-page .organization-children::before {
-  border-radius: 999px;
-}
-
 .category-management-page .organization-node > .organization-children {
   margin-left: 58px !important;
   padding-left: 0 !important;
 }
 
-.category-management-page .organization-root-rail > .organization-node > .organization-children::before {
-  display: block;
-}
-
-.category-management-page .organization-node > .organization-children::after {
-  position: absolute;
-  z-index: 0;
-  top: calc(50% - 12px);
-  left: -60px;
-  width: 62px;
-  height: 12px;
-  border-right: 2px solid #d1dced;
-  border-bottom: 2px solid #d1dced;
-  border-radius: 0 0 12px 0;
-  content: '';
-}
-
+.category-management-page .organization-root-rail-line,
+.category-management-page .organization-root-rail::before,
 .category-management-page .organization-root-rail > .organization-node::before,
-.category-management-page .organization-children > .organization-node::before {
-  top: calc(50% - 14px);
-  left: -38px;
-  width: 38px;
-  height: 14px;
-  border-bottom: 2px solid #b9c8e4;
-  border-right: 2px solid #b9c8e4;
-  border-radius: 0 0 14px 0;
-  background: transparent;
-  transform: none;
-}
-
-.category-management-page .organization-children > .organization-node::before {
-  border-color: #d1dced;
-}
-
-.category-management-page .organization-root-rail::before {
-  border-radius: 999px;
+.category-management-page .organization-node > .organization-children::before,
+.category-management-page .organization-node > .organization-children::after,
+.category-management-page .organization-children > .organization-node::before,
+.category-management-page .organization-folder-row::before {
+  display: none !important;
+  content: none !important;
 }
 
 @media (max-width: 1120px) {
@@ -3083,16 +3077,6 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
     margin-left: 42px !important;
   }
 
-  .category-management-page .organization-node > .organization-children::after {
-    left: -44px;
-    width: 46px;
-  }
-
-  .category-management-page .organization-root-rail > .organization-node::before,
-  .category-management-page .organization-children > .organization-node::before {
-    left: -28px;
-    width: 28px;
-  }
 }
 
 /* 分类管理：左侧书签按文件夹分组 */
