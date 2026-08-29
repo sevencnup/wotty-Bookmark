@@ -76,13 +76,17 @@ async function shutdown(exitCode) {
 for (const { name, child } of processes) {
   child.once('error', (error) => {
     console.error(`[${name}] ${error.message}`)
-    void shutdown(1)
+    console.error(`[dev] ${name} 启动失败；其他开发服务继续运行。修复后请重新执行 pnpm dev。`)
+    process.exitCode = 1
   })
   child.once('exit', (code, signal) => {
     if (shuttingDown) return
     if (code !== 0 || signal) {
       console.error(`[${name}] exited with code ${code ?? 'signal ' + signal}`)
-      void shutdown(code ?? 1)
+      console.error(`[dev] ${name} 服务已退出；其他开发服务继续运行。修复后请重新执行 pnpm dev。`)
+      process.exitCode = code ?? 1
+    } else {
+      console.log(`[dev] ${name} 服务已正常退出；其他开发服务继续运行。`)
     }
   })
 }

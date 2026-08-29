@@ -1,5 +1,26 @@
 # 管理后台开发记录
 
+## 2026-08-29：`admin-runtime-connection-recovery`
+
+### 任务
+
+处理 API 500、Vite 断连和页面 `Failed to fetch` 的连锁运行时错误。
+
+### 进度
+
+- 将 Fetch 网络失败和 Vite 代理断连转换为明确的中文错误。
+- 存储文件、应用密码和分类管理页面增加重新连接入口。
+- 联合启动脚本在单个子服务退出后保留另一个服务，并打印退出来源。
+- 确认 `sidebar.js getComputedStyle` 来自浏览器扩展注入，不属于管理后台源码。
+
+### 验证
+
+- `pnpm --filter @bookmark-vault/admin-web lint`：通过。
+- `pnpm --filter @bookmark-vault/admin-web test`：17 项通过。
+- `pnpm --filter @bookmark-vault/admin-web build`：通过。
+- API 健康检查返回 200，未登录受保护接口返回预期 401。
+- 调试服务、临时数据库副本和诊断账号已清理。
+
 ## 2026-08-29：`admin-bookmark-folder-group-controls`
 
 ### 任务

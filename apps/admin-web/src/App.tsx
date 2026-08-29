@@ -362,11 +362,16 @@ function StorageFiles({ token, onOpenFloccus }: { token: string; onOpenFloccus: 
   const [storage, setStorage] = useState<api.StorageStatus | null>(null)
   const [error, setError] = useState('')
 
-  useEffect(() => {
-    api.getStorageStatus(token).then(setStorage).catch((requestError) => {
+  async function loadStorage() {
+    setError('')
+    try {
+      setStorage(await api.getStorageStatus(token))
+    } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : '读取存储状态失败')
-    })
-  }, [token])
+    }
+  }
+
+  useEffect(() => { void loadStorage() }, [token])
 
   return (
     <div className="storage-content">
@@ -381,7 +386,7 @@ function StorageFiles({ token, onOpenFloccus }: { token: string; onOpenFloccus: 
             <span className="storage-encryption-badge">端到端加密</span>
           </div>
           {error ? (
-            <div className="empty-state"><span>!</span><h4>无法读取存储状态</h4><p>{error}</p></div>
+            <div className="empty-state"><span>!</span><h4>无法读取存储状态</h4><p>{error}</p><button className="toolbar-button compact" onClick={() => void loadStorage()} type="button"><RefreshCw size={14} /> 重新连接</button></div>
           ) : storage ? (
             <div className="storage-summary">
               <div className="storage-summary-icon"><HardDrive size={24} strokeWidth={1.8} /></div>
@@ -708,10 +713,12 @@ function AppPasswords({ token }: { token: string }) {
   const [name, setName] = useState('')
   const [newSecret, setNewSecret] = useState<string | null>(null)
   const [error, setError] = useState('')
-  useEffect(() => { api.getAppPasswords(token).then(setItems).catch((requestError) => setError(requestError instanceof Error ? requestError.message : '读取失败')) }, [token])
+  const [loadError, setLoadError] = useState('')
+  async function loadPasswords() { setLoadError(''); try { setItems(await api.getAppPasswords(token)) } catch (requestError) { setLoadError(requestError instanceof Error ? requestError.message : '读取失败') } }
+  useEffect(() => { void loadPasswords() }, [token])
   async function create() { if (!name.trim()) return; try { const item = await api.createAppPassword(token, name.trim()); setItems((current) => [item, ...current]); setNewSecret(item.secret ?? null); setName(''); setError('') } catch (requestError) { setError(requestError instanceof Error ? requestError.message : '创建失败') } }
-  async function revoke(id: string) { await api.revokeAppPassword(token, id); setItems((current) => current.filter((item) => item.id !== id)) }
-  return <section className="panel"><div className="panel-heading"><div><p className="eyebrow">ACCESS CONTROL</p><h3>应用密码</h3></div></div><div className="password-create"><input value={name} onChange={(event) => setName(event.target.value)} placeholder="例如：Chrome 工作浏览器" /><button className="primary-button compact" onClick={() => void create()} type="button">创建应用密码</button></div>{error && <p className="form-error">{error}</p>}{newSecret && <div className="secret-box"><strong>请立即保存这串应用密码</strong><code>{newSecret}</code><button className="ghost-button" onClick={() => navigator.clipboard?.writeText(newSecret)} type="button">复制</button><p>它只会在创建成功时显示一次。</p></div>}{items.length === 0 ? <div className="empty-state"><span>◇</span><h4>还没有应用密码</h4><p>建议为每个浏览器或设备创建独立的应用密码，撤销时不会影响账户登录。</p></div> : <div className="password-list">{items.map((item) => <div className="password-row" key={item.id}><div><strong>{item.name}</strong><span>创建于 {new Date(item.createdAt).toLocaleString()}</span></div><button className="danger-button" onClick={() => void revoke(item.id)} type="button">撤销</button></div>)}</div>}</section>
+  async function revoke(id: string) { try { await api.revokeAppPassword(token, id); setItems((current) => current.filter((item) => item.id !== id)); setError('') } catch (requestError) { setError(requestError instanceof Error ? requestError.message : '撤销失败') } }
+  return <section className="panel"><div className="panel-heading"><div><p className="eyebrow">ACCESS CONTROL</p><h3>应用密码</h3></div></div><div className="password-create"><input value={name} onChange={(event) => setName(event.target.value)} placeholder="例如：Chrome 工作浏览器" /><button className="primary-button compact" onClick={() => void create()} type="button">创建应用密码</button></div>{error && <p className="form-error">{error}</p>}{newSecret && <div className="secret-box"><strong>请立即保存这串应用密码</strong><code>{newSecret}</code><button className="ghost-button" onClick={() => navigator.clipboard?.writeText(newSecret)} type="button">复制</button><p>它只会在创建成功时显示一次。</p></div>}{loadError ? <div className="empty-state"><span>!</span><h4>无法读取应用密码</h4><p>{loadError}</p><button className="toolbar-button compact" onClick={() => void loadPasswords()} type="button"><RefreshCw size={14} /> 重新连接</button></div> : items.length === 0 ? <div className="empty-state"><span>◇</span><h4>还没有应用密码</h4><p>建议为每个浏览器或设备创建独立的应用密码，撤销时不会影响账户登录。</p></div> : <div className="password-list">{items.map((item) => <div className="password-row" key={item.id}><div><strong>{item.name}</strong><span>创建于 {new Date(item.createdAt).toLocaleString()}</span></div><button className="danger-button" onClick={() => void revoke(item.id)} type="button">撤销</button></div>)}</div>}</section>
 }
 
 function FloccusGuide({ token, loginIdentifier }: { token: string; loginIdentifier: string }) {

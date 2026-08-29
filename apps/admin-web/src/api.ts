@@ -118,12 +118,22 @@ export class ApiRequestError extends Error {
   }
 }
 
+function networkRequestError(error: unknown): ApiRequestError | null {
+  if (!(error instanceof TypeError) || !/fetch|network|failed|connection/i.test(error.message)) return null
+  return new ApiRequestError('开发服务连接已断开，请重新运行 pnpm dev 后点击刷新重试。', 0, 'network_error')
+}
+
 async function request<T>(path: string, init: RequestInit = {}, token?: string): Promise<T> {
   const headers = new Headers(init.headers)
   if (!headers.has('content-type')) headers.set('content-type', 'application/json')
   if (token) headers.set('authorization', `Bearer ${token}`)
 
-  const response = await fetch(path, { ...init, headers })
+  let response: Response
+  try {
+    response = await fetch(path, { ...init, headers })
+  } catch (error) {
+    throw networkRequestError(error) ?? error
+  }
   const text = await response.text()
   let payload: unknown = null
   try {
@@ -134,10 +144,14 @@ async function request<T>(path: string, init: RequestInit = {}, token?: string):
 
   if (!response.ok) {
     const errorPayload = typeof payload === 'object' && payload ? payload as { message?: unknown; code?: unknown } : {}
-    const message = typeof errorPayload.message === 'string'
+    const code = typeof errorPayload.code === 'string' ? errorPayload.code : undefined
+    const proxyConnectionFailed = response.status === 500 && !code && (payload === null || typeof payload === 'string')
+    const message = proxyConnectionFailed
+      ? 'API 服务未连接，请查看 pnpm dev 终端中的 api 退出原因，修复后点击刷新重试。'
+      : typeof errorPayload.message === 'string'
       ? errorPayload.message
       : `请求失败（${response.status}）`
-    throw new ApiRequestError(message, response.status, typeof errorPayload.code === 'string' ? errorPayload.code : undefined)
+    throw new ApiRequestError(message, response.status, proxyConnectionFailed ? 'service_unavailable' : code)
   }
   return payload as T
 }
@@ -234,9 +248,14 @@ export function revokeDevice(token: string, id: string) {
 }
 
 export async function exportStorageFile(token: string) {
-  const response = await fetch('/api/v1/storage/export', {
-    headers: { authorization: `Bearer ${token}` },
-  })
+  let response: Response
+  try {
+    response = await fetch('/api/v1/storage/export', {
+      headers: { authorization: `Bearer ${token}` },
+    })
+  } catch (error) {
+    throw networkRequestError(error) ?? error
+  }
   if (!response.ok) throw new ApiRequestError('同步文件导出失败', response.status)
   return response.blob()
 }

@@ -107,6 +107,26 @@ describe('admin API contract', () => {
     await expect(getTrash('session-token')).rejects.toMatchObject({ status: 423, code: 'locked' })
   })
 
+  it('turns a dropped development server into an actionable network error', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')))
+
+    await expect(getBookmarks('session-token')).rejects.toMatchObject({
+      status: 0,
+      code: 'network_error',
+      message: '开发服务连接已断开，请重新运行 pnpm dev 后点击刷新重试。',
+    })
+  })
+
+  it('recognizes a Vite proxy 500 when the API process is unavailable', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response(undefined, 500)))
+
+    await expect(getBookmarks('session-token')).rejects.toMatchObject({
+      status: 500,
+      code: 'service_unavailable',
+      message: 'API 服务未连接，请查看 pnpm dev 终端中的 api 退出原因，修复后点击刷新重试。',
+    })
+  })
+
   it('calls trash, device, version, and health endpoints with the expected methods', async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(response([]))
