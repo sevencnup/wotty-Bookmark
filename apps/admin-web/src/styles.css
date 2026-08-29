@@ -3008,6 +3008,39 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 }
 
 /* 分类管理：文件夹整棵分支拖动 */
+.category-management-page .category-tree-panel .organization-toggle,
+.category-management-page .category-tree-panel .organization-toggle-spacer {
+  display: grid;
+  flex: 0 0 24px;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  margin: 0;
+  padding: 0;
+  border-radius: 6px;
+}
+
+.category-management-page .category-tree-panel button.organization-toggle {
+  border: 1px solid #ccd5e3;
+  color: #637083;
+  background: #f7f9fc;
+  appearance: none;
+}
+
+.category-management-page .category-tree-panel button.organization-toggle:hover,
+.category-management-page .category-tree-panel button.organization-toggle:focus-visible {
+  border-color: #9eb1d9;
+  color: #315aaa;
+  background: #edf3ff;
+  outline: 0;
+  box-shadow: 0 0 0 3px rgba(79, 116, 217, 0.13);
+}
+
+.category-management-page .category-tree-panel .organization-toggle-spacer {
+  border: 1px solid transparent;
+  pointer-events: none;
+}
+
 .category-management-page .organization-folder-button[draggable='true'] {
   cursor: grab;
 }
