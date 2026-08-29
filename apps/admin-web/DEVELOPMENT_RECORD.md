@@ -1,5 +1,26 @@
 # 管理后台开发记录
 
+## 2026-08-29：`admin-bookmark-batch-trash`
+
+### 任务
+
+在分类管理页面增加勾选书签后的批量删除能力，并保证删除写入 WebDAV 同步文件。
+
+### 进度
+
+- 批量操作栏增加“删除”危险操作按钮，仅在已选择书签时显示。
+- 删除前提示选中数量，并明确下次 Floccus 双向同步可能同步删除浏览器中的对应书签。
+- 新增批量移入回收站接口，一次加载书签索引、一次事务处理全部书签、一次重写 XBEL。
+- 复用明文 XBEL 状态、文件锁和 ETag 校验，避免覆盖 Floccus 的并发同步结果。
+- 删除成功后清空选择、刷新书签树，并保留管理后台回收站恢复能力。
+
+### 验证
+
+- `cargo test --manifest-path services/api/Cargo.toml`：21 项通过。
+- `pnpm --filter @bookmark-vault/admin-web lint`：通过。
+- `pnpm --filter @bookmark-vault/admin-web test`：18 项通过。
+- `pnpm --filter @bookmark-vault/admin-web build`：通过。
+
 ## 2026-08-29：`admin-folder-subtree-drag-move`
 
 ### 任务

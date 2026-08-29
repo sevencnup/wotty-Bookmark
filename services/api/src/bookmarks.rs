@@ -330,11 +330,11 @@ pub struct BookmarkNodeForTrash {
     pub position: i32,
 }
 
-pub async fn load_node_for_user(
+pub async fn load_nodes_for_user(
     db: &SqlitePool,
     user_id: Uuid,
-    node_id: Uuid,
-) -> Result<Option<BookmarkNodeForTrash>, sqlx::Error> {
+    node_ids: &[Uuid],
+) -> Result<HashMap<Uuid, BookmarkNodeForTrash>, sqlx::Error> {
     let rows = sqlx::query(
         "SELECT id, parent_id, node_type, title, url, position
          FROM bookmark_nodes WHERE user_id = $1",
@@ -360,20 +360,27 @@ pub async fn load_node_for_user(
         .iter()
         .map(|node| (node.id, node))
         .collect::<HashMap<_, _>>();
-    let Some(node) = nodes.iter().find(|node| node.id == node_id) else {
-        return Ok(None);
-    };
-    Ok(Some(BookmarkNodeForTrash {
-        node_type: match node.kind {
-            NodeKind::Folder => "folder",
-            NodeKind::Bookmark => "bookmark",
-        }
-        .into(),
-        title: node.title.clone(),
-        url: node.url.clone(),
-        folder_path: folder_path(node.parent_id, &by_id),
-        position: node.position,
-    }))
+    let requested_ids = node_ids.iter().copied().collect::<HashSet<_>>();
+    Ok(nodes
+        .iter()
+        .filter(|node| requested_ids.contains(&node.id))
+        .map(|node| {
+            (
+                node.id,
+                BookmarkNodeForTrash {
+                    node_type: match node.kind {
+                        NodeKind::Folder => "folder",
+                        NodeKind::Bookmark => "bookmark",
+                    }
+                    .into(),
+                    title: node.title.clone(),
+                    url: node.url.clone(),
+                    folder_path: folder_path(node.parent_id, &by_id),
+                    position: node.position,
+                },
+            )
+        })
+        .collect())
 }
 
 pub async fn current_bookmark_status(

@@ -7,6 +7,7 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use sqlx::Row;
+use std::collections::HashSet;
 use uuid::Uuid;
 
 #[derive(Serialize)]
@@ -34,26 +35,52 @@ pub struct TrashCreatePayload {
     pub expected_etag: Option<String>,
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TrashBatchCreatePayload {
+    pub bookmark_ids: Vec<Uuid>,
+    pub expected_etag: Option<String>,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum TrashSelectionError {
+    Empty,
+    Duplicate,
+}
+
+fn validate_trash_selection(bookmark_ids: Vec<Uuid>) -> Result<Vec<Uuid>, TrashSelectionError> {
+    if bookmark_ids.is_empty() {
+        return Err(TrashSelectionError::Empty);
+    }
+    let unique_ids = bookmark_ids.iter().copied().collect::<HashSet<_>>();
+    if unique_ids.len() != bookmark_ids.len() {
+        return Err(TrashSelectionError::Duplicate);
+    }
+    Ok(bookmark_ids)
+}
+
 #[derive(Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct TrashMutationPayload {
     pub expected_etag: Option<String>,
 }
 
-pub async fn list(
-    State(state): State<AppState>,
-    headers: HeaderMap,
-) -> Response {
+pub async fn list(State(state): State<AppState>, headers: HeaderMap) -> Response {
     let Some(user) = auth::authenticate_session(&state, &headers).await else {
         return auth::error(StatusCode::UNAUTHORIZED, "unauthorized", "请先登录");
     };
-    let status = match bookmarks::current_bookmark_status(&state, user.id, &user.login_identifier).await {
-        Ok(status) => status,
-        Err(error) => {
-            tracing::error!(?error, "load bookmark trash status failed");
-            return auth::error(StatusCode::INTERNAL_SERVER_ERROR, "trash_list_failed", "回收站状态读取失败");
-        }
-    };
+    let status =
+        match bookmarks::current_bookmark_status(&state, user.id, &user.login_identifier).await {
+            Ok(status) => status,
+            Err(error) => {
+                tracing::error!(?error, "load bookmark trash status failed");
+                return auth::error(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "trash_list_failed",
+                    "回收站状态读取失败",
+                );
+            }
+        };
     let rows = sqlx::query(
         "SELECT id, title, url, folder_path, original_position, deleted_at
          FROM bookmark_trash WHERE user_id = $1 ORDER BY deleted_at DESC, id DESC",
@@ -73,7 +100,11 @@ pub async fn list(
         .into_response(),
         Err(error) => {
             tracing::error!(?error, "list bookmark trash failed");
-            auth::error(StatusCode::INTERNAL_SERVER_ERROR, "trash_list_failed", "回收站读取失败")
+            auth::error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "trash_list_failed",
+                "回收站读取失败",
+            )
         }
     }
 }
@@ -83,35 +114,110 @@ pub async fn create(
     headers: HeaderMap,
     Json(payload): Json<TrashCreatePayload>,
 ) -> Response {
+    create_impl(
+        state,
+        headers,
+        vec![payload.bookmark_id],
+        payload.expected_etag,
+    )
+    .await
+}
+
+pub async fn create_batch(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(payload): Json<TrashBatchCreatePayload>,
+) -> Response {
+    create_impl(state, headers, payload.bookmark_ids, payload.expected_etag).await
+}
+
+async fn create_impl(
+    state: AppState,
+    headers: HeaderMap,
+    bookmark_ids: Vec<Uuid>,
+    expected_etag: Option<String>,
+) -> Response {
+    let bookmark_ids = match validate_trash_selection(bookmark_ids) {
+        Ok(bookmark_ids) => bookmark_ids,
+        Err(TrashSelectionError::Empty) => {
+            return auth::error(
+                StatusCode::BAD_REQUEST,
+                "empty_selection",
+                "至少选择一个书签",
+            )
+        }
+        Err(TrashSelectionError::Duplicate) => {
+            return auth::error(
+                StatusCode::BAD_REQUEST,
+                "duplicate_selection",
+                "书签选择不能重复",
+            )
+        }
+    };
     let Some(user) = auth::authenticate_session(&state, &headers).await else {
         return auth::error(StatusCode::UNAUTHORIZED, "unauthorized", "请先登录");
     };
-    let target = match bookmarks::load_node_for_user(&state.db, user.id, payload.bookmark_id).await {
-        Ok(Some(target)) => target,
-        Ok(None) => return auth::error(StatusCode::NOT_FOUND, "bookmark_not_found", "书签不存在"),
-        Err(error) => {
-            tracing::error!(?error, "load bookmark for trash failed");
-            return auth::error(StatusCode::INTERNAL_SERVER_ERROR, "trash_create_failed", "书签读取失败");
-        }
-    };
-    let current_status = match bookmarks::current_bookmark_status(&state, user.id, &user.login_identifier).await {
-        Ok(status) => status,
-        Err(error) => {
-            tracing::error!(?error, "load trash mutation status failed");
-            return auth::error(StatusCode::INTERNAL_SERVER_ERROR, "trash_create_failed", "同步文件状态读取失败");
-        }
-    };
-    if current_status != "ready" {
-        return auth::error(StatusCode::CONFLICT, "trash_unavailable", "当前同步文件不是可编辑的明文 XBEL");
+    let mut targets_by_id =
+        match bookmarks::load_nodes_for_user(&state.db, user.id, &bookmark_ids).await {
+            Ok(targets) => targets,
+            Err(error) => {
+                tracing::error!(?error, "load bookmarks for trash failed");
+                return auth::error(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "trash_create_failed",
+                    "书签读取失败",
+                );
+            }
+        };
+    if targets_by_id.len() != bookmark_ids.len() {
+        return auth::error(
+            StatusCode::NOT_FOUND,
+            "bookmark_not_found",
+            "部分书签不存在",
+        );
     }
-    if target.node_type != "bookmark" || target.url.is_none() {
-        return auth::error(StatusCode::BAD_REQUEST, "invalid_bookmark", "只能将书签移入回收站");
+    let mut targets = Vec::with_capacity(bookmark_ids.len());
+    for bookmark_id in &bookmark_ids {
+        let Some(target) = targets_by_id.remove(bookmark_id) else {
+            return auth::error(
+                StatusCode::NOT_FOUND,
+                "bookmark_not_found",
+                "部分书签不存在",
+            );
+        };
+        if target.node_type != "bookmark" || target.url.is_none() {
+            return auth::error(
+                StatusCode::BAD_REQUEST,
+                "invalid_bookmark",
+                "只能将书签移入回收站",
+            );
+        }
+        targets.push((*bookmark_id, target));
+    }
+    let current_status =
+        match bookmarks::current_bookmark_status(&state, user.id, &user.login_identifier).await {
+            Ok(status) => status,
+            Err(error) => {
+                tracing::error!(?error, "load trash mutation status failed");
+                return auth::error(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "trash_create_failed",
+                    "同步文件状态读取失败",
+                );
+            }
+        };
+    if current_status != "ready" {
+        return auth::error(
+            StatusCode::CONFLICT,
+            "trash_unavailable",
+            "当前同步文件不是可编辑的明文 XBEL",
+        );
     }
     if let Err(response) = webdav::ensure_bookmark_editable(
         &state,
         user.id,
         &user.login_identifier,
-        payload.expected_etag.as_deref(),
+        expected_etag.as_deref(),
     )
     .await
     {
@@ -121,38 +227,84 @@ pub async fn create(
         Ok(transaction) => transaction,
         Err(error) => {
             tracing::error!(?error, "start trash transaction failed");
-            return auth::error(StatusCode::INTERNAL_SERVER_ERROR, "trash_create_failed", "移入回收站失败");
+            return auth::error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "trash_create_failed",
+                "移入回收站失败",
+            );
         }
     };
-    let inserted = sqlx::query(
-        "INSERT INTO bookmark_trash (id, user_id, title, url, folder_path, original_position)
-         VALUES ($1, $2, $3, $4, $5, $6)",
-    )
-    .bind(Uuid::new_v4())
-    .bind(user.id)
-    .bind(&target.title)
-    .bind(target.url.as_deref().unwrap_or_default())
-    .bind(&target.folder_path)
-    .bind(target.position)
-    .execute(&mut *transaction)
-    .await;
-    if inserted.is_err() {
-        return auth::error(StatusCode::INTERNAL_SERVER_ERROR, "trash_create_failed", "回收站记录创建失败");
-    }
-    let deleted = sqlx::query("DELETE FROM bookmark_nodes WHERE id = $1 AND user_id = $2 AND node_type = 'bookmark'")
-        .bind(payload.bookmark_id)
+    for (bookmark_id, target) in &targets {
+        let inserted = sqlx::query(
+            "INSERT INTO bookmark_trash (id, user_id, title, url, folder_path, original_position)
+             VALUES ($1, $2, $3, $4, $5, $6)",
+        )
+        .bind(Uuid::new_v4())
+        .bind(user.id)
+        .bind(&target.title)
+        .bind(target.url.as_deref().unwrap_or_default())
+        .bind(&target.folder_path)
+        .bind(target.position)
+        .execute(&mut *transaction)
+        .await;
+        if inserted.is_err() {
+            return auth::error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "trash_create_failed",
+                "回收站记录创建失败",
+            );
+        }
+        let deleted = sqlx::query(
+            "DELETE FROM bookmark_nodes WHERE id = $1 AND user_id = $2 AND node_type = 'bookmark'",
+        )
+        .bind(bookmark_id)
         .bind(user.id)
         .execute(&mut *transaction)
         .await;
-    if deleted.map(|result| result.rows_affected()).unwrap_or(0) != 1 {
-        return auth::error(StatusCode::NOT_FOUND, "bookmark_not_found", "书签不存在");
+        if deleted.map(|result| result.rows_affected()).unwrap_or(0) != 1 {
+            return auth::error(
+                StatusCode::NOT_FOUND,
+                "bookmark_not_found",
+                "部分书签不存在",
+            );
+        }
     }
     if transaction.commit().await.is_err() {
-        return auth::error(StatusCode::INTERNAL_SERVER_ERROR, "trash_create_failed", "移入回收站失败");
+        return auth::error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "trash_create_failed",
+            "移入回收站失败",
+        );
     }
     match webdav::rewrite_bookmark_file(&state, user.id, &user.login_identifier).await {
-        Ok(_) => Json(serde_json::json!({ "deleted": true })).into_response(),
+        Ok(response) => Json(serde_json::json!({
+            "deleted": true,
+            "count": targets.len(),
+            "etag": response.0,
+            "version": response.1
+        }))
+        .into_response(),
         Err(response) => response,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{validate_trash_selection, TrashSelectionError};
+    use uuid::Uuid;
+
+    #[test]
+    fn validates_batch_trash_selection() {
+        let bookmark = Uuid::new_v4();
+        assert_eq!(
+            validate_trash_selection(Vec::new()),
+            Err(TrashSelectionError::Empty)
+        );
+        assert_eq!(
+            validate_trash_selection(vec![bookmark, bookmark]),
+            Err(TrashSelectionError::Duplicate)
+        );
+        assert_eq!(validate_trash_selection(vec![bookmark]), Ok(vec![bookmark]));
     }
 }
 
@@ -165,15 +317,24 @@ pub async fn restore(
     let Some(user) = auth::authenticate_session(&state, &headers).await else {
         return auth::error(StatusCode::UNAUTHORIZED, "unauthorized", "请先登录");
     };
-    let status = match bookmarks::current_bookmark_status(&state, user.id, &user.login_identifier).await {
-        Ok(status) => status,
-        Err(error) => {
-            tracing::error!(?error, "load trash restore status failed");
-            return auth::error(StatusCode::INTERNAL_SERVER_ERROR, "trash_restore_failed", "同步文件状态读取失败");
-        }
-    };
+    let status =
+        match bookmarks::current_bookmark_status(&state, user.id, &user.login_identifier).await {
+            Ok(status) => status,
+            Err(error) => {
+                tracing::error!(?error, "load trash restore status failed");
+                return auth::error(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "trash_restore_failed",
+                    "同步文件状态读取失败",
+                );
+            }
+        };
     if status != "ready" {
-        return auth::error(StatusCode::CONFLICT, "trash_unavailable", "当前同步文件不是可编辑的明文 XBEL");
+        return auth::error(
+            StatusCode::CONFLICT,
+            "trash_unavailable",
+            "当前同步文件不是可编辑的明文 XBEL",
+        );
     }
     if let Err(response) = webdav::ensure_bookmark_editable(
         &state,
@@ -192,11 +353,17 @@ pub async fn restore(
         Ok(transaction) => transaction,
         Err(error) => {
             tracing::error!(?error, "start trash restore transaction failed");
-            return auth::error(StatusCode::INTERNAL_SERVER_ERROR, "trash_restore_failed", "恢复书签失败");
+            return auth::error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "trash_restore_failed",
+                "恢复书签失败",
+            );
         }
     };
     let parent_id = find_folder_by_path(&mut transaction, user.id, &item.folder_path).await;
-    let position = next_position(&mut transaction, user.id, parent_id).await.unwrap_or(0);
+    let position = next_position(&mut transaction, user.id, parent_id)
+        .await
+        .unwrap_or(0);
     let bookmark_id = Uuid::new_v4();
     let inserted = sqlx::query(
         "INSERT INTO bookmark_nodes (id, user_id, parent_id, node_type, title, url, position)
@@ -211,7 +378,11 @@ pub async fn restore(
     .execute(&mut *transaction)
     .await;
     if inserted.is_err() {
-        return auth::error(StatusCode::INTERNAL_SERVER_ERROR, "trash_restore_failed", "恢复书签失败");
+        return auth::error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "trash_restore_failed",
+            "恢复书签失败",
+        );
     }
     let deleted = sqlx::query("DELETE FROM bookmark_trash WHERE id = $1 AND user_id = $2")
         .bind(trash_id)
@@ -222,7 +393,11 @@ pub async fn restore(
         return auth::error(StatusCode::NOT_FOUND, "trash_not_found", "回收站记录不存在");
     }
     if transaction.commit().await.is_err() {
-        return auth::error(StatusCode::INTERNAL_SERVER_ERROR, "trash_restore_failed", "恢复书签失败");
+        return auth::error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "trash_restore_failed",
+            "恢复书签失败",
+        );
     }
     match webdav::rewrite_bookmark_file(&state, user.id, &user.login_identifier).await {
         Ok(_) => Json(serde_json::json!({ "restored": true })).into_response(),
@@ -248,15 +423,16 @@ pub async fn remove(
         Ok(_) => auth::error(StatusCode::NOT_FOUND, "trash_not_found", "回收站记录不存在"),
         Err(error) => {
             tracing::error!(?error, "remove bookmark trash failed");
-            auth::error(StatusCode::INTERNAL_SERVER_ERROR, "trash_remove_failed", "永久删除失败")
+            auth::error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "trash_remove_failed",
+                "永久删除失败",
+            )
         }
     }
 }
 
-pub async fn empty(
-    State(state): State<AppState>,
-    headers: HeaderMap,
-) -> Response {
+pub async fn empty(State(state): State<AppState>, headers: HeaderMap) -> Response {
     let Some(user) = auth::authenticate_session(&state, &headers).await else {
         return auth::error(StatusCode::UNAUTHORIZED, "unauthorized", "请先登录");
     };
@@ -265,10 +441,16 @@ pub async fn empty(
         .execute(&state.db)
         .await
     {
-        Ok(result) => Json(serde_json::json!({ "removed": result.rows_affected() })).into_response(),
+        Ok(result) => {
+            Json(serde_json::json!({ "removed": result.rows_affected() })).into_response()
+        }
         Err(error) => {
             tracing::error!(?error, "empty bookmark trash failed");
-            auth::error(StatusCode::INTERNAL_SERVER_ERROR, "trash_empty_failed", "清空回收站失败")
+            auth::error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "trash_empty_failed",
+                "清空回收站失败",
+            )
         }
     }
 }

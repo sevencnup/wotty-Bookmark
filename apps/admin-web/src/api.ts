@@ -236,6 +236,13 @@ export function trashBookmark(token: string, bookmarkId: string, expectedEtag: s
   }, token)
 }
 
+export function trashBookmarks(token: string, bookmarkIds: string[], expectedEtag: string | null) {
+  return request<{ deleted: boolean; count: number; etag: string; version: number }>('/api/v1/bookmarks/trash/batch', {
+    method: 'POST',
+    body: JSON.stringify({ bookmarkIds, expectedEtag }),
+  }, token)
+}
+
 export function restoreTrashItem(token: string, id: string, expectedEtag: string | null) {
   return request<{ restored: boolean }>(`/api/v1/bookmarks/trash/${id}/restore`, {
     method: 'POST',

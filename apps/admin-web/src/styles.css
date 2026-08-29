@@ -2140,6 +2140,7 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 .category-bulk-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 9px; margin-bottom: 13px; padding: 10px 12px; border: 1px solid var(--primary-border); border-radius: var(--radius-md); color: var(--primary); background: var(--primary-soft); font-size: 12px; }
 .category-bulk-bar > span { color: var(--muted); font-size: 11px; }
 .category-bulk-bar select { min-width: 170px; height: 32px; margin-left: auto; padding: 0 9px; border: 1px solid var(--primary-border); border-radius: var(--radius-sm); outline: 0; background: var(--paper); font-size: 12px; }
+.category-bulk-bar .category-delete-selected { min-height: 32px; padding: 0 12px; border-radius: var(--radius-sm); font-size: 12px; }
 .category-bookmark-list { overflow: hidden; border: 1px solid var(--line); border-radius: var(--radius-lg); }
 .category-list-header, .category-bookmark-row { display: grid; grid-template-columns: 34px 30px minmax(200px, 1.25fr) minmax(170px, 1fr) 34px; align-items: center; gap: 0; padding: 0 12px; }
 .category-list-header { min-height: 43px; border-bottom: 1px solid var(--line); color: var(--muted); background: var(--surface-subtle); font-size: 11px; font-weight: 700; }

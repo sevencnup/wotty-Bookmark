@@ -21,6 +21,7 @@ import {
   revokeAppPassword,
   revokeDevice,
   trashBookmark,
+  trashBookmarks,
 } from './api'
 
 function response(payload: unknown, status = 200): Response {
@@ -141,6 +142,7 @@ describe('admin API contract', () => {
       .mockResolvedValueOnce(response({ removed: 0, retainedPerFile: 30 }))
       .mockResolvedValueOnce(response({ restored: true }))
       .mockResolvedValueOnce(response({ deleted: true }))
+      .mockResolvedValueOnce(response({ deleted: true, count: 2, etag: 'etag-next', version: 4 }))
       .mockResolvedValueOnce(response({ restored: true }))
       .mockResolvedValueOnce(response(undefined, 204))
       .mockResolvedValueOnce(response({ removed: 1 }))
@@ -154,6 +156,7 @@ describe('admin API contract', () => {
     await cleanupFileVersions('token')
     await restoreFileVersion('token', 'version')
     await trashBookmark('token', 'bookmark', 'etag')
+    await trashBookmarks('token', ['bookmark-1', 'bookmark-2'], 'etag-next')
     await restoreTrashItem('token', 'trash', 'etag')
     await permanentlyDeleteTrashItem('token', 'trash')
     await emptyTrash('token')
@@ -167,10 +170,15 @@ describe('admin API contract', () => {
       ['/api/v1/storage/versions/cleanup', 'POST'],
       ['/api/v1/storage/versions/version/restore', 'POST'],
       ['/api/v1/bookmarks/trash', 'POST'],
+      ['/api/v1/bookmarks/trash/batch', 'POST'],
       ['/api/v1/bookmarks/trash/trash/restore', 'POST'],
       ['/api/v1/bookmarks/trash/trash', 'DELETE'],
       ['/api/v1/bookmarks/trash/empty', 'POST'],
       ['/health/live', 'GET'],
     ])
+    expect(JSON.parse(fetchMock.mock.calls[7][1].body)).toEqual({
+      bookmarkIds: ['bookmark-1', 'bookmark-2'],
+      expectedEtag: 'etag-next',
+    })
   })
 })

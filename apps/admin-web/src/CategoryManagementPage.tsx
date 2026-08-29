@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, Folder, FolderOpen, Folders, GripVertical, Home, Link2, LoaderCircle, RefreshCw, Search, Sparkles } from 'lucide-react'
+import { ChevronDown, ChevronRight, Folder, FolderOpen, Folders, GripVertical, Home, Link2, LoaderCircle, RefreshCw, Search, Sparkles, Trash2 } from 'lucide-react'
 import type { DragEvent, MouseEvent as ReactMouseEvent } from 'react'
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import * as api from './api'
@@ -273,6 +273,30 @@ export function CategoryManagementPage({ token, onOpenFloccus }: Props) {
     }
   }
 
+  async function deleteSelectedBookmarks() {
+    if (!tree || !ready || moving || selectedIds.size === 0) return
+    const ids = [...selectedIds].filter((id) => tree.bookmarks.some((bookmark) => bookmark.id === id))
+    if (!ids.length) return
+    const confirmed = window.confirm(
+      `确定将选中的 ${ids.length} 个书签移入回收站吗？\n\n后台会立即更新 WebDAV 同步文件；下次 Floccus 双向同步时，浏览器中的对应书签也可能被删除。`,
+    )
+    if (!confirmed) return
+    setMoving(true)
+    setError('')
+    setNotice('')
+    try {
+      const response = await api.trashBookmarks(token, ids, tree.etag)
+      setSelectedIds(new Set())
+      setNotice(`已将 ${response.count} 个书签移入回收站，并更新同步文件`)
+      await load()
+    } catch (requestError) {
+      await load()
+      setError(readableError(requestError, '删除书签失败，请刷新后重试'))
+    } finally {
+      setMoving(false)
+    }
+  }
+
   async function moveFolder(folderId: string, parentId: string | null) {
     if (!tree || !ready || moving) return
     setMoving(true)
@@ -412,7 +436,7 @@ export function CategoryManagementPage({ token, onOpenFloccus }: Props) {
           <div className="category-result-summary"><span className="category-result-count">{visibleBookmarks.length} 个结果 · {bookmarkGroups.length} 个文件夹</span><div className="category-group-actions"><button disabled={bookmarkGroups.length === 0} onClick={expandBookmarkGroups} type="button">展开全部</button><button disabled={bookmarkGroups.length === 0} onClick={collapseBookmarkGroups} type="button">收起全部</button></div></div>
         </div>
         <div className="category-toolbar"><label className="bookmark-search"><Search size={15} /><input onChange={(event) => setQuery(event.target.value)} placeholder="搜索书签、网址或文件夹" type="search" value={query} /></label><button className="toolbar-button" disabled={refreshing || moving} onClick={() => void load(true)} type="button">{refreshing ? '刷新中…' : '刷新'}</button></div>
-        {selectedIds.size > 0 && <div className="category-bulk-bar"><strong>已选择 {selectedIds.size} 个</strong><span>也可以拖动其中一个批量归类</span><select aria-label="将选中的书签移动到文件夹" onChange={(event) => { if (event.target.value) void moveBookmarks([...selectedIds], event.target.value) }} value=""><option value="">选择目标文件夹…</option>{flatFolders.map((folder) => <option key={folder.id} value={folder.id}>{'　'.repeat(folder.depth)}{folder.title}</option>)}</select><button className="toolbar-button" onClick={() => setSelectedIds(new Set())} type="button">取消选择</button></div>}
+        {selectedIds.size > 0 && <div className="category-bulk-bar"><strong>已选择 {selectedIds.size} 个</strong><span>可批量移动或移入回收站</span><select aria-label="将选中的书签移动到文件夹" disabled={moving} onChange={(event) => { if (event.target.value) void moveBookmarks([...selectedIds], event.target.value) }} value=""><option value="">选择目标文件夹…</option>{flatFolders.map((folder) => <option key={folder.id} value={folder.id}>{'　'.repeat(folder.depth)}{folder.title}</option>)}</select><button className="danger-button category-delete-selected" disabled={moving} onClick={() => void deleteSelectedBookmarks()} type="button"><Trash2 size={14} />{moving ? '处理中…' : '删除'}</button><button className="toolbar-button" disabled={moving} onClick={() => setSelectedIds(new Set())} type="button">取消选择</button></div>}
         <div className="category-bookmark-list category-layout-bookmark-list">
           <div className="category-list-header"><label className="checkbox-wrap"><input checked={visibleBookmarks.length > 0 && visibleBookmarks.every((bookmark) => selectedIds.has(bookmark.id))} onChange={toggleAll} type="checkbox" /><span /></label><span className="category-list-title"><Folders size={14} />按文件夹分类</span><span>操作</span></div>
           {visibleBookmarks.length === 0 ? <div className="category-empty"><Search size={25} /><strong>没有匹配的书签</strong><p>换个搜索关键词，或先在右侧选择其他文件夹。</p></div> : bookmarkGroups.map((group) => <BookmarkGroup collapsed={!normalizedQuery && collapsedGroupIds.has(group.id)} draggedIds={draggedIds} group={group} key={group.id} moving={moving} onDragEnd={endDrag} onDragStart={beginDrag} onSelectionMouseDown={beginSelectionPaint} onSelectionMouseOver={continueSelectionPaint} onToggle={toggleGroup} onToggleGroupSelection={toggleGroupSelection} onToggleSelected={toggleSelected} selectedIds={selectedIds} />)}

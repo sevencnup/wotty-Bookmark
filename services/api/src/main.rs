@@ -105,6 +105,10 @@ fn app_router(state: AppState) -> Router {
             get(trash::list).post(trash::create),
         )
         .route(
+            "/api/v1/bookmarks/trash/batch",
+            post(trash::create_batch),
+        )
+        .route(
             "/api/v1/bookmarks/trash/empty",
             post(trash::empty),
         )
