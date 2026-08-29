@@ -1,5 +1,23 @@
 # 管理后台开发记录
 
+## 2026-08-29：`admin-bookmark-folder-group-controls`
+
+### 任务
+
+修复文件夹分组控件在新 JSX 与旧 CSS 资源混用时退化为原生按钮、表头竖排的问题。
+
+### 进度
+
+- 分组标题复用组织树已有稳定控件类，增加按钮原生外观重置和最终布局覆盖。
+- 锁定分组表头三列、分组栏四列和书签行四列布局，兼容 680px 以下窄屏。
+
+### 验证
+
+- `pnpm --filter @bookmark-vault/admin-web lint`：通过。
+- Chromium 窄窗口计算样式检查：表头横向三列、折叠按钮 `display: grid`、文件夹按钮 `appearance: none`、原生按钮数量为 0。
+- 314px 列表宽度下分组按钮和书签行无横向溢出。
+- 临时浏览器与管理后台开发服务已关闭。
+
 ## 2026-08-29：`admin-bookmark-folder-groups`
 
 ### 任务

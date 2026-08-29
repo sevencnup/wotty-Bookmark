@@ -3223,6 +3223,147 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   }
 }
 
+/* 分类管理：分组控件强制兼容覆盖，避免旧缓存样式把按钮还原为原生外观 */
+.category-management-page .category-list-header {
+  display: grid !important;
+  grid-template-columns: 34px minmax(0, 1fr) 34px !important;
+  align-items: center !important;
+  min-height: 43px !important;
+  padding: 0 12px !important;
+  white-space: nowrap !important;
+}
+
+.category-management-page .category-list-header .category-list-title {
+  display: flex !important;
+  min-width: 0 !important;
+  align-items: center !important;
+  gap: 7px !important;
+  white-space: nowrap !important;
+}
+
+.category-management-page .category-bookmark-group-header {
+  display: grid !important;
+  grid-template-columns: 24px 26px minmax(0, 1fr) auto !important;
+  align-items: center !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: 48px !important;
+  gap: 4px !important;
+  box-sizing: border-box !important;
+}
+
+.category-management-page .category-group-toggle,
+.category-management-page .category-group-summary {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  box-sizing: border-box !important;
+  border: 0 !important;
+  outline: 0 !important;
+  font: inherit !important;
+  text-decoration: none !important;
+}
+
+.category-management-page .category-group-toggle {
+  display: grid !important;
+  place-items: center !important;
+  width: 24px !important;
+  height: 28px !important;
+  min-width: 24px !important;
+  padding: 0 !important;
+  border-radius: 7px !important;
+  color: #6b7f9e !important;
+  background: transparent !important;
+  cursor: pointer !important;
+}
+
+.category-management-page .category-group-toggle:hover,
+.category-management-page .category-group-toggle:focus-visible {
+  color: var(--primary) !important;
+  background: rgba(255, 255, 255, 0.72) !important;
+}
+
+.category-management-page .category-group-summary {
+  display: flex !important;
+  min-width: 0 !important;
+  width: 100% !important;
+  align-items: center !important;
+  gap: 9px !important;
+  padding: 2px 0 !important;
+  color: inherit !important;
+  background: transparent !important;
+  text-align: left !important;
+  cursor: pointer !important;
+}
+
+.category-management-page .category-group-summary > span:last-child {
+  display: grid !important;
+  min-width: 0 !important;
+  flex: 1 1 auto !important;
+  gap: 1px !important;
+}
+
+.category-management-page .category-group-icon {
+  display: grid !important;
+  flex: 0 0 28px !important;
+  place-items: center !important;
+  width: 28px !important;
+  height: 28px !important;
+}
+
+.category-management-page .category-group-summary strong,
+.category-management-page .category-group-summary small {
+  display: block !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.category-management-page .category-group-count {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-width: 25px !important;
+  white-space: nowrap !important;
+}
+
+.category-management-page .category-bookmark-group-items {
+  display: block !important;
+  width: 100% !important;
+  min-width: 0 !important;
+}
+
+.category-management-page .category-bookmark-group .category-bookmark-row {
+  display: grid !important;
+  grid-template-columns: 34px 30px minmax(0, 1fr) 34px !important;
+  align-items: center !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+}
+
+@media (max-width: 680px) {
+  .category-management-page .category-list-header {
+    grid-template-columns: 30px minmax(0, 1fr) 32px !important;
+    padding: 0 8px !important;
+  }
+
+  .category-management-page .category-bookmark-group-header {
+    grid-template-columns: 22px 24px minmax(0, 1fr) auto !important;
+    padding-right: 8px !important;
+  }
+
+  .category-management-page .category-group-toggle {
+    width: 22px !important;
+    min-width: 22px !important;
+  }
+
+  .category-management-page .category-bookmark-group .category-bookmark-row {
+    grid-template-columns: 30px 28px minmax(0, 1fr) 32px !important;
+    padding: 0 8px !important;
+  }
+}
+
 /* ── 2026 管理后台视觉升级覆盖层 ─────────────────────────── */
 :root {
   --ink: #172033;
