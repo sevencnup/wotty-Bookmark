@@ -1,5 +1,27 @@
 # 管理后台开发记录
 
+## 2026-08-29：`floccus-xbel-stable-node-ids`
+
+### 任务
+
+修复管理后台重写 XBEL 后丢失 Floccus 节点 ID、导致 E050 大量删除保护的问题。
+
+### 进度
+
+- 从本机 Floccus 5.10.2 源码确认节点 `id` 属性和 `highestId` 注释格式。
+- 数据库持久化 Floccus 节点 ID 与用户级最高编号，后台移动和删除保留原 ID。
+- 回收站恢复分配新的单调递增 ID，不复用已删除节点编号。
+- XBEL 解析和渲染完整保留身份信息，拒绝重复、非法或缺失身份的后台重写。
+- 缺少完整身份的旧文件显示安全迁移提示，并在公共编辑闸门阻止直接 API 修改。
+- 服务器没有可恢复的旧明文历史版本，因此修复后需由浏览器执行一次“向上推一次”。
+
+### 验证
+
+- `cargo test --manifest-path services/api/Cargo.toml`：23 项通过。
+- `pnpm --filter @bookmark-vault/admin-web lint`：通过。
+- `pnpm --filter @bookmark-vault/admin-web test`：18 项通过。
+- `pnpm --filter @bookmark-vault/admin-web build`：通过。
+
 ## 2026-08-29：`admin-bookmark-batch-trash`
 
 ### 任务

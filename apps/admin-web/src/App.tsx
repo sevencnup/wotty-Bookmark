@@ -651,9 +651,9 @@ function BookmarkOrganizer({ token, onOpenFloccus, mode = 'organizer' }: { token
       ) : tree?.status === 'migrationRequired' ? (
         <section className="panel bookmark-encrypted-state">
           <span className="bookmark-encrypted-icon">!</span>
-          <strong>同步文件已收到，但格式无法读取</strong>
-          <p>服务器保存了同步文件，但当前格式不是可建立索引的明文 XBEL。请在 Floccus 中确认文件格式为 XBEL，或继续使用浏览器和 Floccus 管理。</p>
-          <button className="primary-button compact" onClick={onOpenFloccus} type="button">检查 Floccus 配置</button>
+          <strong>需要由浏览器重新建立同步身份</strong>
+          <p>当前 XBEL 缺少 Floccus 节点 ID，后台已暂停移动和删除，避免产生大量误删。请先备份浏览器书签，再在 Floccus 中对该配置执行一次“向上推一次”；完成后刷新本页。</p>
+          <button className="primary-button compact" onClick={() => void loadBookmarks(true)} type="button">我已推送，重新检查</button>
         </section>
       ) : tree?.status !== 'ready' ? (
         <section className="panel bookmark-empty">

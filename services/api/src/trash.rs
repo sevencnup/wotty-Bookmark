@@ -364,14 +364,26 @@ pub async fn restore(
     let position = next_position(&mut transaction, user.id, parent_id)
         .await
         .unwrap_or(0);
+    let floccus_id = match bookmarks::allocate_floccus_id(&mut transaction, user.id).await {
+        Ok(id) => id,
+        Err(error) => {
+            tracing::error!(?error, "allocate Floccus ID for restored bookmark failed");
+            return auth::error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "trash_restore_failed",
+                "恢复书签失败",
+            );
+        }
+    };
     let bookmark_id = Uuid::new_v4();
     let inserted = sqlx::query(
-        "INSERT INTO bookmark_nodes (id, user_id, parent_id, node_type, title, url, position)
-         VALUES ($1, $2, $3, 'bookmark', $4, $5, $6)",
+        "INSERT INTO bookmark_nodes (id, user_id, parent_id, floccus_id, node_type, title, url, position)
+         VALUES ($1, $2, $3, $4, 'bookmark', $5, $6, $7)",
     )
     .bind(bookmark_id)
     .bind(user.id)
     .bind(parent_id)
+    .bind(floccus_id)
     .bind(&item.title)
     .bind(&item.url)
     .bind(position)

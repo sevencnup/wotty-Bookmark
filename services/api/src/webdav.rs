@@ -161,7 +161,9 @@ pub async fn import_file(
     Json(json!({ "imported": true, "encrypted": encrypted, "byteSize": body.len() })).into_response()
 }
 
-fn validate_import_body(body: &[u8]) -> Result<Option<Vec<crate::bookmarks::XbelNode>>, Response> {
+fn validate_import_body(
+    body: &[u8],
+) -> Result<Option<crate::bookmarks::XbelDocument>, Response> {
     if is_encrypted_sync_file(body) {
         return Ok(None);
     }
@@ -451,6 +453,24 @@ pub async fn ensure_bookmark_editable(
         data_root: state.data_dir.clone(),
     };
     ensure_unlocked(&target).await?;
+    let body = fs::read(&target.file_path).await.map_err(|error| {
+        tracing::error!(?error, "read bookmark file before admin edit failed");
+        auth::error(
+            StatusCode::CONFLICT,
+            "floccus_identity_required",
+            "请先在 Floccus 中执行一次向上推送，重新建立同步身份",
+        )
+    })?;
+    let identity_ready = crate::bookmarks::parse_xbel(&body)
+        .map(|document| document.has_complete_floccus_identity())
+        .unwrap_or(false);
+    if !identity_ready {
+        return Err(auth::error(
+            StatusCode::CONFLICT,
+            "floccus_identity_required",
+            "请先在 Floccus 中执行一次向上推送，重新建立同步身份",
+        ));
+    }
     if let Some(expected_etag) = expected_etag {
         let current = sqlx::query("SELECT etag FROM dav_files WHERE user_id = $1 AND path LIKE $2")
             .bind(user_id)

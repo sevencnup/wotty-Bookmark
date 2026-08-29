@@ -25,11 +25,32 @@ pub enum NodeKind {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct XbelNode {
+    pub floccus_id: Option<i64>,
     pub kind: NodeKind,
     pub title: String,
     pub url: Option<String>,
     pub parent: Option<usize>,
     pub position: usize,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct XbelDocument {
+    pub highest_id: Option<i64>,
+    pub nodes: Vec<XbelNode>,
+}
+
+impl XbelDocument {
+    pub fn has_complete_floccus_identity(&self) -> bool {
+        self.highest_id.is_some() && self.nodes.iter().all(|node| node.floccus_id.is_some())
+    }
+}
+
+impl std::ops::Deref for XbelDocument {
+    type Target = [XbelNode];
+
+    fn deref(&self) -> &Self::Target {
+        &self.nodes
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -56,7 +77,7 @@ struct OpenElement {
     title_text: String,
 }
 
-pub fn parse_xbel(bytes: &[u8]) -> Result<Vec<XbelNode>, XbelError> {
+pub fn parse_xbel(bytes: &[u8]) -> Result<XbelDocument, XbelError> {
     let mut reader = Reader::from_reader(Cursor::new(bytes));
     reader.config_mut().trim_text(false);
     let mut buffer = Vec::new();
@@ -64,6 +85,7 @@ pub fn parse_xbel(bytes: &[u8]) -> Result<Vec<XbelNode>, XbelError> {
     let mut nodes = Vec::new();
     let mut saw_root = false;
     let mut closed_root = false;
+    let mut highest_id = None;
 
     loop {
         let event = reader.read_event_into(&mut buffer)?;
@@ -80,11 +102,23 @@ pub fn parse_xbel(bytes: &[u8]) -> Result<Vec<XbelNode>, XbelError> {
                 }
 
                 let node_index = match name.as_str() {
-                    "folder" => Some(push_node(&mut nodes, NodeKind::Folder, None, &stack)),
+                    "folder" => Some(push_node(
+                        &mut nodes,
+                        parse_floccus_id(&start)?,
+                        NodeKind::Folder,
+                        None,
+                        &stack,
+                    )),
                     "bookmark" => {
                         let url = attribute_value(&start, b"href")?
                             .ok_or_else(|| XbelError("书签缺少 href 属性".into()))?;
-                        Some(push_node(&mut nodes, NodeKind::Bookmark, Some(url), &stack))
+                        Some(push_node(
+                            &mut nodes,
+                            parse_floccus_id(&start)?,
+                            NodeKind::Bookmark,
+                            Some(url),
+                            &stack,
+                        ))
                     }
                     _ => None,
                 };
@@ -107,12 +141,24 @@ pub fn parse_xbel(bytes: &[u8]) -> Result<Vec<XbelNode>, XbelError> {
                 }
                 match name.as_str() {
                     "folder" => {
-                        push_node(&mut nodes, NodeKind::Folder, None, &stack);
+                        push_node(
+                            &mut nodes,
+                            parse_floccus_id(&empty)?,
+                            NodeKind::Folder,
+                            None,
+                            &stack,
+                        );
                     }
                     "bookmark" => {
                         let url = attribute_value(&empty, b"href")?
                             .ok_or_else(|| XbelError("书签缺少 href 属性".into()))?;
-                        push_node(&mut nodes, NodeKind::Bookmark, Some(url), &stack);
+                        push_node(
+                            &mut nodes,
+                            parse_floccus_id(&empty)?,
+                            NodeKind::Bookmark,
+                            Some(url),
+                            &stack,
+                        );
                     }
                     _ => {}
                 }
@@ -132,6 +178,16 @@ pub fn parse_xbel(bytes: &[u8]) -> Result<Vec<XbelNode>, XbelError> {
                 if let Some(element) = stack.last_mut() {
                     if element.title_target.is_some() {
                         element.title_text.push_str(&String::from_utf8_lossy(&text));
+                    }
+                }
+            }
+            Event::Comment(comment) => {
+                let comment = comment
+                    .unescape()
+                    .map_err(|error| XbelError(error.to_string()))?;
+                if let Some(value) = parse_highest_id_comment(&comment)? {
+                    if highest_id.replace(value).is_some() {
+                        return Err(XbelError("Floccus highestId 注释重复".into()));
                     }
                 }
             }
@@ -159,21 +215,34 @@ pub fn parse_xbel(bytes: &[u8]) -> Result<Vec<XbelNode>, XbelError> {
     if !saw_root || !closed_root || !stack.is_empty() {
         return Err(XbelError("XBEL 文档不完整".into()));
     }
-    Ok(nodes)
+    validate_floccus_identity(&nodes, highest_id)?;
+    Ok(XbelDocument { highest_id, nodes })
 }
 
-pub fn render_xbel(nodes: &[XbelNode]) -> Result<Vec<u8>, XbelError> {
-    validate_nodes(nodes)?;
-    let mut output =
-        String::from("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<xbel version=\"1.0\">\n");
-    let roots = child_indices(nodes, None);
-    render_children(nodes, &roots, 1, &mut output);
+pub fn render_xbel(document: &XbelDocument) -> Result<Vec<u8>, XbelError> {
+    validate_nodes(&document.nodes)?;
+    validate_floccus_identity(&document.nodes, document.highest_id)?;
+    let highest_id = document
+        .highest_id
+        .ok_or_else(|| XbelError("缺少 Floccus highestId".into()))?;
+    if document.nodes.iter().any(|node| node.floccus_id.is_none()) {
+        return Err(XbelError("存在缺少 Floccus ID 的节点".into()));
+    }
+    let mut output = String::from(
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE xbel PUBLIC \"+//IDN python.org//DTD XML Bookmark Exchange Language 1.0//EN//XML\" \"http://pyxml.sourceforge.net/topics/dtds/xbel.dtd\">\n<xbel version=\"1.0\">\n",
+    );
+    output.push_str(&format!(
+        "<!--- highestId :{highest_id}: for Floccus bookmark sync browser extension -->\n"
+    ));
+    let roots = child_indices(&document.nodes, None);
+    render_children(&document.nodes, &roots, 1, &mut output);
     output.push_str("</xbel>\n");
     Ok(output.into_bytes())
 }
 
 fn push_node(
     nodes: &mut Vec<XbelNode>,
+    floccus_id: Option<i64>,
     kind: NodeKind,
     url: Option<String>,
     stack: &[OpenElement],
@@ -182,6 +251,7 @@ fn push_node(
     let position = nodes.iter().filter(|node| node.parent == parent).count();
     let index = nodes.len();
     nodes.push(XbelNode {
+        floccus_id,
         kind,
         title: String::new(),
         url,
@@ -189,6 +259,58 @@ fn push_node(
         position,
     });
     index
+}
+
+fn parse_floccus_id(element: &quick_xml::events::BytesStart<'_>) -> Result<Option<i64>, XbelError> {
+    let Some(value) = attribute_value(element, b"id")? else {
+        return Ok(None);
+    };
+    let id = value
+        .parse::<i64>()
+        .map_err(|_| XbelError("Floccus 节点 ID 不是有效整数".into()))?;
+    if id <= 0 {
+        return Err(XbelError("Floccus 节点 ID 必须为正整数".into()));
+    }
+    Ok(Some(id))
+}
+
+fn parse_highest_id_comment(comment: &str) -> Result<Option<i64>, XbelError> {
+    let Some((_, rest)) = comment.split_once("highestId :") else {
+        return Ok(None);
+    };
+    let Some((value, _)) = rest.split_once(':') else {
+        return Err(XbelError("Floccus highestId 注释格式无效".into()));
+    };
+    let highest_id = value
+        .trim()
+        .parse::<i64>()
+        .map_err(|_| XbelError("Floccus highestId 不是有效整数".into()))?;
+    if highest_id < 0 {
+        return Err(XbelError("Floccus highestId 不能为负数".into()));
+    }
+    Ok(Some(highest_id))
+}
+
+fn validate_floccus_identity(nodes: &[XbelNode], highest_id: Option<i64>) -> Result<(), XbelError> {
+    let mut ids = HashSet::new();
+    let mut maximum = 0;
+    for node in nodes {
+        if let Some(id) = node.floccus_id {
+            if id <= 0 {
+                return Err(XbelError("Floccus 节点 ID 必须为正整数".into()));
+            }
+            if !ids.insert(id) {
+                return Err(XbelError(format!("Floccus 节点 ID {id} 重复")));
+            }
+            maximum = maximum.max(id);
+        }
+    }
+    if let Some(highest_id) = highest_id {
+        if highest_id < maximum {
+            return Err(XbelError("Floccus highestId 小于节点最大 ID".into()));
+        }
+    }
+    Ok(())
 }
 
 fn attribute_value(
@@ -256,7 +378,10 @@ fn render_children(nodes: &[XbelNode], children: &[usize], depth: usize, output:
         let indent = "  ".repeat(depth);
         match node.kind {
             NodeKind::Folder => {
-                output.push_str(&format!("{indent}<folder folded=\"no\">\n"));
+                output.push_str(&format!(
+                    "{indent}<folder folded=\"no\" id=\"{}\">\n",
+                    node.floccus_id.unwrap_or_default()
+                ));
                 output.push_str(&format!(
                     "{}<title>{}</title>\n",
                     "  ".repeat(depth + 1),
@@ -268,8 +393,9 @@ fn render_children(nodes: &[XbelNode], children: &[usize], depth: usize, output:
             }
             NodeKind::Bookmark => {
                 output.push_str(&format!(
-                    "{indent}<bookmark href=\"{}\"><title>{}</title></bookmark>\n",
+                    "{indent}<bookmark href=\"{}\" id=\"{}\"><title>{}</title></bookmark>\n",
                     xml_escape(node.url.as_deref().unwrap_or_default()),
+                    node.floccus_id.unwrap_or_default(),
                     xml_escape(&node.title)
                 ));
             }
@@ -404,10 +530,11 @@ pub async fn current_bookmark_status(
     let bytes = fs::read(file_path).await.map_err(sqlx::Error::Io)?;
     Ok(if is_encrypted_sync_file(&bytes) {
         "encrypted"
-    } else if parse_xbel(&bytes).is_ok() {
-        "ready"
     } else {
-        "migrationRequired"
+        match parse_xbel(&bytes) {
+            Ok(document) if document.has_complete_floccus_identity() => "ready",
+            _ => "migrationRequired",
+        }
     })
 }
 
@@ -475,8 +602,10 @@ async fn load_bookmark_tree(
     let status = if file_exists {
         match fs::read(&file_path).await {
             Ok(bytes) if is_encrypted_sync_file(&bytes) => "encrypted",
-            Ok(bytes) if parse_xbel(&bytes).is_ok() => "ready",
-            Ok(_) => "migrationRequired",
+            Ok(bytes) => match parse_xbel(&bytes) {
+                Ok(document) if document.has_complete_floccus_identity() => "ready",
+                _ => "migrationRequired",
+            },
             Err(_) => "notReady",
         }
     } else if !nodes.is_empty() {
@@ -986,24 +1115,48 @@ async fn move_bookmarks_impl(
 pub async fn replace_index(
     db: &SqlitePool,
     user_id: Uuid,
-    parsed: &[XbelNode],
+    parsed: &XbelDocument,
 ) -> Result<(), sqlx::Error> {
     let mut transaction = db.begin().await?;
+    let stored_highest = sqlx::query_scalar::<_, i64>(
+        "SELECT highest_id FROM bookmark_sync_state WHERE user_id = $1",
+    )
+    .bind(user_id)
+    .fetch_optional(&mut *transaction)
+    .await?
+    .unwrap_or(0);
+    let supplied_maximum = parsed
+        .nodes
+        .iter()
+        .filter_map(|node| node.floccus_id)
+        .max()
+        .unwrap_or(0);
+    let mut highest_id = stored_highest
+        .max(parsed.highest_id.unwrap_or(0))
+        .max(supplied_maximum);
     sqlx::query("DELETE FROM bookmark_nodes WHERE user_id = $1")
         .bind(user_id)
         .execute(&mut *transaction)
         .await?;
-    let mut ids = Vec::with_capacity(parsed.len());
-    for node in parsed {
+    let mut ids = Vec::with_capacity(parsed.nodes.len());
+    for node in &parsed.nodes {
         let id = Uuid::new_v4();
         let parent_id = node.parent.and_then(|parent| ids.get(parent).copied());
+        let floccus_id = match node.floccus_id {
+            Some(id) => id,
+            None => {
+                highest_id += 1;
+                highest_id
+            }
+        };
         sqlx::query(
-            "INSERT INTO bookmark_nodes (id, user_id, parent_id, node_type, title, url, position)
-             VALUES ($1, $2, $3, $4, $5, $6, $7)",
+            "INSERT INTO bookmark_nodes (id, user_id, parent_id, floccus_id, node_type, title, url, position)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
         )
         .bind(id)
         .bind(user_id)
         .bind(parent_id)
+        .bind(floccus_id)
         .bind(match node.kind {
             NodeKind::Folder => "folder",
             NodeKind::Bookmark => "bookmark",
@@ -1015,24 +1168,77 @@ pub async fn replace_index(
         .await?;
         ids.push(id);
     }
+    sqlx::query(
+        "INSERT INTO bookmark_sync_state (user_id, highest_id, updated_at)
+         VALUES ($1, $2, CURRENT_TIMESTAMP)
+         ON CONFLICT(user_id) DO UPDATE SET
+           highest_id = MAX(bookmark_sync_state.highest_id, excluded.highest_id),
+           updated_at = CURRENT_TIMESTAMP",
+    )
+    .bind(user_id)
+    .bind(highest_id)
+    .execute(&mut *transaction)
+    .await?;
     transaction.commit().await
 }
 
-pub async fn load_index(db: &SqlitePool, user_id: Uuid) -> Result<Vec<XbelNode>, sqlx::Error> {
+pub async fn load_index(db: &SqlitePool, user_id: Uuid) -> Result<XbelDocument, sqlx::Error> {
+    let mut transaction = db.begin().await?;
+    let mut highest_id = sqlx::query_scalar::<_, i64>(
+        "SELECT highest_id FROM bookmark_sync_state WHERE user_id = $1",
+    )
+    .bind(user_id)
+    .fetch_optional(&mut *transaction)
+    .await?
+    .unwrap_or(0);
+    let missing_ids = sqlx::query_scalar::<_, Uuid>(
+        "SELECT id FROM bookmark_nodes WHERE user_id = $1 AND floccus_id IS NULL
+         ORDER BY created_at, id",
+    )
+    .bind(user_id)
+    .fetch_all(&mut *transaction)
+    .await?;
+    for id in missing_ids {
+        highest_id += 1;
+        sqlx::query("UPDATE bookmark_nodes SET floccus_id = $1 WHERE id = $2 AND user_id = $3")
+            .bind(highest_id)
+            .bind(id)
+            .bind(user_id)
+            .execute(&mut *transaction)
+            .await?;
+    }
     let rows = sqlx::query(
-        "SELECT id, parent_id, node_type, title, url, position
+        "SELECT id, parent_id, floccus_id, node_type, title, url, position
          FROM bookmark_nodes WHERE user_id = $1 ORDER BY parent_id NULLS FIRST, position, id",
     )
     .bind(user_id)
-    .fetch_all(db)
+    .fetch_all(&mut *transaction)
+    .await?;
+    let maximum = rows
+        .iter()
+        .filter_map(|row| row.get::<Option<i64>, _>("floccus_id"))
+        .max()
+        .unwrap_or(0);
+    highest_id = highest_id.max(maximum);
+    sqlx::query(
+        "INSERT INTO bookmark_sync_state (user_id, highest_id, updated_at)
+         VALUES ($1, $2, CURRENT_TIMESTAMP)
+         ON CONFLICT(user_id) DO UPDATE SET
+           highest_id = MAX(bookmark_sync_state.highest_id, excluded.highest_id),
+           updated_at = CURRENT_TIMESTAMP",
+    )
+    .bind(user_id)
+    .bind(highest_id)
+    .execute(&mut *transaction)
     .await?;
     let mut index_by_id = HashMap::new();
     for (index, row) in rows.iter().enumerate() {
         index_by_id.insert(row.get::<Uuid, _>("id"), index);
     }
-    Ok(rows
+    let nodes = rows
         .iter()
         .map(|row| XbelNode {
+            floccus_id: row.get("floccus_id"),
             kind: if row.get::<String, _>("node_type") == "folder" {
                 NodeKind::Folder
             } else {
@@ -1045,13 +1251,52 @@ pub async fn load_index(db: &SqlitePool, user_id: Uuid) -> Result<Vec<XbelNode>,
                 .and_then(|id| index_by_id.get(&id).copied()),
             position: row.get::<i32, _>("position") as usize,
         })
-        .collect())
+        .collect();
+    transaction.commit().await?;
+    Ok(XbelDocument {
+        highest_id: Some(highest_id),
+        nodes,
+    })
+}
+
+pub async fn allocate_floccus_id(
+    transaction: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+    user_id: Uuid,
+) -> Result<i64, sqlx::Error> {
+    let stored_highest = sqlx::query_scalar::<_, i64>(
+        "SELECT highest_id FROM bookmark_sync_state WHERE user_id = $1",
+    )
+    .bind(user_id)
+    .fetch_optional(&mut **transaction)
+    .await?
+    .unwrap_or(0);
+    let node_maximum = sqlx::query_scalar::<_, i64>(
+        "SELECT COALESCE(MAX(floccus_id), 0) FROM bookmark_nodes WHERE user_id = $1",
+    )
+    .bind(user_id)
+    .fetch_one(&mut **transaction)
+    .await?;
+    let next_id = stored_highest.max(node_maximum) + 1;
+    sqlx::query(
+        "INSERT INTO bookmark_sync_state (user_id, highest_id, updated_at)
+         VALUES ($1, $2, CURRENT_TIMESTAMP)
+         ON CONFLICT(user_id) DO UPDATE SET
+           highest_id = excluded.highest_id,
+           updated_at = CURRENT_TIMESTAMP",
+    )
+    .bind(user_id)
+    .bind(next_id)
+    .execute(&mut **transaction)
+    .await?;
+    Ok(next_id)
 }
 #[cfg(test)]
 mod tests {
     use super::{
-        folder_move_creates_cycle, is_encrypted_sync_file, parse_xbel, render_xbel, NodeKind,
+        allocate_floccus_id, folder_move_creates_cycle, is_encrypted_sync_file, load_index,
+        parse_xbel, render_xbel, replace_index, NodeKind,
     };
+    use sqlx::{sqlite::SqlitePoolOptions, Row};
     use std::collections::HashMap;
     use uuid::Uuid;
 
@@ -1093,13 +1338,127 @@ mod tests {
         assert_eq!(nodes[4].position, 1);
     }
 
-    #[test]
-    fn renders_xml_that_can_be_parsed_again() {
-        let input = br#"<xbel><bookmark href="https://example.com"><title>A &amp; B</title></bookmark><folder><title>Folder</title></folder></xbel>"#;
-        let parsed = parse_xbel(input).expect("valid XBEL");
-        let rendered = render_xbel(&parsed).expect("rendered XBEL");
+    async fn test_db() -> sqlx::SqlitePool {
+        let db = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .expect("test database");
+        sqlx::migrate!("../../migrations")
+            .run(&db)
+            .await
+            .expect("test migrations");
+        db
+    }
+
+    async fn create_test_user(db: &sqlx::SqlitePool, user_id: Uuid) {
+        sqlx::query(
+            "INSERT INTO users (id, login_identifier, password_hash) VALUES ($1, $2, 'hash')",
+        )
+        .bind(user_id)
+        .bind(format!("{user_id}@example.com"))
+        .execute(db)
+        .await
+        .expect("test user");
+    }
+
+    #[tokio::test]
+    async fn generic_xbel_receives_ids_before_rendering() {
+        let db = test_db().await;
+        let user_id = Uuid::new_v4();
+        create_test_user(&db, user_id).await;
+        let parsed = parse_xbel(
+            br#"<xbel><bookmark href="https://example.com"><title>A &amp; B</title></bookmark><folder><title>Folder</title></folder></xbel>"#,
+        )
+        .expect("valid generic XBEL");
+
+        replace_index(&db, user_id, &parsed)
+            .await
+            .expect("indexed XBEL");
+        let indexed = load_index(&db, user_id).await.expect("loaded index");
+        assert_eq!(indexed.highest_id, Some(2));
+        assert_eq!(indexed.nodes[0].floccus_id, Some(1));
+        assert_eq!(indexed.nodes[1].floccus_id, Some(2));
+
+        let rendered = render_xbel(&indexed).expect("rendered XBEL");
         let reparsed = parse_xbel(&rendered).expect("rendered XBEL parses");
-        assert_eq!(parsed, reparsed);
+        assert_eq!(indexed, reparsed);
+    }
+
+    #[tokio::test]
+    async fn move_and_delete_keep_remaining_ids_and_highest_id() {
+        let db = test_db().await;
+        let user_id = Uuid::new_v4();
+        create_test_user(&db, user_id).await;
+        let parsed = parse_xbel(
+            br#"<xbel><!--- highestId :12: for Floccus bookmark sync browser extension --><folder id="10"><title>Folder</title><bookmark href="https://a.example" id="11"><title>A</title></bookmark></folder><bookmark href="https://b.example" id="12"><title>B</title></bookmark></xbel>"#,
+        )
+        .expect("valid Floccus XBEL");
+        replace_index(&db, user_id, &parsed)
+            .await
+            .expect("indexed XBEL");
+
+        let rows = sqlx::query(
+            "SELECT id, floccus_id FROM bookmark_nodes WHERE user_id = $1 ORDER BY floccus_id",
+        )
+        .bind(user_id)
+        .fetch_all(&db)
+        .await
+        .expect("stored nodes");
+        let folder_id: Uuid = rows[0].get("id");
+        let nested_id: Uuid = rows[1].get("id");
+        let root_bookmark_id: Uuid = rows[2].get("id");
+        sqlx::query("UPDATE bookmark_nodes SET parent_id = $1 WHERE id = $2 AND user_id = $3")
+            .bind(folder_id)
+            .bind(root_bookmark_id)
+            .bind(user_id)
+            .execute(&db)
+            .await
+            .expect("move bookmark");
+        sqlx::query("DELETE FROM bookmark_nodes WHERE id = $1 AND user_id = $2")
+            .bind(nested_id)
+            .bind(user_id)
+            .execute(&db)
+            .await
+            .expect("delete bookmark");
+
+        let indexed = load_index(&db, user_id).await.expect("loaded index");
+        assert_eq!(indexed.highest_id, Some(12));
+        assert_eq!(
+            indexed
+                .nodes
+                .iter()
+                .map(|node| node.floccus_id)
+                .collect::<Vec<_>>(),
+            vec![Some(10), Some(12)]
+        );
+        assert_eq!(indexed.nodes[1].parent, Some(0));
+
+        let mut transaction = db.begin().await.expect("restore transaction");
+        let restored_id = allocate_floccus_id(&mut transaction, user_id)
+            .await
+            .expect("new Floccus ID");
+        transaction.commit().await.expect("commit restored ID");
+        assert_eq!(restored_id, 13);
+    }
+
+    #[test]
+    fn preserves_floccus_node_ids_and_highest_id() {
+        let input = br#"<?xml version="1.0" encoding="UTF-8"?>
+<xbel version="1.0">
+<!--- highestId :8: for Floccus bookmark sync browser extension -->
+<folder id="7"><title>Folder</title><bookmark href="https://example.com" id="8"><title>Example</title></bookmark></folder>
+</xbel>"#;
+        let parsed = parse_xbel(input).expect("valid Floccus XBEL");
+        assert_eq!(parsed.highest_id, Some(8));
+        assert_eq!(parsed.nodes[0].floccus_id, Some(7));
+        assert_eq!(parsed.nodes[1].floccus_id, Some(8));
+
+        let rendered =
+            String::from_utf8(render_xbel(&parsed).expect("rendered XBEL")).expect("UTF-8 XBEL");
+        assert!(rendered.contains("highestId :8:"));
+        assert!(rendered.contains("<folder folded=\"no\" id=\"7\">"));
+        assert!(rendered.contains("id=\"8\""));
     }
 
     #[test]
