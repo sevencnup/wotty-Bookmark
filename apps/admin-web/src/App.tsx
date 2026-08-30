@@ -892,6 +892,18 @@ function FloccusGuide({ token, loginIdentifier }: { token: string; loginIdentifi
           <div className="config-fields">
             <ConfigField label="Encryption Passphrase" value={createdSecret ?? '（与 WebDAV Password 使用同一串）'} copyable={Boolean(createdSecret)} />
           </div>
+          {!createdSecret && (
+            <div className="floccus-inline-generate">
+              <div>
+                <strong>还没有专用密码</strong>
+                <span>点击后会生成一串密码，并自动填入上面的 WebDAV Password 和 Encryption Passphrase。</span>
+              </div>
+              <button className="primary-button compact" disabled={creating} onClick={() => { void handleCreate() }} type="button">
+                {creating ? '正在生成…' : '生成并填入专用密码'}
+              </button>
+            </div>
+          )}
+          {!createdSecret && error && <p className="form-error floccus-inline-error">{error}</p>}
           <div className="floccus-same-secret-notice">
             <span>✓</span>
             <p><strong>两处填写同一串。</strong>同步完成后不需要再去分类管理验证，服务器会自动解密并建立索引。</p>

@@ -1,5 +1,10 @@
 # 管理后台开发记录
 
+## 2026-08-30：Floccus 第四步生成入口
+
+- 在 Encryption Passphrase 步骤内增加“生成并填入专用密码”按钮。
+- 生成后同时填充 WebDAV Password 与 Encryption Passphrase，避免用户返回第一步查找入口。
+
 ## 2026-08-30：floccus-single-credential-setup
 
 ### 任务
