@@ -1,6 +1,8 @@
 mod auth;
 mod bookmarks;
 mod devices;
+mod floccus_crypto;
+mod floccus_secrets;
 mod state;
 mod trash;
 mod webdav;
@@ -57,11 +59,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
     sqlx::migrate!("../../migrations").run(&db).await?;
 
+    let master_key = floccus_crypto::MasterKey::load_or_create(std::path::Path::new(&data_dir))?;
     let state = AppState {
         db,
         data_dir: data_dir.into(),
         version: env!("CARGO_PKG_VERSION").into(),
         auth_rate_limiter: Arc::new(AuthRateLimiter::default()),
+        master_key: Arc::new(master_key),
     };
 
     let app = app_router(state);
@@ -83,13 +87,28 @@ fn app_router(state: AppState) -> Router {
             "/api/v1/sidebar/pairing-codes",
             post(auth::create_sidebar_pairing),
         )
-        .route("/api/v1/sidebar/exchange", post(auth::exchange_sidebar_pairing))
+        .route(
+            "/api/v1/sidebar/exchange",
+            post(auth::exchange_sidebar_pairing),
+        )
         .route(
             "/api/v1/app-passwords",
             get(auth::list_app_passwords).post(auth::create_app_password),
         )
         .route(APP_PASSWORD_BY_ID_ROUTE, delete(auth::revoke_app_password))
         .route("/api/v1/storage/status", get(auth::storage_status))
+        .route(
+            "/api/v1/storage/encryption",
+            get(floccus_secrets::encryption_status),
+        )
+        .route(
+            "/api/v1/storage/encryption/unlock",
+            post(floccus_secrets::unlock),
+        )
+        .route(
+            "/api/v1/storage/encryption/passphrase",
+            delete(floccus_secrets::forget_passphrase),
+        )
         .route("/api/v1/bookmarks", get(bookmarks::list_bookmarks))
         .route("/api/v1/bookmarks/move", post(bookmarks::move_bookmark))
         .route(
@@ -104,22 +123,10 @@ fn app_router(state: AppState) -> Router {
             "/api/v1/bookmarks/trash",
             get(trash::list).post(trash::create),
         )
-        .route(
-            "/api/v1/bookmarks/trash/batch",
-            post(trash::create_batch),
-        )
-        .route(
-            "/api/v1/bookmarks/trash/empty",
-            post(trash::empty),
-        )
-        .route(
-            "/api/v1/bookmarks/trash/:id",
-            delete(trash::remove),
-        )
-        .route(
-            "/api/v1/bookmarks/trash/:id/restore",
-            post(trash::restore),
-        )
+        .route("/api/v1/bookmarks/trash/batch", post(trash::create_batch))
+        .route("/api/v1/bookmarks/trash/empty", post(trash::empty))
+        .route("/api/v1/bookmarks/trash/:id", delete(trash::remove))
+        .route("/api/v1/bookmarks/trash/:id/restore", post(trash::restore))
         .route("/api/v1/devices", get(devices::list))
         .route("/api/v1/devices/register", post(devices::register))
         .route("/api/v1/devices/:id/revoke", post(devices::revoke))
@@ -231,6 +238,7 @@ mod tests {
             data_dir: PathBuf::from("/tmp/bookmark-vault-route-test"),
             version: "test".into(),
             auth_rate_limiter: Arc::new(AuthRateLimiter::default()),
+            master_key: Arc::new(crate::floccus_crypto::MasterKey::for_tests()),
         };
         let response = app_router(state)
             .oneshot(

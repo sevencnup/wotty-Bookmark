@@ -437,7 +437,7 @@ function Overview({ token }: { token: string }) {
             </span>
           </div>
           <h2>从 Floccus 开始同步你的书签</h2>
-          <p>服务器只保存 Floccus 加密后的 XBEL 文件，书签内容安全且不会在后台明文展示。</p>
+          <p>服务器保存 Floccus 加密后的 XBEL 文件；需要后台整理时，可用同一个 passphrase 显式解锁并建立索引。</p>
         </div>
         <div className="hero-symbol-container">
           <div className="hero-symbol-halo" />
@@ -509,6 +509,9 @@ function BookmarkOrganizer({ token, onOpenFloccus, mode = 'organizer' }: { token
   const [expandedFolderIds, setExpandedFolderIds] = useState<Set<string>>(new Set())
   const [draggedIds, setDraggedIds] = useState<string[]>([])
   const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null)
+  const [passphrase, setPassphrase] = useState('')
+  const [unlocking, setUnlocking] = useState(false)
+  const [encryption, setEncryption] = useState<api.EncryptionStatus | null>(null)
 
   async function loadBookmarks(showLoading = false) {
     if (showLoading) setRefreshing(true)
@@ -526,6 +529,46 @@ function BookmarkOrganizer({ token, onOpenFloccus, mode = 'organizer' }: { token
   }
 
   useEffect(() => { void loadBookmarks() }, [token])
+
+  useEffect(() => {
+    if (tree?.status === 'encrypted' || tree?.status === 'ready') {
+      api.getEncryptionStatus(token).then(setEncryption).catch(() => setEncryption(null))
+    }
+  }, [token, tree?.status])
+
+  async function unlockEncryptedBookmarks() {
+    if (!passphrase || unlocking) return
+    setUnlocking(true)
+    setError('')
+    setNotice('')
+    try {
+      await api.unlockFloccusEncryption(token, passphrase)
+      setPassphrase('')
+      setNotice('加密书签已解锁，后台可以整理并继续写回 Floccus 加密文件')
+      setEncryption(await api.getEncryptionStatus(token))
+      await loadBookmarks()
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : '加密书签解锁失败')
+    } finally {
+      setUnlocking(false)
+    }
+  }
+
+  async function forgetPassphrase() {
+    if (unlocking) return
+    setUnlocking(true)
+    setError('')
+    try {
+      await api.forgetFloccusPassphrase(token)
+      setEncryption(await api.getEncryptionStatus(token))
+      setNotice('服务器已移除受保护的 passphrase，并清除了可搜索索引；加密同步文件仍保留')
+      await loadBookmarks()
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : '移除 passphrase 失败')
+    } finally {
+      setUnlocking(false)
+    }
+  }
 
   const folders = tree ? flattenFolders(tree.folders) : []
   const visibleCategoryFolders = tree ? visibleFolders(tree.folders, expandedFolderIds) : []
@@ -644,9 +687,11 @@ function BookmarkOrganizer({ token, onOpenFloccus, mode = 'organizer' }: { token
       ) : tree?.status === 'encrypted' ? (
         <section className="panel bookmark-encrypted-state">
           <span className="bookmark-encrypted-icon">◆</span>
-          <strong>同步成功，但书签内容已加密</strong>
-          <p>服务器已经收到 `bookmarks.xbel`，但 Floccus 使用了客户端加密。passphrase 只保存在你的浏览器中，服务器无法解密，所以这里不能直接列出书签。</p>
-          <div className="bookmark-encrypted-actions"><button className="primary-button compact" onClick={onOpenFloccus} type="button">在 Floccus 中管理</button><span>书签仍可在浏览器的「收藏夹栏」中查看</span></div>
+          <strong>{encryption?.passphraseStored ? '保存的 passphrase 已失效' : '输入 Floccus passphrase 解锁后台管理'}</strong>
+          <p>请输入 Floccus 账户中设置的同一个 passphrase。服务器会先验证当前文件，再使用服务器主密钥加密保存；之后后台移动、删除和恢复都会重新生成 Floccus 可读取的加密文件。</p>
+          <div className="bookmark-encryption-warning">启用后不再是零知识加密：拥有服务器主密钥和数据库的管理员可以解密书签。passphrase 不会显示在页面或写入日志。</div>
+          <div className="bookmark-unlock-form"><input aria-label="Floccus passphrase" autoComplete="current-password" onChange={(event) => setPassphrase(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') void unlockEncryptedBookmarks() }} placeholder="Floccus passphrase" type="password" value={passphrase} /><button className="primary-button compact" disabled={!passphrase || unlocking} onClick={() => void unlockEncryptedBookmarks()} type="button">{unlocking ? '验证中…' : '验证并解锁'}</button></div>
+          <div className="bookmark-encrypted-actions"><button className="toolbar-button compact" onClick={onOpenFloccus} type="button">查看 Floccus 配置</button>{encryption?.passphraseStored && <button className="toolbar-button compact" disabled={unlocking} onClick={() => void forgetPassphrase()} type="button">移除已保存口令</button>}</div>
         </section>
       ) : tree?.status === 'migrationRequired' ? (
         <section className="panel bookmark-encrypted-state">
@@ -688,6 +733,7 @@ function BookmarkOrganizer({ token, onOpenFloccus, mode = 'organizer' }: { token
               {visibleBookmarks.length === 0 ? <div className="bookmark-empty"><span><Search size={22} strokeWidth={1.8} /></span><strong>没有匹配的书签</strong><p>换个关键词，或切换左侧文件夹。</p></div> : visibleBookmarks.map((bookmark, index) => <div className={`bookmark-row ${selectedIds.has(bookmark.id) ? 'selected' : ''} ${isCategoriesMode && draggedIds.includes(bookmark.id) ? 'category-dragging' : ''}`} key={bookmark.id}><label className="checkbox-wrap"><input checked={selectedIds.has(bookmark.id)} onChange={() => toggleSelection(bookmark.id)} type="checkbox" /><span /></label>{isCategoriesMode && <button aria-label={`拖动 ${bookmark.title || bookmark.url}`} className="category-drag-handle" draggable={!moving} onDragEnd={clearDragState} onDragStart={(event) => startBookmarkDrag(event, bookmark.id)} title="拖动到左侧文件夹" type="button">⠿</button>}<div className="bookmark-name"><span className={`site-mark site-mark-${index % 4}`}>{(bookmark.title || '?').charAt(0).toUpperCase()}</span><div><strong title={bookmark.title}>{bookmark.title || '未命名书签'}</strong><span>{getBookmarkHost(bookmark.url)}</span></div></div><a className="bookmark-url-cell" href={bookmark.url} rel="noreferrer" target="_blank" title={bookmark.url}>{bookmark.url}</a><span className="category-pill" title={bookmark.folderPath}>{bookmark.folderPath || '根目录'}</span><a className="bookmark-open-link" href={bookmark.url} rel="noreferrer" target="_blank" title="打开书签" aria-label={`打开 ${bookmark.title || bookmark.url}`}><ExternalLink size={13} strokeWidth={1.8} /></a></div>)}
             </div>
             <p className="bookmark-index-note">书签内容仍由 Floccus 加密同步；此页面使用服务器索引进行查找和整理。</p>
+            {encryption?.encryptedFile && encryption.unlocked && <div className="bookmark-key-controls"><span>服务器已解锁 Floccus 加密文件；这不是零知识模式。</span><button className="toolbar-button compact" disabled={unlocking} onClick={() => void forgetPassphrase()} type="button">移除服务器口令</button></div>}
           </section>
         </div>
       )}
@@ -918,7 +964,7 @@ function ConfigField({ label, value, copyable = true }: { label: string; value: 
   )
 }
 function GuideStep({ number, title, content }: { number: string; title: string; content: string }) { return <div className="guide-step"><span>{number}</span><div><h4>{title}</h4><p>{content}</p></div></div> }
-function Security() { return <section className="panel"><div className="panel-heading"><div><p className="eyebrow">SECURITY</p><h3>账户安全</h3></div></div><div className="security-notice"><span><Shield size={14} strokeWidth={1.8} /></span><p>WOTTY BOOKMARK 不保存 Floccus passphrase。忘记 passphrase 后，服务器无法解密或恢复书签内容。</p></div><button className="danger-button" type="button">删除账户</button></section> }
+function Security() { return <section className="panel"><div className="panel-heading"><div><p className="eyebrow">SECURITY</p><h3>账户安全</h3></div></div><div className="security-notice"><span><Shield size={14} strokeWidth={1.8} /></span><p>后台解锁加密书签后，Floccus passphrase 会由服务器主密钥加密保存。页面不会显示口令；移除服务器口令不会删除加密同步文件。</p></div><button className="danger-button" type="button">删除账户</button></section> }
 function ComingSoon({ label }: { label: string }) { return <section className="panel coming-soon"><span className="coming-icon"><Sparkles size={24} strokeWidth={1.8} /></span><h3>{label}</h3><p>这个管理模块正在设计中，书签管理和侧边栏会保持独立运行。</p></section> }
 
 export default App

@@ -3,10 +3,12 @@ import {
   cleanupFileVersions,
   emptyTrash,
   exportStorageFile,
+  forgetFloccusPassphrase,
   getBookmarks,
   getDevices,
   getFileVersions,
   getHealth,
+  getEncryptionStatus,
   getTrash,
   importStorageFile,
   login,
@@ -23,6 +25,7 @@ import {
   revokeDevice,
   trashBookmark,
   trashBookmarks,
+  unlockFloccusEncryption,
 } from './api'
 
 function response(payload: unknown, status = 200): Response {
@@ -117,6 +120,25 @@ describe('admin API contract', () => {
       expect.objectContaining({ method: 'POST' }),
     )
     expect(new Headers(fetchMock.mock.calls[0][1].headers).get('authorization')).toBe('Bearer session-token')
+  })
+
+  it('manages the protected Floccus passphrase without reading it back', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(response({ encryptedFile: true, passphraseStored: false, unlocked: false, zeroKnowledge: true }))
+      .mockResolvedValueOnce(response({ unlocked: true }))
+      .mockResolvedValueOnce(response(undefined, 204))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await getEncryptionStatus('session-token')
+    await unlockFloccusEncryption('session-token', 'same passphrase as Floccus')
+    await forgetFloccusPassphrase('session-token')
+
+    expect(fetchMock.mock.calls.map(([path, init]) => [path, init?.method ?? 'GET'])).toEqual([
+      ['/api/v1/storage/encryption', 'GET'],
+      ['/api/v1/storage/encryption/unlock', 'POST'],
+      ['/api/v1/storage/encryption/passphrase', 'DELETE'],
+    ])
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({ passphrase: 'same passphrase as Floccus' })
   })
 
 

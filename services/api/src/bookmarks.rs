@@ -522,13 +522,14 @@ pub async fn current_bookmark_status(
         return Ok("notReady");
     }
     let bytes = fs::read(file_path).await.map_err(sqlx::Error::Io)?;
-    Ok(if is_encrypted_sync_file(&bytes) {
-        "encrypted"
-    } else {
-        match parse_xbel(&bytes) {
-            Ok(document) if document.has_complete_floccus_identity() => "ready",
-            _ => "migrationRequired",
-        }
+    if is_encrypted_sync_file(&bytes) {
+        let ready = crate::floccus_secrets::has_passphrase(&state.db, user_id).await?
+            && crate::floccus_secrets::has_verified_index(&state.db, user_id).await?;
+        return Ok(if ready { "ready" } else { "encrypted" });
+    }
+    Ok(match parse_xbel(&bytes) {
+        Ok(document) if document.has_complete_floccus_identity() => "ready",
+        _ => "migrationRequired",
     })
 }
 
@@ -598,7 +599,15 @@ async fn load_bookmark_tree(
     };
     let status = if file_exists {
         match fs::read(&file_path).await {
-            Ok(bytes) if is_encrypted_sync_file(&bytes) => "encrypted",
+            Ok(bytes) if is_encrypted_sync_file(&bytes) => {
+                let ready = crate::floccus_secrets::has_passphrase(&state.db, user_id).await?
+                    && crate::floccus_secrets::has_verified_index(&state.db, user_id).await?;
+                if ready {
+                    "ready"
+                } else {
+                    "encrypted"
+                }
+            }
             Ok(bytes) => match parse_xbel(&bytes) {
                 Ok(document) if document.has_complete_floccus_identity() => "ready",
                 _ => "migrationRequired",
@@ -1164,14 +1173,16 @@ pub async fn replace_index(
         ids.push(id);
     }
     sqlx::query(
-        "INSERT INTO bookmark_sync_state (user_id, highest_id, updated_at)
-         VALUES ($1, $2, CURRENT_TIMESTAMP)
+        "INSERT INTO bookmark_sync_state (user_id, highest_id, source_identity_ready, updated_at)
+         VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
          ON CONFLICT(user_id) DO UPDATE SET
            highest_id = MAX(bookmark_sync_state.highest_id, excluded.highest_id),
+           source_identity_ready = excluded.source_identity_ready,
            updated_at = CURRENT_TIMESTAMP",
     )
     .bind(user_id)
     .bind(highest_id)
+    .bind(parsed.has_complete_floccus_identity())
     .execute(&mut *transaction)
     .await?;
     transaction.commit().await

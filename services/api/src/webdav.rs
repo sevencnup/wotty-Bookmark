@@ -61,11 +61,11 @@ pub async fn handle(
         DavResource::File(target) => match method {
             Method::GET => read_file(&target, false).await,
             Method::HEAD => read_file(&target, true).await,
-            Method::PUT => write_file(&target, request, &state.db, user.app_password_id).await,
-            Method::DELETE => delete_file(&target, &state.db, user.app_password_id).await,
+            Method::PUT => write_file(&target, request, &state, user.app_password_id).await,
+            Method::DELETE => delete_file(&target, &state, user.app_password_id).await,
             method if method.as_str() == "PROPFIND" => propfind_file(&target).await,
             method if method.as_str() == "MOVE" => {
-                move_file(&target, request, &state.db, user.app_password_id).await
+                move_file(&target, request, &state, user.app_password_id).await
             }
             _ => method_not_allowed(),
         },
@@ -76,15 +76,26 @@ pub async fn export_file(State(state): State<AppState>, headers: HeaderMap) -> R
     let Some(user) = auth::authenticate_session(&state, &headers).await else {
         return auth::error(StatusCode::UNAUTHORIZED, "unauthorized", "请先登录");
     };
-    let path = state.data_dir.join(user.id.to_string()).join("bookmarks.xbel");
+    let path = state
+        .data_dir
+        .join(user.id.to_string())
+        .join("bookmarks.xbel");
     let body = match fs::read(path).await {
         Ok(body) => body,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-            return auth::error(StatusCode::NOT_FOUND, "file_not_found", "还没有可导出的同步文件")
+            return auth::error(
+                StatusCode::NOT_FOUND,
+                "file_not_found",
+                "还没有可导出的同步文件",
+            )
         }
         Err(error) => {
             tracing::error!(?error, "export WebDAV file failed");
-            return auth::error(StatusCode::INTERNAL_SERVER_ERROR, "export_failed", "导出同步文件失败");
+            return auth::error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "export_failed",
+                "导出同步文件失败",
+            );
         }
     };
     let mut response = (StatusCode::OK, Body::from(body)).into_response();
@@ -110,7 +121,10 @@ pub async fn import_file(
     let target = DavTarget {
         user_id: user.id,
         relative_path: format!("{}/bookmarks.xbel", user.login_identifier),
-        file_path: state.data_dir.join(user.id.to_string()).join("bookmarks.xbel"),
+        file_path: state
+            .data_dir
+            .join(user.id.to_string())
+            .join("bookmarks.xbel"),
         data_root: state.data_dir.clone(),
     };
     if let Err(response) = ensure_unlocked(&target).await {
@@ -118,65 +132,95 @@ pub async fn import_file(
     }
     let body = match to_bytes(request.into_body(), MAX_FILE_BYTES + 1).await {
         Ok(body) if body.len() <= MAX_FILE_BYTES => body,
-        Ok(_) => return auth::error(StatusCode::PAYLOAD_TOO_LARGE, "file_too_large", "书签文件不能超过 10 MB"),
+        Ok(_) => {
+            return auth::error(
+                StatusCode::PAYLOAD_TOO_LARGE,
+                "file_too_large",
+                "书签文件不能超过 10 MB",
+            )
+        }
         Err(_) => return auth::error(StatusCode::BAD_REQUEST, "invalid_body", "无法读取导入文件"),
     };
-    let parsed = match validate_import_body(&body) {
+    let parsed = match validate_import_body(&state, user.id, &body).await {
         Ok(parsed) => parsed,
         Err(response) => return response,
     };
     if fs::try_exists(&target.file_path).await.unwrap_or(false) {
         if let Err(error) = snapshot_existing_file(&state.db, &target).await {
             tracing::error!(?error, "snapshot before import failed");
-            return auth::error(StatusCode::INTERNAL_SERVER_ERROR, "import_failed", "导入前备份失败");
+            return auth::error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "import_failed",
+                "导入前备份失败",
+            );
         }
     }
     if let Err(error) = replace_file(&target.file_path, &body).await {
         tracing::error!(?error, "replace imported file failed");
-        return auth::error(StatusCode::INTERNAL_SERVER_ERROR, "import_failed", "导入同步文件失败");
+        return auth::error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "import_failed",
+            "导入同步文件失败",
+        );
     }
     if let Err(error) = record_file(&state.db, &target, &body).await {
         tracing::error!(?error, "record imported file failed");
-        return auth::error(StatusCode::INTERNAL_SERVER_ERROR, "import_failed", "导入文件元数据更新失败");
+        return auth::error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "import_failed",
+            "导入文件元数据更新失败",
+        );
     }
-    let encrypted = parsed.is_none();
+    let encrypted = is_encrypted_sync_file(&body);
     match parsed {
         Some(parsed) => {
             if let Err(error) = crate::bookmarks::replace_index(&state.db, user.id, &parsed).await {
                 tracing::error!(?error, "index imported bookmarks failed");
-                return auth::error(StatusCode::INTERNAL_SERVER_ERROR, "import_failed", "导入书签索引失败");
+                return auth::error(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "import_failed",
+                    "导入书签索引失败",
+                );
             }
         }
         None => {
-            if let Err(error) = sqlx::query("DELETE FROM bookmark_nodes WHERE user_id = $1")
-                .bind(user.id)
-                .execute(&state.db)
-                .await
-            {
+            if let Err(error) = crate::floccus_secrets::clear_index(&state.db, user.id).await {
                 tracing::error!(?error, "clear encrypted bookmark index after import failed");
-                return auth::error(StatusCode::INTERNAL_SERVER_ERROR, "import_failed", "导入文件索引清理失败");
+                return auth::error(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "import_failed",
+                    "导入文件索引清理失败",
+                );
             }
         }
     }
-    Json(json!({ "imported": true, "encrypted": encrypted, "byteSize": body.len() })).into_response()
+    Json(json!({ "imported": true, "encrypted": encrypted, "byteSize": body.len() }))
+        .into_response()
 }
 
-fn validate_import_body(
+async fn validate_import_body(
+    state: &AppState,
+    user_id: uuid::Uuid,
     body: &[u8],
 ) -> Result<Option<crate::bookmarks::XbelDocument>, Response> {
-    if is_encrypted_sync_file(body) {
-        return Ok(None);
-    }
-    crate::bookmarks::parse_xbel(body)
-        .map(Some)
-        .map_err(|_| auth::error(StatusCode::UNPROCESSABLE_ENTITY, "invalid_xbel", "导入文件不是有效的 XBEL 或 Floccus 加密文件"))
+    parse_sync_file_for_index(state, user_id, body).await
 }
 
 fn is_encrypted_sync_file(bytes: &[u8]) -> bool {
-    let Ok(value) = serde_json::from_slice::<serde_json::Value>(bytes) else { return false };
-    let Some(object) = value.as_object() else { return false };
-    object.get("ciphertext").and_then(serde_json::Value::as_str).is_some()
-        && object.get("salt").and_then(serde_json::Value::as_str).is_some()
+    let Ok(value) = serde_json::from_slice::<serde_json::Value>(bytes) else {
+        return false;
+    };
+    let Some(object) = value.as_object() else {
+        return false;
+    };
+    object
+        .get("ciphertext")
+        .and_then(serde_json::Value::as_str)
+        .is_some()
+        && object
+            .get("salt")
+            .and_then(serde_json::Value::as_str)
+            .is_some()
 }
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -201,17 +245,17 @@ enum ResetSyncBaselineError {
     Failed(String),
 }
 
-pub async fn reset_sync_baseline(
-    State(state): State<AppState>,
-    headers: HeaderMap,
-) -> Response {
+pub async fn reset_sync_baseline(State(state): State<AppState>, headers: HeaderMap) -> Response {
     let Some(user) = auth::authenticate_session(&state, &headers).await else {
         return auth::error(StatusCode::UNAUTHORIZED, "unauthorized", "请先登录");
     };
     let target = DavTarget {
         user_id: user.id,
         relative_path: format!("{}/bookmarks.xbel", user.login_identifier),
-        file_path: state.data_dir.join(user.id.to_string()).join("bookmarks.xbel"),
+        file_path: state
+            .data_dir
+            .join(user.id.to_string())
+            .join("bookmarks.xbel"),
         data_root: state.data_dir.clone(),
     };
     match reset_sync_baseline_for_target(&state.db, &target).await {
@@ -239,7 +283,9 @@ async fn reset_sync_baseline_for_target(
     let owner_id = uuid::Uuid::new_v4();
     let lock_target = DavTarget {
         user_id: target.user_id,
-        relative_path: target.relative_path.replace("bookmarks.xbel", "bookmarks.xbel.lock"),
+        relative_path: target
+            .relative_path
+            .replace("bookmarks.xbel", "bookmarks.xbel.lock"),
         file_path: target.file_path.with_file_name("bookmarks.xbel.lock"),
         data_root: target.data_root.clone(),
     };
@@ -247,7 +293,10 @@ async fn reset_sync_baseline_for_target(
     if lock_response.status() == StatusCode::LOCKED {
         return Err(ResetSyncBaselineError::Locked);
     }
-    if !matches!(lock_response.status(), StatusCode::CREATED | StatusCode::NO_CONTENT) {
+    if !matches!(
+        lock_response.status(),
+        StatusCode::CREATED | StatusCode::NO_CONTENT
+    ) {
         return Err(ResetSyncBaselineError::Failed(format!(
             "acquire recovery lock: {}",
             lock_response.status()
@@ -304,7 +353,9 @@ async fn reset_sync_baseline_while_locked(
                 )));
             }
         }
-        return Err(ResetSyncBaselineError::Failed(format!("clear index: {error}")));
+        return Err(ResetSyncBaselineError::Failed(format!(
+            "clear index: {error}"
+        )));
     }
 
     Ok(ResetSyncBaselineResponse {
@@ -437,32 +488,22 @@ pub async fn restore_version(
         return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     }
     if is_versioned_file(&target) {
-        match crate::bookmarks::parse_xbel(&body) {
-            Ok(parsed) => {
-                if let Err(error) = crate::bookmarks::replace_index(&state.db, user.id, &parsed).await {
+        match parse_sync_file_for_index(&state, user.id, &body).await {
+            Ok(Some(parsed)) => {
+                if let Err(error) =
+                    crate::bookmarks::replace_index(&state.db, user.id, &parsed).await
+                {
                     tracing::error!(?error, path = %target.relative_path, "restore bookmark index failed");
                     return StatusCode::INTERNAL_SERVER_ERROR.into_response();
                 }
             }
-            Err(error) if is_encrypted_sync_file(&body) => {
-                tracing::debug!(?error, path = %target.relative_path, "restoring encrypted bookmark file without index");
-                if let Err(error) = sqlx::query("DELETE FROM bookmark_nodes WHERE user_id = $1")
-                    .bind(user.id)
-                    .execute(&state.db)
-                    .await
-                {
+            Ok(None) => {
+                if let Err(error) = crate::floccus_secrets::clear_index(&state.db, user.id).await {
                     tracing::error!(?error, path = %target.relative_path, "clear encrypted bookmark index failed");
                     return StatusCode::INTERNAL_SERVER_ERROR.into_response();
                 }
             }
-            Err(error) => {
-                tracing::error!(?error, path = %target.relative_path, "restore invalid XBEL");
-                return auth::error(
-                    StatusCode::UNPROCESSABLE_ENTITY,
-                    "invalid_xbel",
-                    "历史版本不是有效的 XBEL 或 Floccus 加密文件",
-                );
-            }
+            Err(response) => return response,
         }
     }
     Json(json!({
@@ -584,7 +625,10 @@ pub async fn ensure_bookmark_editable(
     let target = DavTarget {
         user_id,
         relative_path: format!("{login_identifier}/bookmarks.xbel"),
-        file_path: state.data_dir.join(user_id.to_string()).join("bookmarks.xbel"),
+        file_path: state
+            .data_dir
+            .join(user_id.to_string())
+            .join("bookmarks.xbel"),
         data_root: state.data_dir.clone(),
     };
     ensure_unlocked(&target).await?;
@@ -596,9 +640,18 @@ pub async fn ensure_bookmark_editable(
             "请先在 Floccus 中执行一次向上推送，重新建立同步身份",
         )
     })?;
-    let identity_ready = crate::bookmarks::parse_xbel(&body)
-        .map(|document| document.has_complete_floccus_identity())
-        .unwrap_or(false);
+    let identity_ready = if is_encrypted_sync_file(&body) {
+        crate::floccus_secrets::has_passphrase(&state.db, user_id)
+            .await
+            .unwrap_or(false)
+            && crate::floccus_secrets::has_verified_index(&state.db, user_id)
+                .await
+                .unwrap_or(false)
+    } else {
+        crate::bookmarks::parse_xbel(&body)
+            .map(|document| document.has_complete_floccus_identity())
+            .unwrap_or(false)
+    };
     if !identity_ready {
         return Err(auth::error(
             StatusCode::CONFLICT,
@@ -614,11 +667,19 @@ pub async fn ensure_bookmark_editable(
             .await
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR.into_response())?;
         let Some(current) = current else {
-            return Err(auth::error(StatusCode::CONFLICT, "version_conflict", "同步文件已发生变化，请刷新后重试"));
+            return Err(auth::error(
+                StatusCode::CONFLICT,
+                "version_conflict",
+                "同步文件已发生变化，请刷新后重试",
+            ));
         };
         let current_etag: String = current.get("etag");
         if current_etag != expected_etag {
-            return Err(auth::error(StatusCode::CONFLICT, "version_conflict", "同步文件已发生变化，请刷新后重试"));
+            return Err(auth::error(
+                StatusCode::CONFLICT,
+                "version_conflict",
+                "同步文件已发生变化，请刷新后重试",
+            ));
         }
     }
     Ok(())
@@ -632,27 +693,66 @@ pub async fn rewrite_bookmark_file(
     let target = DavTarget {
         user_id,
         relative_path: format!("{login_identifier}/bookmarks.xbel"),
-        file_path: state.data_dir.join(user_id.to_string()).join("bookmarks.xbel"),
+        file_path: state
+            .data_dir
+            .join(user_id.to_string())
+            .join("bookmarks.xbel"),
         data_root: state.data_dir.clone(),
     };
     let nodes = crate::bookmarks::load_index(&state.db, user_id)
         .await
-        .map_err(|_| auth::error(StatusCode::INTERNAL_SERVER_ERROR, "rewrite_failed", "同步文件生成失败"))?;
-    let body = crate::bookmarks::render_xbel(&nodes)
-        .map_err(|_| auth::error(StatusCode::INTERNAL_SERVER_ERROR, "rewrite_failed", "同步文件生成失败"))?;
+        .map_err(|_| {
+            auth::error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "rewrite_failed",
+                "同步文件生成失败",
+            )
+        })?;
+    let plaintext = crate::bookmarks::render_xbel(&nodes).map_err(|_| {
+        auth::error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "rewrite_failed",
+            "同步文件生成失败",
+        )
+    })?;
+    let encrypted = fs::read(&target.file_path)
+        .await
+        .ok()
+        .as_deref()
+        .is_some_and(is_encrypted_sync_file);
+    let body = crate::floccus_secrets::encode_sync_file(state, user_id, &plaintext, encrypted)
+        .await
+        .map_err(|error| {
+            tracing::error!(?error, "encrypt rewritten bookmark file failed");
+            auth::error(
+                StatusCode::CONFLICT,
+                "floccus_passphrase_required",
+                "请先使用正确的 Floccus passphrase 解锁同步文件",
+            )
+        })?;
     if let Err(error) = replace_file(&target.file_path, &body).await {
         tracing::error!(?error, "rewrite bookmark file failed");
         return Err(StatusCode::INTERNAL_SERVER_ERROR.into_response());
     }
-    record_file(&state.db, &target, &body)
-        .await
-        .map_err(|_| auth::error(StatusCode::INTERNAL_SERVER_ERROR, "rewrite_failed", "同步文件元数据更新失败"))?;
+    record_file(&state.db, &target, &body).await.map_err(|_| {
+        auth::error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "rewrite_failed",
+            "同步文件元数据更新失败",
+        )
+    })?;
     let row = sqlx::query("SELECT etag, version FROM dav_files WHERE user_id = $1 AND path = $2")
         .bind(user_id)
         .bind(&target.relative_path)
         .fetch_one(&state.db)
         .await
-        .map_err(|_| auth::error(StatusCode::INTERNAL_SERVER_ERROR, "rewrite_failed", "同步文件元数据读取失败"))?;
+        .map_err(|_| {
+            auth::error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "rewrite_failed",
+                "同步文件元数据读取失败",
+            )
+        })?;
     Ok((row.get("etag"), row.get("version")))
 }
 async fn read_file(target: &DavTarget, head_only: bool) -> Response {
@@ -681,9 +781,10 @@ async fn read_file(target: &DavTarget, head_only: bool) -> Response {
 async fn write_file(
     target: &DavTarget,
     request: Request,
-    db: &SqlitePool,
+    state: &AppState,
     owner_id: Option<uuid::Uuid>,
 ) -> Response {
+    let db = &state.db;
     if target
         .file_path
         .file_name()
@@ -710,20 +811,9 @@ async fn write_file(
         Err(_) => return auth::error(StatusCode::BAD_REQUEST, "invalid_body", "无法读取请求内容"),
     };
     let parsed = if is_versioned_file(target) {
-        if is_encrypted_sync_file(&body) {
-            None
-        } else {
-            match crate::bookmarks::parse_xbel(&body) {
-                Ok(parsed) => Some(parsed),
-                Err(error) => {
-                    tracing::warn!(?error, path = %target.relative_path, "reject invalid plaintext XBEL");
-                    return auth::error(
-                        StatusCode::UNPROCESSABLE_ENTITY,
-                        "invalid_xbel",
-                        "书签文件不是有效的 XBEL 或 Floccus 加密文件",
-                    );
-                }
-            }
+        match parse_sync_file_for_index(state, target.user_id, &body).await {
+            Ok(parsed) => parsed,
+            Err(response) => return response,
         }
     } else {
         None
@@ -758,11 +848,7 @@ async fn write_file(
             );
         }
     } else if is_versioned_file(target) {
-        if let Err(error) = sqlx::query("DELETE FROM bookmark_nodes WHERE user_id = $1")
-            .bind(target.user_id)
-            .execute(db)
-            .await
-        {
+        if let Err(error) = crate::floccus_secrets::clear_index(db, target.user_id).await {
             tracing::error!(?error, path = %target.relative_path, "clear encrypted bookmark index failed");
             return auth::error(
                 StatusCode::INTERNAL_SERVER_ERROR,
@@ -867,10 +953,9 @@ async fn acquire_lock(
             return StatusCode::INTERNAL_SERVER_ERROR.into_response();
         }
     }
-    let temp_path = target.file_path.with_file_name(format!(
-        ".bookmarks.xbel.lock-{}",
-        uuid::Uuid::new_v4()
-    ));
+    let temp_path = target
+        .file_path
+        .with_file_name(format!(".bookmarks.xbel.lock-{}", uuid::Uuid::new_v4()));
     let mut temp_file = match fs::OpenOptions::new()
         .write(true)
         .create_new(true)
@@ -897,7 +982,10 @@ async fn acquire_lock(
                     match fs::write(&target.file_path, marker.as_bytes()).await {
                         Ok(()) => StatusCode::NO_CONTENT.into_response(),
                         Err(error) => {
-                            tracing::error!(?error, "refresh concurrently acquired WebDAV lock failed");
+                            tracing::error!(
+                                ?error,
+                                "refresh concurrently acquired WebDAV lock failed"
+                            );
                             StatusCode::INTERNAL_SERVER_ERROR.into_response()
                         }
                     }
@@ -959,15 +1047,22 @@ async fn lock_owner_is_inactive(
 
 async fn delete_file(
     target: &DavTarget,
-    db: &SqlitePool,
+    state: &AppState,
     owner_id: Option<uuid::Uuid>,
 ) -> Response {
+    let db = &state.db;
     if let Err(response) = check_lock_owner(target, owner_id).await {
         return response;
     }
     match fs::remove_file(&target.file_path).await {
         Ok(()) => {
             remove_file_metadata(db, target).await;
+            if is_versioned_file(target) {
+                if let Err(error) = crate::floccus_secrets::clear_index(db, target.user_id).await {
+                    tracing::error!(?error, "clear bookmark index after WebDAV delete failed");
+                    return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+                }
+            }
             StatusCode::NO_CONTENT.into_response()
         }
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
@@ -983,9 +1078,10 @@ async fn delete_file(
 async fn move_file(
     source: &DavTarget,
     request: Request,
-    db: &SqlitePool,
+    state: &AppState,
     owner_id: Option<uuid::Uuid>,
 ) -> Response {
+    let db = &state.db;
     if let Err(response) = check_lock_owner(source, owner_id).await {
         return response;
     }
@@ -1057,21 +1153,22 @@ async fn move_file(
                     tracing::error!(?error, path = %target.relative_path, "record WebDAV MOVE metadata failed");
                 }
                 if is_versioned_file(&target) {
-                    match crate::bookmarks::parse_xbel(&body) {
-                        Ok(parsed) => {
-                            if let Err(error) = crate::bookmarks::replace_index(db, target.user_id, &parsed).await {
+                    match parse_sync_file_for_index(state, target.user_id, &body).await {
+                        Ok(Some(parsed)) => {
+                            if let Err(error) =
+                                crate::bookmarks::replace_index(db, target.user_id, &parsed).await
+                            {
                                 tracing::error!(?error, path = %target.relative_path, "index moved plaintext bookmarks failed");
                             }
                         }
-                        Err(_) => {
-                            if let Err(error) = sqlx::query("DELETE FROM bookmark_nodes WHERE user_id = $1")
-                                .bind(target.user_id)
-                                .execute(db)
-                                .await
+                        Ok(None) => {
+                            if let Err(error) =
+                                crate::floccus_secrets::clear_index(db, target.user_id).await
                             {
                                 tracing::error!(?error, path = %target.relative_path, "clear encrypted bookmark index failed");
                             }
                         }
+                        Err(response) => return response,
                     }
                 }
             }
@@ -1091,11 +1188,39 @@ async fn move_file(
     }
 }
 
-async fn record_file(
-    db: &SqlitePool,
-    target: &DavTarget,
+async fn parse_sync_file_for_index(
+    state: &AppState,
+    user_id: uuid::Uuid,
     body: &[u8],
-) -> Result<(), sqlx::Error> {
+) -> Result<Option<crate::bookmarks::XbelDocument>, Response> {
+    match crate::floccus_secrets::parse_sync_file(state, user_id, body).await {
+        Ok(parsed) => Ok(parsed),
+        Err(crate::floccus_secrets::SyncFileError::Crypto(
+            crate::floccus_crypto::CryptoError::AuthenticationFailed,
+        )) if is_encrypted_sync_file(body) => Ok(None),
+        Err(crate::floccus_secrets::SyncFileError::Crypto(
+            crate::floccus_crypto::CryptoError::InvalidPayload,
+        )) if is_encrypted_sync_file(body) => Ok(None),
+        Err(crate::floccus_secrets::SyncFileError::Database(error)) => {
+            tracing::error!(?error, "load protected Floccus passphrase failed");
+            Err(auth::error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "bookmark_index_failed",
+                "书签加密状态读取失败",
+            ))
+        }
+        Err(error) => {
+            tracing::warn!(?error, "reject invalid XBEL or Floccus payload");
+            Err(auth::error(
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "invalid_xbel",
+                "书签文件不是有效的 XBEL 或 Floccus 加密文件",
+            ))
+        }
+    }
+}
+
+async fn record_file(db: &SqlitePool, target: &DavTarget, body: &[u8]) -> Result<(), sqlx::Error> {
     let mut digest = Sha256::new();
     digest.update(body);
     let etag = format!("\"{:x}\"", digest.finalize());
@@ -1452,17 +1577,19 @@ fn xml_escape(value: &str) -> String {
 mod tests {
     use super::{
         acquire_lock, check_lock_owner, normalize_destination, read_file, record_file,
-        reset_sync_baseline_for_target, write_file, xml_escape, DavResource, DavTarget,
-        ResetSyncBaselineError,
+        reset_sync_baseline_for_target, rewrite_bookmark_file, write_file, xml_escape, DavResource,
+        DavTarget, ResetSyncBaselineError,
     };
+    use crate::state::{AppState, AuthRateLimiter};
+    use axum::response::IntoResponse;
     use axum::{
         body::Body,
         http::{Request, StatusCode},
     };
-    use axum::response::IntoResponse;
     use sqlx::{sqlite::SqlitePoolOptions, Row};
     use std::fs;
     use std::path::Path;
+    use std::sync::Arc;
     use uuid::Uuid;
 
     async fn test_db() -> sqlx::SqlitePool {
@@ -1487,6 +1614,16 @@ mod tests {
         .execute(db)
         .await
         .expect("test user");
+    }
+
+    fn test_state(db: sqlx::SqlitePool, data_root: std::path::PathBuf) -> AppState {
+        AppState {
+            db,
+            data_dir: data_root,
+            version: "test".into(),
+            auth_rate_limiter: Arc::new(AuthRateLimiter::default()),
+            master_key: Arc::new(crate::floccus_crypto::MasterKey::for_tests()),
+        }
     }
 
     #[test]
@@ -1582,11 +1719,17 @@ mod tests {
         let owner = Uuid::new_v4();
 
         assert_eq!(
-            acquire_lock(&target, owner, None).await.into_response().status(),
+            acquire_lock(&target, owner, None)
+                .await
+                .into_response()
+                .status(),
             StatusCode::CREATED
         );
         assert_eq!(
-            acquire_lock(&target, owner, None).await.into_response().status(),
+            acquire_lock(&target, owner, None)
+                .await
+                .into_response()
+                .status(),
             StatusCode::NO_CONTENT
         );
         assert_eq!(
@@ -1631,7 +1774,10 @@ mod tests {
             fs::read_dir(&user_directory)
                 .expect("read lock directory")
                 .filter_map(Result::ok)
-                .filter(|entry| entry.file_name().to_string_lossy().starts_with(".bookmarks.xbel.lock-"))
+                .filter(|entry| entry
+                    .file_name()
+                    .to_string_lossy()
+                    .starts_with(".bookmarks.xbel.lock-"))
                 .count(),
             0
         );
@@ -1674,7 +1820,9 @@ mod tests {
         .expect("write revoked lock");
 
         assert_eq!(
-            acquire_lock(&target, active_owner, Some(&db)).await.status(),
+            acquire_lock(&target, active_owner, Some(&db))
+                .await
+                .status(),
             StatusCode::CREATED
         );
         assert_eq!(
@@ -1721,7 +1869,10 @@ mod tests {
             reset_sync_baseline_for_target(&db, &target).await,
             Err(ResetSyncBaselineError::Locked)
         ));
-        assert_eq!(fs::read(&target.file_path).expect("baseline remains"), original);
+        assert_eq!(
+            fs::read(&target.file_path).expect("baseline remains"),
+            original
+        );
         assert!(user_directory.join("bookmarks.xbel.lock").exists());
 
         fs::remove_dir_all(data_root).expect("remove reset directory");
@@ -1741,7 +1892,8 @@ mod tests {
             file_path: user_directory.join("bookmarks.xbel"),
             data_root: data_root.clone(),
         };
-        let old_body = br#"<xbel><bookmark href="https://old.example"><title>Old</title></bookmark></xbel>"#;
+        let old_body =
+            br#"<xbel><bookmark href="https://old.example"><title>Old</title></bookmark></xbel>"#;
         fs::write(&target.file_path, old_body).expect("write old baseline");
         record_file(&db, &target, old_body)
             .await
@@ -1764,7 +1916,10 @@ mod tests {
         assert!(reset.reset);
         assert!(reset.backup_created);
         assert!(!target.file_path.exists());
-        assert_eq!(read_file(&target, false).await.status(), StatusCode::NOT_FOUND);
+        assert_eq!(
+            read_file(&target, false).await.status(),
+            StatusCode::NOT_FOUND
+        );
         assert_eq!(
             sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM bookmark_nodes WHERE user_id = $1")
                 .bind(user_id)
@@ -1774,11 +1929,13 @@ mod tests {
             0
         );
         assert_eq!(
-            sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM bookmark_sync_state WHERE user_id = $1")
-                .bind(user_id)
-                .fetch_one(&db)
-                .await
-                .expect("sync state count"),
+            sqlx::query_scalar::<_, i64>(
+                "SELECT COUNT(*) FROM bookmark_sync_state WHERE user_id = $1"
+            )
+            .bind(user_id)
+            .fetch_one(&db)
+            .await
+            .expect("sync state count"),
             0
         );
         let version = sqlx::query(
@@ -1801,13 +1958,14 @@ mod tests {
         assert!(!user_directory.join("bookmarks.xbel.lock").exists());
 
         let new_body = br#"<xbel><!--- highestId :1: for Floccus bookmark sync browser extension --><bookmark href="https://new.example" id="1"><title>New</title></bookmark></xbel>"#;
+        let state = test_state(db.clone(), data_root.clone());
         let response = write_file(
             &target,
             Request::builder()
                 .method("PUT")
                 .body(Body::from(new_body.as_slice()))
                 .expect("upload request"),
-            &db,
+            &state,
             None,
         )
         .await;
@@ -1823,5 +1981,61 @@ mod tests {
         );
 
         fs::remove_dir_all(data_root).expect("remove reset directory");
+    }
+
+    #[tokio::test]
+    async fn encrypted_upload_is_indexed_and_admin_rewrite_stays_encrypted() {
+        let db = test_db().await;
+        let user_id = Uuid::new_v4();
+        create_test_user(&db, user_id).await;
+        let data_root = std::env::temp_dir().join(format!("bookmark-vault-encrypted-{user_id}"));
+        let user_directory = data_root.join(user_id.to_string());
+        fs::create_dir_all(&user_directory).expect("create encrypted test directory");
+        let state = test_state(db.clone(), data_root.clone());
+        crate::floccus_secrets::save_passphrase(&state, user_id, "floccus passphrase")
+            .await
+            .expect("save protected passphrase");
+        let plaintext = br#"<?xml version="1.0" encoding="UTF-8"?><xbel version="1.0"><!--- highestId :1: for Floccus bookmark sync browser extension --><bookmark href="https://example.com" id="1"><title>Encrypted bookmark</title></bookmark></xbel>"#;
+        let encrypted = crate::floccus_crypto::encrypt_floccus(plaintext, "floccus passphrase")
+            .expect("encrypt test XBEL");
+        let target = DavTarget {
+            user_id,
+            relative_path: "alice/bookmarks.xbel".to_owned(),
+            file_path: user_directory.join("bookmarks.xbel"),
+            data_root: data_root.clone(),
+        };
+
+        let response = write_file(
+            &target,
+            Request::builder()
+                .method("PUT")
+                .body(Body::from(encrypted))
+                .expect("encrypted upload request"),
+            &state,
+            None,
+        )
+        .await;
+        assert_eq!(response.status(), StatusCode::CREATED);
+        assert_eq!(
+            sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM bookmark_nodes WHERE user_id = $1")
+                .bind(user_id)
+                .fetch_one(&db)
+                .await
+                .expect("encrypted index count"),
+            1
+        );
+
+        rewrite_bookmark_file(&state, user_id, "alice")
+            .await
+            .expect("encrypted admin rewrite");
+        let rewritten = fs::read(&target.file_path).expect("read rewritten encrypted file");
+        assert!(crate::floccus_crypto::is_floccus_encrypted(&rewritten));
+        let decrypted = crate::floccus_crypto::decrypt_floccus(&rewritten, "floccus passphrase")
+            .expect("decrypt rewritten file");
+        let parsed = crate::bookmarks::parse_xbel(&decrypted).expect("rewritten XBEL parses");
+        assert_eq!(parsed.nodes.len(), 1);
+        assert_eq!(parsed.nodes[0].floccus_id, Some(1));
+
+        fs::remove_dir_all(data_root).expect("remove encrypted test directory");
     }
 }

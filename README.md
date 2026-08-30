@@ -58,4 +58,6 @@ cargo run
 
 ## 安全边界
 
-Floccus 的 passphrase 由客户端管理，服务端不保存。生产环境必须启用 HTTPS，并为每个浏览器使用独立应用密码。
+默认情况下 Floccus 的 passphrase 只由客户端管理。若要在管理后台整理加密书签，可输入同一个 passphrase 解锁；服务端会用独立主密钥加密保存它，并在内存中解密 XBEL 后重新以 Floccus 兼容格式写回。启用该功能后不再是零知识加密，拥有数据库、同步文件和服务器主密钥的管理员能够解密书签。
+
+服务器主密钥优先从 `BOOKMARK_VAULT_MASTER_KEY` 读取（32 字节标准 Base64）。未配置时会在 `data/server-master.key` 自动生成；部署和备份时必须将该文件与 SQLite 数据库一起保护和备份。主密钥丢失后，可在后台重新输入 Floccus passphrase 恢复管理能力。生产环境必须启用 HTTPS，并为每个浏览器使用独立应用密码。

@@ -210,7 +210,7 @@ async fn create_impl(
         return auth::error(
             StatusCode::CONFLICT,
             "trash_unavailable",
-            "当前同步文件不是可编辑的明文 XBEL",
+            "当前同步文件尚未解锁或缺少完整的 Floccus 身份",
         );
     }
     if let Err(response) = webdav::ensure_bookmark_editable(
@@ -333,7 +333,7 @@ pub async fn restore(
         return auth::error(
             StatusCode::CONFLICT,
             "trash_unavailable",
-            "当前同步文件不是可编辑的明文 XBEL",
+            "当前同步文件尚未解锁或缺少完整的 Floccus 身份",
         );
     }
     if let Err(response) = webdav::ensure_bookmark_editable(

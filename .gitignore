@@ -11,3 +11,4 @@ coverage/
 .ai/
 *.log
 /data
+floccus-*.map.tmp

@@ -60,6 +60,9 @@ export function CategoryManagementPage({ token, onOpenFloccus }: Props) {
   const [treeConnectionLayer, setTreeConnectionLayer] = useState<TreeConnectionLayerState>({ width: 0, height: 0, connections: [] })
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const [passphrase, setPassphrase] = useState('')
+  const [unlocking, setUnlocking] = useState(false)
+  const [encryption, setEncryption] = useState<api.EncryptionStatus | null>(null)
   const treeCanvasRef = useRef<HTMLDivElement>(null)
   const treeContentRef = useRef<HTMLDivElement>(null)
   const folderExpandTimerRef = useRef<number | null>(null)
@@ -87,6 +90,30 @@ export function CategoryManagementPage({ token, onOpenFloccus }: Props) {
   }, [token])
 
   useEffect(() => { void load() }, [load])
+
+  useEffect(() => {
+    if (tree?.status === 'encrypted' || tree?.status === 'ready') {
+      api.getEncryptionStatus(token).then(setEncryption).catch(() => setEncryption(null))
+    }
+  }, [token, tree?.status])
+
+  async function unlockEncryptedBookmarks() {
+    if (!passphrase || unlocking) return
+    setUnlocking(true)
+    setError('')
+    setNotice('')
+    try {
+      await api.unlockFloccusEncryption(token, passphrase)
+      setPassphrase('')
+      setNotice('加密书签已解锁，可以在分类树中整理并写回 Floccus')
+      setEncryption(await api.getEncryptionStatus(token))
+      await load()
+    } catch (requestError) {
+      setError(readableError(requestError, '加密书签解锁失败'))
+    } finally {
+      setUnlocking(false)
+    }
+  }
 
   async function resetSyncBaseline() {
     if (resettingBaseline) return
@@ -454,7 +481,7 @@ export function CategoryManagementPage({ token, onOpenFloccus }: Props) {
   return <div className="category-management-page">
     {error && tree && <div aria-live="polite" className="bookmark-alert error"><strong>操作失败</strong><span>{error}</span></div>}
     {notice && <div aria-live="polite" className="bookmark-alert success"><strong>已完成</strong><span>{notice}</span></div>}
-    {loading ? <section className="panel category-state"><LoaderCircle className="spin" size={30} /><strong>正在加载书签组织结构…</strong><p>正在读取最新的文件夹和书签索引。</p></section> : error && !tree ? <section className="panel category-state"><RefreshCw size={30} /><strong>书签服务暂时无法连接</strong><p>{error}</p><button className="primary-button" onClick={() => void load(true)} type="button"><RefreshCw size={15} /> 重新连接</button></section> : tree?.status === 'encrypted' ? <section className="panel category-state"><Sparkles size={30} /><strong>同步文件已加密，暂时无法建立分类树</strong><p>远端当前是 Floccus 加密文件。直接关闭加密后再同步会把密文当成 XBEL 读取并触发 E034。若要切换为明文，请先取消同步并备份移除远端加密基线，再在 Floccus 关闭加密并执行一次“向上推一次”。</p><div className="bookmark-encrypted-actions bookmark-recovery-actions"><button className="danger-button" disabled={resettingBaseline} onClick={() => void resetSyncBaseline()} type="button">{resettingBaseline ? '正在安全备份…' : '备份并切换为明文同步'}</button><button className="toolbar-button" disabled={resettingBaseline || refreshing} onClick={() => void load(true)} type="button">{refreshing ? '正在检查…' : '我已推送，重新检查'}</button></div><small className="bookmark-recovery-hint">此操作不会删除浏览器本地书签；旧密文会保留在后台历史版本中。</small></section> : tree?.status === 'migrationRequired' ? <section className="panel category-state"><FolderOpen size={30} /><strong>需要由浏览器重新建立同步身份</strong><p>当前 XBEL 缺少 Floccus 节点 ID，直接推送会先对旧树执行耗时的完整比较。请先取消当前同步，再让后台备份并移除旧基线；浏览器本地书签不会被删除。</p><div className="bookmark-encrypted-actions bookmark-recovery-actions"><button className="danger-button" disabled={resettingBaseline} onClick={() => void resetSyncBaseline()} type="button">{resettingBaseline ? '正在安全备份…' : '备份并快速重建同步文件'}</button><button className="toolbar-button" disabled={resettingBaseline || refreshing} onClick={() => void load(true)} type="button">{refreshing ? '正在检查…' : '我已推送，重新检查'}</button></div><small className="bookmark-recovery-hint">重建完成后，只需在 Floccus 执行一次“向上推一次”，无需删除配置。</small></section> : tree?.status !== 'ready' ? <section className="panel category-state"><FolderOpen size={30} /><strong>还没有可用的书签索引</strong><p>完成一次明文 XBEL 同步后，这里会显示从总目录衍生的文件夹组织树。</p><button className="primary-button" onClick={onOpenFloccus} type="button">前往同步配置</button></section> : <div className="category-workspace">
+    {loading ? <section className="panel category-state"><LoaderCircle className="spin" size={30} /><strong>正在加载书签组织结构…</strong><p>正在读取最新的文件夹和书签索引。</p></section> : error && !tree ? <section className="panel category-state"><RefreshCw size={30} /><strong>书签服务暂时无法连接</strong><p>{error}</p><button className="primary-button" onClick={() => void load(true)} type="button"><RefreshCw size={15} /> 重新连接</button></section> : tree?.status === 'encrypted' ? <section className="panel category-state"><Sparkles size={30} /><strong>{encryption?.passphraseStored ? '保存的 passphrase 无法解密当前文件' : '输入 Floccus passphrase 建立分类树'}</strong><p>使用 Floccus 账户里相同的 passphrase。验证成功后，后台可以移动文件夹、批量归类和删除书签，并继续写回 Floccus 加密格式。</p><div className="bookmark-encryption-warning">启用后不再是零知识模式：服务器管理员可使用主密钥解密书签。passphrase 只以加密信封保存。</div><div className="bookmark-unlock-form"><input aria-label="Floccus passphrase" autoComplete="current-password" onChange={(event) => setPassphrase(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') void unlockEncryptedBookmarks() }} placeholder="Floccus passphrase" type="password" value={passphrase} /><button className="primary-button compact" disabled={!passphrase || unlocking} onClick={() => void unlockEncryptedBookmarks()} type="button">{unlocking ? '验证中…' : '验证并解锁'}</button></div><div className="bookmark-encrypted-actions"><button className="toolbar-button" onClick={onOpenFloccus} type="button">查看 Floccus 配置</button><button className="toolbar-button" disabled={refreshing} onClick={() => void load(true)} type="button">{refreshing ? '正在检查…' : '刷新状态'}</button></div></section> : tree?.status === 'migrationRequired' ? <section className="panel category-state"><FolderOpen size={30} /><strong>需要由浏览器重新建立同步身份</strong><p>当前 XBEL 缺少 Floccus 节点 ID，直接推送会先对旧树执行耗时的完整比较。请先取消当前同步，再让后台备份并移除旧基线；浏览器本地书签不会被删除。</p><div className="bookmark-encrypted-actions bookmark-recovery-actions"><button className="danger-button" disabled={resettingBaseline} onClick={() => void resetSyncBaseline()} type="button">{resettingBaseline ? '正在安全备份…' : '备份并快速重建同步文件'}</button><button className="toolbar-button" disabled={resettingBaseline || refreshing} onClick={() => void load(true)} type="button">{refreshing ? '正在检查…' : '我已推送，重新检查'}</button></div><small className="bookmark-recovery-hint">重建完成后，只需在 Floccus 执行一次“向上推一次”，无需删除配置。</small></section> : tree?.status !== 'ready' ? <section className="panel category-state"><FolderOpen size={30} /><strong>还没有可用的书签索引</strong><p>完成一次 Floccus XBEL 同步后，这里会显示从总目录衍生的文件夹组织树。</p><button className="primary-button" onClick={onOpenFloccus} type="button">前往同步配置</button></section> : <div className="category-workspace">
       <section className="panel category-bookmarks-panel category-layout-bookmarks">
         <div className="category-panel-title">
           <div><p className="eyebrow">BOOKMARKS TO ORGANIZE</p><h3>{selectedFolder ? selectedFolder.title : '全部书签'}</h3></div>

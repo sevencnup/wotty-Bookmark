@@ -1,3 +1,4 @@
+use crate::floccus_crypto::MasterKey;
 use sqlx::SqlitePool;
 use std::{
     collections::HashMap,
@@ -12,6 +13,7 @@ pub struct AppState {
     pub data_dir: PathBuf,
     pub version: Arc<str>,
     pub auth_rate_limiter: Arc<AuthRateLimiter>,
+    pub master_key: Arc<MasterKey>,
 }
 
 #[derive(Default)]

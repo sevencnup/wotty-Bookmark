@@ -118,6 +118,13 @@ export class ApiRequestError extends Error {
   }
 }
 
+export type EncryptionStatus = {
+  encryptedFile: boolean
+  passphraseStored: boolean
+  unlocked: boolean
+  zeroKnowledge: boolean
+}
+
 export type ResetSyncBaselineResult = {
   reset: boolean
   backupCreated: boolean
@@ -201,6 +208,21 @@ export function revokeAppPassword(token: string, id: string) {
 
 export function getStorageStatus(token: string) {
   return request<StorageStatus>('/api/v1/storage/status', {}, token)
+}
+
+export function getEncryptionStatus(token: string) {
+  return request<EncryptionStatus>('/api/v1/storage/encryption', {}, token)
+}
+
+export function unlockFloccusEncryption(token: string, passphrase: string) {
+  return request<{ unlocked: boolean }>('/api/v1/storage/encryption/unlock', {
+    method: 'POST',
+    body: JSON.stringify({ passphrase }),
+  }, token)
+}
+
+export function forgetFloccusPassphrase(token: string) {
+  return request<void>('/api/v1/storage/encryption/passphrase', { method: 'DELETE' }, token)
 }
 
 export function getHealth() {
