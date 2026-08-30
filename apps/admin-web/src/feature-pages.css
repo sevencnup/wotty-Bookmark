@@ -15,6 +15,7 @@
 .feature-empty { color: var(--soft-muted); }
 .feature-empty h3 { margin-top: 10px; }
 .feature-empty .ghost-button, .capability-state .primary-button { margin-top: 18px; }
+.feature-empty .inline-actions .toolbar-button.compact { min-height: 36px; padding: 0 16px; font-size: 13px; }
 .compact-loading, .compact-empty { min-height: 160px; }
 .spin { animation: spin 0.9s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
