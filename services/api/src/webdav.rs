@@ -243,7 +243,7 @@ async fn reset_sync_baseline_for_target(
         file_path: target.file_path.with_file_name("bookmarks.xbel.lock"),
         data_root: target.data_root.clone(),
     };
-    let lock_response = acquire_lock(&lock_target, owner_id).await;
+    let lock_response = acquire_lock(&lock_target, owner_id, Some(db)).await;
     if lock_response.status() == StatusCode::LOCKED {
         return Err(ResetSyncBaselineError::Locked);
     }
@@ -693,7 +693,7 @@ async fn write_file(
         let Some(owner_id) = owner_id else {
             return auth::unauthorized_basic();
         };
-        return acquire_lock(target, owner_id).await;
+        return acquire_lock(target, owner_id, Some(db)).await;
     }
     if let Err(response) = check_lock_owner(target, owner_id).await {
         return response;
@@ -818,29 +818,46 @@ async fn check_lock_owner(
     }
 }
 
-async fn acquire_lock(target: &DavTarget, owner_id: uuid::Uuid) -> Response {
+async fn acquire_lock(
+    target: &DavTarget,
+    owner_id: uuid::Uuid,
+    db: Option<&SqlitePool>,
+) -> Response {
     let marker = format!("bookmark-vault-lock:{owner_id}");
     if let Ok(metadata) = fs::metadata(&target.file_path).await {
         if let Ok(modified) = metadata.modified() {
             if modified.elapsed().unwrap_or_default() > LOCK_TIMEOUT {
                 let _ = fs::remove_file(&target.file_path).await;
             } else {
-                return match fs::read(&target.file_path).await {
+                match fs::read(&target.file_path).await {
                     Ok(contents) if contents == marker.as_bytes() => {
                         match fs::write(&target.file_path, marker.as_bytes()).await {
-                            Ok(()) => StatusCode::NO_CONTENT.into_response(),
+                            Ok(()) => return StatusCode::NO_CONTENT.into_response(),
                             Err(error) => {
                                 tracing::error!(?error, "refresh WebDAV lock failed");
-                                StatusCode::INTERNAL_SERVER_ERROR.into_response()
+                                return StatusCode::INTERNAL_SERVER_ERROR.into_response();
                             }
                         }
                     }
-                    Ok(_) => StatusCode::LOCKED.into_response(),
+                    Ok(contents) => {
+                        if lock_owner_is_inactive(db, target.user_id, &contents).await {
+                            match fs::remove_file(&target.file_path).await {
+                                Ok(()) => {}
+                                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                                Err(error) => {
+                                    tracing::error!(?error, "remove revoked WebDAV lock failed");
+                                    return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+                                }
+                            }
+                        } else {
+                            return StatusCode::LOCKED.into_response();
+                        }
+                    }
                     Err(error) => {
                         tracing::error!(?error, "read existing WebDAV lock failed");
-                        StatusCode::INTERNAL_SERVER_ERROR.into_response()
+                        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
                     }
-                };
+                }
             }
         }
     }
@@ -903,6 +920,41 @@ async fn acquire_lock(target: &DavTarget, owner_id: uuid::Uuid) -> Response {
         }
     }
     result
+}
+
+async fn lock_owner_is_inactive(
+    db: Option<&SqlitePool>,
+    user_id: uuid::Uuid,
+    contents: &[u8],
+) -> bool {
+    let Some(db) = db else {
+        return false;
+    };
+    let Ok(marker) = std::str::from_utf8(contents) else {
+        return false;
+    };
+    let Some(owner_id) = marker.strip_prefix("bookmark-vault-lock:") else {
+        return false;
+    };
+    let Ok(owner_id) = owner_id.parse::<uuid::Uuid>() else {
+        return false;
+    };
+    match sqlx::query_scalar::<_, i64>(
+        "SELECT COUNT(*) FROM app_passwords
+         WHERE id = $1 AND user_id = $2 AND revoked_at IS NULL
+           AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP)",
+    )
+    .bind(owner_id)
+    .bind(user_id)
+    .fetch_one(db)
+    .await
+    {
+        Ok(count) => count == 0,
+        Err(error) => {
+            tracing::error!(?error, "inspect WebDAV lock owner failed");
+            false
+        }
+    }
 }
 
 async fn delete_file(
@@ -1530,15 +1582,15 @@ mod tests {
         let owner = Uuid::new_v4();
 
         assert_eq!(
-            acquire_lock(&target, owner).await.into_response().status(),
+            acquire_lock(&target, owner, None).await.into_response().status(),
             StatusCode::CREATED
         );
         assert_eq!(
-            acquire_lock(&target, owner).await.into_response().status(),
+            acquire_lock(&target, owner, None).await.into_response().status(),
             StatusCode::NO_CONTENT
         );
         assert_eq!(
-            acquire_lock(&target, Uuid::new_v4())
+            acquire_lock(&target, Uuid::new_v4(), None)
                 .await
                 .into_response()
                 .status(),
@@ -1565,8 +1617,8 @@ mod tests {
         let first_target = target.clone();
         let second_target = target.clone();
         let (first, second) = tokio::join!(
-            acquire_lock(&first_target, owner),
-            acquire_lock(&second_target, owner),
+            acquire_lock(&first_target, owner, None),
+            acquire_lock(&second_target, owner, None),
         );
         let mut statuses = [first.status(), second.status()];
         statuses.sort_by_key(|status| status.as_u16());
@@ -1588,6 +1640,52 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn revoked_app_password_lock_is_replaced_immediately() {
+        let db = test_db().await;
+        let user_id = Uuid::new_v4();
+        create_test_user(&db, user_id).await;
+        let revoked_owner = Uuid::new_v4();
+        let active_owner = Uuid::new_v4();
+        for (id, revoked) in [(revoked_owner, true), (active_owner, false)] {
+            sqlx::query(
+                "INSERT INTO app_passwords (id, user_id, name, secret_hash, revoked_at)
+                 VALUES ($1, $2, 'Floccus', 'hash', CASE WHEN $3 THEN CURRENT_TIMESTAMP ELSE NULL END)",
+            )
+            .bind(id)
+            .bind(user_id)
+            .bind(revoked)
+            .execute(&db)
+            .await
+            .expect("test app password");
+        }
+        let data_root = std::env::temp_dir().join(format!("bookmark-vault-revoked-lock-{user_id}"));
+        let user_directory = data_root.join(user_id.to_string());
+        fs::create_dir_all(&user_directory).expect("create test WebDAV directory");
+        let target = DavTarget {
+            user_id,
+            relative_path: "alice/bookmarks.xbel.lock".to_owned(),
+            file_path: user_directory.join("bookmarks.xbel.lock"),
+            data_root: data_root.clone(),
+        };
+        fs::write(
+            &target.file_path,
+            format!("bookmark-vault-lock:{revoked_owner}"),
+        )
+        .expect("write revoked lock");
+
+        assert_eq!(
+            acquire_lock(&target, active_owner, Some(&db)).await.status(),
+            StatusCode::CREATED
+        );
+        assert_eq!(
+            fs::read(&target.file_path).expect("read replacement lock"),
+            format!("bookmark-vault-lock:{active_owner}").as_bytes()
+        );
+
+        fs::remove_dir_all(data_root).expect("remove test WebDAV directory");
+    }
+
+    #[tokio::test]
     async fn active_floccus_lock_blocks_fast_baseline_reset() {
         let db = test_db().await;
         let user_id = Uuid::new_v4();
@@ -1603,9 +1701,19 @@ mod tests {
         };
         let original = b"<xbel></xbel>";
         fs::write(&target.file_path, original).expect("write baseline");
+        let active_owner = Uuid::new_v4();
+        sqlx::query(
+            "INSERT INTO app_passwords (id, user_id, name, secret_hash)
+             VALUES ($1, $2, 'Active Floccus', 'hash')",
+        )
+        .bind(active_owner)
+        .bind(user_id)
+        .execute(&db)
+        .await
+        .expect("active test app password");
         fs::write(
             user_directory.join("bookmarks.xbel.lock"),
-            format!("bookmark-vault-lock:{}", Uuid::new_v4()),
+            format!("bookmark-vault-lock:{active_owner}"),
         )
         .expect("write active lock");
 
