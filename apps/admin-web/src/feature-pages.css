@@ -14,7 +14,8 @@
 .feature-loading p, .feature-empty p, .capability-state p { max-width: 640px; margin: 0; color: var(--muted); font-size: 13px; line-height: 1.65; }
 .feature-empty { color: var(--soft-muted); }
 .feature-empty h3 { margin-top: 10px; }
-.feature-empty .ghost-button, .capability-state .primary-button { margin-top: 18px; }
+.feature-empty .inline-actions, .capability-state .inline-actions { margin-top: 18px; }
+.feature-empty .ghost-button, .capability-state .primary-button { margin-top: 0; }
 .feature-empty .inline-actions .toolbar-button.compact { min-height: 36px; padding: 0 16px; font-size: 13px; }
 .compact-loading, .compact-empty { min-height: 160px; }
 .spin { animation: spin 0.9s linear infinite; }
