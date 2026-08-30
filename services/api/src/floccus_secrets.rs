@@ -280,12 +280,43 @@ pub async fn unlock(
                 "文件已解密，但缺少完整的 Floccus 节点身份；请先完成一次浏览器同步",
             )
         }
-        Err(_) => {
+        Err(SyncFileError::Crypto(CryptoError::AuthenticationFailed)) => {
             return auth::error(
                 StatusCode::UNPROCESSABLE_ENTITY,
                 "invalid_passphrase",
-                "passphrase 不正确，或同步文件已损坏",
+                "无法解密：请输入 Floccus 配置中的加密 Passphrase，不是 WebDAV 应用密码",
             )
+        }
+        Err(SyncFileError::Crypto(CryptoError::InvalidPayload)) => {
+            return auth::error(
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "encrypted_file_invalid",
+                "同步文件的 Floccus 加密结构不完整或已损坏",
+            )
+        }
+        Err(SyncFileError::Xbel(_)) => {
+            return auth::error(
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "decrypted_xbel_invalid",
+                "Passphrase 已通过验证，但解密后的 XBEL 无法建立书签索引",
+            )
+        }
+        Err(SyncFileError::Database(error)) => {
+            tracing::error!(?error, "unlock Floccus file database operation failed");
+            return auth::error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "unlock_failed",
+                "加密书签解锁失败",
+            );
+        }
+        Err(SyncFileError::Crypto(error @ CryptoError::InvalidConfiguration(_)))
+        | Err(SyncFileError::Crypto(error @ CryptoError::Io(_))) => {
+            tracing::error!(?error, "unlock Floccus file crypto configuration failed");
+            return auth::error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "unlock_failed",
+                "服务器加密配置不可用，请检查主密钥文件",
+            );
         }
     };
     if let Err(error) = save_passphrase(&state, user.id, &payload.passphrase).await {
@@ -346,3 +377,24 @@ pub async fn forget_passphrase(State(state): State<AppState>, headers: HeaderMap
 
 #[allow(dead_code)]
 fn _assert_master_key_is_send_sync(_: &MasterKey) {}
+
+#[cfg(test)]
+mod tests {
+    use super::{parse_sync_file_with_passphrase, SyncFileError};
+    use crate::floccus_crypto::{encrypt_floccus, CryptoError};
+
+    #[tokio::test]
+    async fn distinguishes_wrong_passphrase_from_invalid_decrypted_xbel() {
+        let encrypted = encrypt_floccus(b"not an XBEL document", "correct passphrase")
+            .expect("encrypt diagnostic payload");
+
+        assert!(matches!(
+            parse_sync_file_with_passphrase(&encrypted, "wrong passphrase").await,
+            Err(SyncFileError::Crypto(CryptoError::AuthenticationFailed))
+        ));
+        assert!(matches!(
+            parse_sync_file_with_passphrase(&encrypted, "correct passphrase").await,
+            Err(SyncFileError::Xbel(_))
+        ));
+    }
+}

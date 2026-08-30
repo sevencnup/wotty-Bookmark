@@ -511,6 +511,7 @@ function BookmarkOrganizer({ token, onOpenFloccus, mode = 'organizer' }: { token
   const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null)
   const [passphrase, setPassphrase] = useState('')
   const [unlocking, setUnlocking] = useState(false)
+  const [resettingBaseline, setResettingBaseline] = useState(false)
   const [encryption, setEncryption] = useState<api.EncryptionStatus | null>(null)
 
   async function loadBookmarks(showLoading = false) {
@@ -567,6 +568,25 @@ function BookmarkOrganizer({ token, onOpenFloccus, mode = 'organizer' }: { token
       setError(requestError instanceof Error ? requestError.message : '移除 passphrase 失败')
     } finally {
       setUnlocking(false)
+    }
+  }
+
+  async function resetEncryptedBaseline() {
+    if (resettingBaseline) return
+    const confirmed = window.confirm('仅当浏览器本地书签仍完整、但旧 Floccus 加密 Passphrase 已忘记时继续。请先取消同步。旧密文会保留到历史版本，远端基线和服务器旧口令会被移除。继续吗？')
+    if (!confirmed) return
+    setResettingBaseline(true)
+    setError('')
+    setNotice('')
+    try {
+      const result = await api.resetSyncBaseline(token)
+      setPassphrase('')
+      setNotice(result.backupCreated ? '旧密文已保存到历史版本。请在 Floccus 设置新的 Passphrase，再执行一次“向上推一次”。' : '远端基线已清空。请在 Floccus 设置 Passphrase，再执行一次“向上推一次”。')
+      await loadBookmarks()
+    } catch (requestError) {
+      setError(requestError instanceof api.ApiRequestError && requestError.status === 423 ? 'Floccus 仍在同步，请先取消并等待停止后重试。' : requestError instanceof Error ? requestError.message : '同步基线重建失败')
+    } finally {
+      setResettingBaseline(false)
     }
   }
 
@@ -687,11 +707,12 @@ function BookmarkOrganizer({ token, onOpenFloccus, mode = 'organizer' }: { token
       ) : tree?.status === 'encrypted' ? (
         <section className="panel bookmark-encrypted-state">
           <span className="bookmark-encrypted-icon">◆</span>
-          <strong>{encryption?.passphraseStored ? '保存的 passphrase 已失效' : '输入 Floccus passphrase 解锁后台管理'}</strong>
-          <p>请输入 Floccus 账户中设置的同一个 passphrase。服务器会先验证当前文件，再使用服务器主密钥加密保存；之后后台移动、删除和恢复都会重新生成 Floccus 可读取的加密文件。</p>
-          <div className="bookmark-encryption-warning">启用后不再是零知识加密：拥有服务器主密钥和数据库的管理员可以解密书签。passphrase 不会显示在页面或写入日志。</div>
-          <div className="bookmark-unlock-form"><input aria-label="Floccus passphrase" autoComplete="current-password" onChange={(event) => setPassphrase(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') void unlockEncryptedBookmarks() }} placeholder="Floccus passphrase" type="password" value={passphrase} /><button className="primary-button compact" disabled={!passphrase || unlocking} onClick={() => void unlockEncryptedBookmarks()} type="button">{unlocking ? '验证中…' : '验证并解锁'}</button></div>
-          <div className="bookmark-encrypted-actions"><button className="toolbar-button compact" onClick={onOpenFloccus} type="button">查看 Floccus 配置</button>{encryption?.passphraseStored && <button className="toolbar-button compact" disabled={unlocking} onClick={() => void forgetPassphrase()} type="button">移除已保存口令</button>}</div>
+          <strong>{encryption?.passphraseStored ? '保存的 Floccus 加密口令已失效' : '输入 Floccus 加密口令解锁后台管理'}</strong>
+          <p>请输入 Floccus 配置中“加密 / Passphrase”字段的口令。它不是后台生成的 WebDAV 应用密码；应用密码只负责连接服务器。</p>
+          <div className="bookmark-encryption-warning">验证成功后不再是零知识加密：拥有服务器主密钥和数据库的管理员可以解密书签。Floccus 加密口令不会显示在页面或写入日志。</div>
+          <div className="bookmark-unlock-form"><input aria-label="Floccus 加密 Passphrase（不是 WebDAV 应用密码）" autoComplete="current-password" onChange={(event) => setPassphrase(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') void unlockEncryptedBookmarks() }} placeholder="Floccus 加密 Passphrase（不是应用密码）" type="password" value={passphrase} /><button className="primary-button compact" disabled={!passphrase || unlocking} onClick={() => void unlockEncryptedBookmarks()} type="button">{unlocking ? '验证中…' : '验证并解锁'}</button></div>
+          <div className="bookmark-encrypted-actions bookmark-recovery-actions"><button className="toolbar-button compact" onClick={onOpenFloccus} type="button">查看 Floccus 配置</button>{encryption?.passphraseStored && <button className="toolbar-button compact" disabled={unlocking || resettingBaseline} onClick={() => void forgetPassphrase()} type="button">移除已保存口令</button>}<button className="danger-button compact" disabled={unlocking || resettingBaseline} onClick={() => void resetEncryptedBaseline()} type="button">{resettingBaseline ? '正在保存旧密文…' : '忘记旧口令，备份后重建'}</button></div>
+          <small className="bookmark-recovery-hint">只有确认浏览器本地书签仍完整、旧 Passphrase 确实找不回时才使用重建。</small>
         </section>
       ) : tree?.status === 'migrationRequired' ? (
         <section className="panel bookmark-encrypted-state">
@@ -871,7 +892,7 @@ function FloccusGuide({ token, loginIdentifier }: { token: string; loginIdentifi
           <h4>客户端加密（可选）</h4>
           <div className="security-notice">
             <span>!</span>
-            <p>如果希望后台直接显示书签索引，请将 Floccus 的 <strong>Passphrase</strong> 留空。填写 passphrase 后，服务器只能保存密文，后台无法读取书签内容；passphrase 也不会上传。</p>
+            <p>Floccus 的 <strong>Passphrase</strong> 是书签加密口令，与上面的 WebDAV 应用密码不同。启用加密后，可在书签管理页输入相同 Passphrase，让服务器受保护地保存并建立后台索引。</p>
           </div>
         </div>
       </div>

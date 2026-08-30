@@ -28,6 +28,8 @@
 - passphrase、派生密钥、解密后的 XBEL 和密文内部字段不得写日志。
 - 主密钥优先读取 `BOOKMARK_VAULT_MASTER_KEY`（32 字节标准 Base64）；未配置时在 `DATA_DIR/server-master.key` 自动生成本机密钥。该文件必须与数据库一同备份并限制读取权限。
 - 主密钥丢失后，已保存 passphrase 无法恢复；用户可重新输入正确 passphrase 覆盖旧信封。
+- Floccus WebDAV `password` 与加密 `passphrase` 是两个独立字段：前者只用于 HTTP Basic 登录，后者才用于加解密同步文件；管理后台必须明确区分。
+- Floccus 新建 WebDAV 配置时 `passphrase` 默认为空，不会自动开启加密。删除配置并重建后，旧密文仍只能由生成它的旧 passphrase 解密。
 
 ## 数据与 API
 

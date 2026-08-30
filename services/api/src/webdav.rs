@@ -341,6 +341,10 @@ async fn reset_sync_baseline_while_locked(
             .bind(target.user_id)
             .execute(&mut *transaction)
             .await?;
+        sqlx::query("DELETE FROM floccus_secrets WHERE user_id = $1")
+            .bind(target.user_id)
+            .execute(&mut *transaction)
+            .await?;
         transaction.commit().await
     }
     .await;
@@ -1895,6 +1899,10 @@ mod tests {
         let old_body =
             br#"<xbel><bookmark href="https://old.example"><title>Old</title></bookmark></xbel>"#;
         fs::write(&target.file_path, old_body).expect("write old baseline");
+        let state = test_state(db.clone(), data_root.clone());
+        crate::floccus_secrets::save_passphrase(&state, user_id, "obsolete passphrase")
+            .await
+            .expect("save obsolete passphrase");
         record_file(&db, &target, old_body)
             .await
             .expect("record old baseline");
@@ -1938,6 +1946,14 @@ mod tests {
             .expect("sync state count"),
             0
         );
+        assert_eq!(
+            sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM floccus_secrets WHERE user_id = $1")
+                .bind(user_id)
+                .fetch_one(&db)
+                .await
+                .expect("passphrase count"),
+            0
+        );
         let version = sqlx::query(
             "SELECT fv.storage_key FROM file_versions fv JOIN dav_files df ON df.id = fv.dav_file_id WHERE df.user_id = $1",
         )
@@ -1958,7 +1974,6 @@ mod tests {
         assert!(!user_directory.join("bookmarks.xbel.lock").exists());
 
         let new_body = br#"<xbel><!--- highestId :1: for Floccus bookmark sync browser extension --><bookmark href="https://new.example" id="1"><title>New</title></bookmark></xbel>"#;
-        let state = test_state(db.clone(), data_root.clone());
         let response = write_file(
             &target,
             Request::builder()
