@@ -85,6 +85,24 @@ pub struct AppPasswordResponse {
     pub created_at: String,
 }
 
+#[derive(Debug)]
+enum CreateFloccusCredentialError {
+    Crypto(crate::floccus_crypto::CryptoError),
+    Database(sqlx::Error),
+}
+
+impl From<crate::floccus_crypto::CryptoError> for CreateFloccusCredentialError {
+    fn from(error: crate::floccus_crypto::CryptoError) -> Self {
+        Self::Crypto(error)
+    }
+}
+
+impl From<sqlx::Error> for CreateFloccusCredentialError {
+    fn from(error: sqlx::Error) -> Self {
+        Self::Database(error)
+    }
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SidebarPairingResponse {
@@ -262,10 +280,7 @@ pub async fn me(State(state): State<AppState>, headers: HeaderMap) -> Response {
     .into_response()
 }
 
-pub async fn create_sidebar_pairing(
-    State(state): State<AppState>,
-    headers: HeaderMap,
-) -> Response {
+pub async fn create_sidebar_pairing(State(state): State<AppState>, headers: HeaderMap) -> Response {
     let Some(user) = authenticate_session(&state, &headers).await else {
         return error(StatusCode::UNAUTHORIZED, "unauthorized", "请先登录");
     };
@@ -310,7 +325,11 @@ pub async fn exchange_sidebar_pairing(
     Json(payload): Json<SidebarPairingExchangePayload>,
 ) -> Response {
     let Some(secret) = sidebar_pairing_secret(&payload.code) else {
-        return error(StatusCode::BAD_REQUEST, "invalid_pairing_code", "设备码无效");
+        return error(
+            StatusCode::BAD_REQUEST,
+            "invalid_pairing_code",
+            "设备码无效",
+        );
     };
     let row = sqlx::query(
         "SELECT id, user_id FROM sidebar_pairings WHERE code_hash = $1 AND used_at IS NULL AND expires_at > CURRENT_TIMESTAMP",
@@ -322,10 +341,18 @@ pub async fn exchange_sidebar_pairing(
         Ok(value) => value,
         Err(error_value) => {
             tracing::error!(?error_value, "sidebar pairing lookup failed");
-            return error(StatusCode::INTERNAL_SERVER_ERROR, "pairing_exchange_failed", "侧边栏连接失败");
+            return error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "pairing_exchange_failed",
+                "侧边栏连接失败",
+            );
         }
     }) else {
-        return error(StatusCode::UNAUTHORIZED, "pairing_expired", "设备码已失效，请重新生成");
+        return error(
+            StatusCode::UNAUTHORIZED,
+            "pairing_expired",
+            "设备码已失效，请重新生成",
+        );
     };
     let pairing_id: Uuid = row.get("id");
     let user_id: Uuid = row.get("user_id");
@@ -333,7 +360,11 @@ pub async fn exchange_sidebar_pairing(
         Ok(value) => value,
         Err(error_value) => {
             tracing::error!(?error_value, "sidebar pairing transaction failed");
-            return error(StatusCode::INTERNAL_SERVER_ERROR, "pairing_exchange_failed", "侧边栏连接失败");
+            return error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "pairing_exchange_failed",
+                "侧边栏连接失败",
+            );
         }
     };
     let updated = sqlx::query(
@@ -343,28 +374,50 @@ pub async fn exchange_sidebar_pairing(
     .execute(&mut *transaction)
     .await;
     if updated.map(|value| value.rows_affected()).unwrap_or(0) != 1 {
-        return error(StatusCode::UNAUTHORIZED, "pairing_expired", "设备码已失效，请重新生成");
+        return error(
+            StatusCode::UNAUTHORIZED,
+            "pairing_expired",
+            "设备码已失效，请重新生成",
+        );
     }
     if transaction.commit().await.is_err() {
-        return error(StatusCode::INTERNAL_SERVER_ERROR, "pairing_exchange_failed", "侧边栏连接失败");
+        return error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "pairing_exchange_failed",
+            "侧边栏连接失败",
+        );
     }
     match create_session(&state, user_id).await {
         Ok(token) => {
-            let login_identifier: String = match sqlx::query_scalar("SELECT login_identifier FROM users WHERE id = $1")
-                .bind(user_id)
-                .fetch_one(&state.db)
-                .await
-            {
-                Ok(value) => value,
-                Err(_) => return error(StatusCode::INTERNAL_SERVER_ERROR, "pairing_exchange_failed", "侧边栏连接失败"),
-            };
+            let login_identifier: String =
+                match sqlx::query_scalar("SELECT login_identifier FROM users WHERE id = $1")
+                    .bind(user_id)
+                    .fetch_one(&state.db)
+                    .await
+                {
+                    Ok(value) => value,
+                    Err(_) => {
+                        return error(
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            "pairing_exchange_failed",
+                            "侧边栏连接失败",
+                        )
+                    }
+                };
             Json(TokenResponse {
                 token,
-                user: UserResponse { id: user_id, login_identifier },
+                user: UserResponse {
+                    id: user_id,
+                    login_identifier,
+                },
             })
             .into_response()
         }
-        Err(_) => error(StatusCode::INTERNAL_SERVER_ERROR, "pairing_exchange_failed", "侧边栏连接失败"),
+        Err(_) => error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "pairing_exchange_failed",
+            "侧边栏连接失败",
+        ),
     }
 }
 
@@ -456,6 +509,115 @@ pub async fn create_app_password(
         created_at: chrono::Utc::now().to_rfc3339(),
     })
     .into_response()
+}
+
+pub async fn create_floccus_credential(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(payload): Json<CreateAppPasswordPayload>,
+) -> Response {
+    let Some(user) = authenticate_session(&state, &headers).await else {
+        return error(StatusCode::UNAUTHORIZED, "unauthorized", "请先登录");
+    };
+    if payload.name.trim().is_empty() || payload.name.len() > 80 {
+        return error(
+            StatusCode::BAD_REQUEST,
+            "invalid_name",
+            "Floccus 专用密码名称不能为空且不能超过 80 个字符",
+        );
+    }
+    let sync_path = state
+        .data_dir
+        .join(user.id.to_string())
+        .join("bookmarks.xbel");
+    match tokio::fs::read(sync_path).await {
+        Ok(bytes) if crate::floccus_crypto::is_floccus_encrypted(&bytes) => {
+            return error(
+                StatusCode::CONFLICT,
+                "encrypted_baseline_exists",
+                "服务器仍有旧加密文件。请先在分类管理使用“忘记旧口令，备份后重建”，再创建新的 Floccus 专用密码",
+            )
+        }
+        Ok(_) => {}
+        Err(file_error) if file_error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(file_error) => {
+            tracing::error!(?file_error, "inspect existing Floccus sync file failed");
+            return error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "floccus_credential_failed",
+                "无法检查现有同步文件",
+            );
+        }
+    }
+
+    match create_floccus_credential_record(&state, user.id, payload.name.trim()).await {
+        Ok(item) => Json(item).into_response(),
+        Err(CreateFloccusCredentialError::Crypto(crypto_error)) => {
+            tracing::error!(?crypto_error, "protect Floccus credential failed");
+            error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "floccus_credential_failed",
+                "Floccus 专用密码安全保存失败，请检查服务器主密钥",
+            )
+        }
+        Err(CreateFloccusCredentialError::Database(db_error)) => {
+            tracing::error!(?db_error, "create Floccus credential failed");
+            error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "floccus_credential_failed",
+                "Floccus 专用密码创建失败",
+            )
+        }
+    }
+}
+
+async fn create_floccus_credential_record(
+    state: &AppState,
+    user_id: Uuid,
+    requested_name: &str,
+) -> Result<AppPasswordResponse, CreateFloccusCredentialError> {
+    let secret = generate_secret();
+    let sealed = state.master_key.seal_passphrase(user_id, &secret)?;
+    let id = Uuid::new_v4();
+    let name = requested_name.trim().to_string();
+    let created_at = chrono::Utc::now().to_rfc3339();
+    let mut transaction = state.db.begin().await?;
+
+    sqlx::query(
+        "INSERT INTO app_passwords (id, user_id, name, secret_hash) VALUES ($1, $2, $3, $4)",
+    )
+    .bind(id)
+    .bind(user_id)
+    .bind(&name)
+    .bind(hash_token(&secret))
+    .execute(&mut *transaction)
+    .await?;
+
+    sqlx::query(
+        "INSERT INTO floccus_secrets (user_id, key_version, nonce, encrypted_passphrase, updated_at)
+         VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
+         ON CONFLICT(user_id) DO UPDATE SET
+           key_version = excluded.key_version,
+           nonce = excluded.nonce,
+           encrypted_passphrase = excluded.encrypted_passphrase,
+           updated_at = CURRENT_TIMESTAMP",
+    )
+    .bind(user_id)
+    .bind(sealed.key_version)
+    .bind(sealed.nonce)
+    .bind(sealed.ciphertext)
+    .execute(&mut *transaction)
+    .await?;
+
+    transaction.commit().await?;
+    Ok(AppPasswordResponse {
+        id,
+        name,
+        secret: Some(secret),
+        last_used_at: None,
+        expires_at: None,
+        created_at,
+    })
 }
 
 pub async fn revoke_app_password(
@@ -592,10 +754,12 @@ pub async fn authenticate_webdav(
         let app_password_id: Uuid = row.get("app_password_id");
         let db = state.db.clone();
         tokio::spawn(async move {
-            let _ = sqlx::query("UPDATE app_passwords SET last_used_at = CURRENT_TIMESTAMP WHERE id = $1")
-                .bind(app_password_id)
-                .execute(&db)
-                .await;
+            let _ = sqlx::query(
+                "UPDATE app_passwords SET last_used_at = CURRENT_TIMESTAMP WHERE id = $1",
+            )
+            .bind(app_password_id)
+            .execute(&db)
+            .await;
         });
         AuthenticatedUser {
             id: row.get("id"),
@@ -714,9 +878,35 @@ pub fn rate_limited(retry_after: Duration) -> Response {
 
 #[cfg(test)]
 mod tests {
-    use super::{basic_credentials, bearer_token, sidebar_pairing_secret, SIDEBAR_PAIRING_PREFIX};
+    use super::{
+        basic_credentials, bearer_token, create_floccus_credential_record, hash_token,
+        sidebar_pairing_secret, SIDEBAR_PAIRING_PREFIX,
+    };
+    use crate::state::{AppState, AuthRateLimiter};
     use axum::http::{header, HeaderMap, HeaderValue};
     use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
+    use sqlx::{sqlite::SqlitePoolOptions, Row};
+    use std::{path::PathBuf, sync::Arc};
+    use uuid::Uuid;
+
+    async fn test_state() -> AppState {
+        let db = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .expect("test database");
+        sqlx::migrate!("../../migrations")
+            .run(&db)
+            .await
+            .expect("test migrations");
+        AppState {
+            db,
+            data_dir: PathBuf::from("/tmp/bookmark-vault-auth-test"),
+            version: "test".into(),
+            auth_rate_limiter: Arc::new(AuthRateLimiter::default()),
+            master_key: Arc::new(crate::floccus_crypto::MasterKey::for_tests()),
+        }
+    }
 
     #[test]
     fn basic_credentials_accepts_case_insensitive_scheme_and_password_colons() {
@@ -765,5 +955,68 @@ mod tests {
             Some("bv_legacy-secret".to_owned())
         );
         assert_eq!(sidebar_pairing_secret("invalid"), None);
+    }
+
+    #[tokio::test]
+    async fn floccus_credential_uses_one_secret_for_webdav_and_encryption() {
+        let state = test_state().await;
+        let user_id = Uuid::new_v4();
+        sqlx::query(
+            "INSERT INTO users (id, login_identifier, password_hash) VALUES ($1, 'alice', 'hash')",
+        )
+        .bind(user_id)
+        .execute(&state.db)
+        .await
+        .expect("test user");
+
+        let credential = create_floccus_credential_record(&state, user_id, " Floccus 同步 ")
+            .await
+            .expect("credential");
+        let secret = credential.secret.expect("one-time secret");
+        let row =
+            sqlx::query("SELECT secret_hash FROM app_passwords WHERE id = $1 AND user_id = $2")
+                .bind(credential.id)
+                .bind(user_id)
+                .fetch_one(&state.db)
+                .await
+                .expect("application password");
+
+        assert_eq!(credential.name, "Floccus 同步");
+        assert_eq!(row.get::<String, _>("secret_hash"), hash_token(&secret));
+        assert_eq!(
+            crate::floccus_secrets::load_passphrase(&state, user_id)
+                .await
+                .expect("load protected passphrase")
+                .as_deref(),
+            Some(secret.as_str())
+        );
+    }
+
+    #[tokio::test]
+    async fn floccus_credential_rolls_back_application_password_when_secret_storage_fails() {
+        let state = test_state().await;
+        let user_id = Uuid::new_v4();
+        sqlx::query(
+            "INSERT INTO users (id, login_identifier, password_hash) VALUES ($1, 'bob', 'hash')",
+        )
+        .bind(user_id)
+        .execute(&state.db)
+        .await
+        .expect("test user");
+        sqlx::query("DROP TABLE floccus_secrets")
+            .execute(&state.db)
+            .await
+            .expect("remove secret table");
+
+        assert!(create_floccus_credential_record(&state, user_id, "Floccus")
+            .await
+            .is_err());
+        let count =
+            sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM app_passwords WHERE user_id = $1")
+                .bind(user_id)
+                .fetch_one(&state.db)
+                .await
+                .expect("application password count");
+        assert_eq!(count, 0);
     }
 }

@@ -202,6 +202,13 @@ export function createAppPassword(token: string, name: string) {
   }, token)
 }
 
+export function createFloccusCredential(token: string, name: string) {
+  return request<AppPassword>('/api/v1/floccus/credentials', {
+    method: 'POST',
+    body: JSON.stringify({ name }),
+  }, token)
+}
+
 export function revokeAppPassword(token: string, id: string) {
   return request<void>(`/api/v1/app-passwords/${id}`, { method: 'DELETE' }, token)
 }

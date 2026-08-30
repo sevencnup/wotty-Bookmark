@@ -1452,6 +1452,35 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 
 .security-notice p { margin: 0; }
 
+.floccus-same-secret-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px solid #bbf7d0;
+  border-radius: var(--radius-md);
+  color: #166534;
+  background: #f0fdf4;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.floccus-same-secret-notice span {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 21px;
+  height: 21px;
+  border-radius: 50%;
+  color: #fff;
+  background: #16a34a;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.floccus-same-secret-notice p { margin: 0; }
+
 /* ── 密码管理与列表 ───────────────────────────────────────── */
 .password-create {
   display: flex;

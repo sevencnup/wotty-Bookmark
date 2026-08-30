@@ -1,5 +1,23 @@
 # 管理后台开发记录
 
+## 2026-08-30：floccus-single-credential-setup
+
+### 任务
+
+消除应用密码与 Passphrase 双重概念造成的新手配置错误。
+
+### 进度
+
+- 配置向导改为一次创建“Floccus 专用密码”。
+- WebDAV Password 与 Encryption Passphrase 两处明确展示并复制同一串值。
+- 服务端自动保存受保护的解密信息，首次同步后无需在分类管理二次验证。
+- 分类页和帮助中心兼容说明旧配置仍需使用原 Passphrase。
+
+### 验证
+
+- 后端覆盖同一秘密双用途与事务回滚。
+- 管理后台 API 契约、类型检查、测试和生产构建通过。
+
 ## 2026-08-30：`floccus-passphrase-recovery`
 
 ### 任务

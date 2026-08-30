@@ -58,8 +58,8 @@ cargo run
 
 ## 安全边界
 
-默认情况下 Floccus 的 passphrase 只由客户端管理。若要在管理后台整理加密书签，可输入同一个 passphrase 解锁；服务端会用独立主密钥加密保存它，并在内存中解密 XBEL 后重新以 Floccus 兼容格式写回。启用该功能后不再是零知识加密，拥有数据库、同步文件和服务器主密钥的管理员能够解密书签。
+新建 Floccus 配置时，后台会生成一串“Floccus 专用密码”：在 WebDAV Password 与 Encryption Passphrase 两处填写同一串即可。服务端同时保存认证哈希与由独立主密钥保护的加密信封；完成首次加密同步后会自动解密 XBEL 并建立后台索引，不需要再去分类管理二次验证。启用该功能后不再是零知识加密，拥有数据库、同步文件和服务器主密钥的管理员能够解密书签。
 
-注意：Floccus 的 WebDAV `Password`（后台生成的应用密码）只用于连接服务器；`Passphrase` 才是同步文件的加密口令，两者不能互换。新建 Floccus WebDAV 配置时 Passphrase 默认留空，不会自动开启加密。
+注意：Floccus 界面中的 WebDAV `Password` 与 Encryption `Passphrase` 仍要分别填写，但新向导要求两处粘贴同一串专用密码。旧配置如果曾单独设置 Passphrase，解锁旧密文时仍应使用原 Passphrase。
 
 服务器主密钥优先从 `BOOKMARK_VAULT_MASTER_KEY` 读取（32 字节标准 Base64）。未配置时会在 `data/server-master.key` 自动生成；部署和备份时必须将该文件与 SQLite 数据库一起保护和备份。主密钥丢失后，可在后台重新输入 Floccus passphrase 恢复管理能力。生产环境必须启用 HTTPS，并为每个浏览器使用独立应用密码。

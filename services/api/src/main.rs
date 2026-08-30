@@ -95,6 +95,10 @@ fn app_router(state: AppState) -> Router {
             "/api/v1/app-passwords",
             get(auth::list_app_passwords).post(auth::create_app_password),
         )
+        .route(
+            "/api/v1/floccus/credentials",
+            post(auth::create_floccus_credential),
+        )
         .route(APP_PASSWORD_BY_ID_ROUTE, delete(auth::revoke_app_password))
         .route("/api/v1/storage/status", get(auth::storage_status))
         .route(

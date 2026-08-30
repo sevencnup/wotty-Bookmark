@@ -28,7 +28,9 @@
 - passphrase、派生密钥、解密后的 XBEL 和密文内部字段不得写日志。
 - 主密钥优先读取 `BOOKMARK_VAULT_MASTER_KEY`（32 字节标准 Base64）；未配置时在 `DATA_DIR/server-master.key` 自动生成本机密钥。该文件必须与数据库一同备份并限制读取权限。
 - 主密钥丢失后，已保存 passphrase 无法恢复；用户可重新输入正确 passphrase 覆盖旧信封。
-- Floccus WebDAV `password` 与加密 `passphrase` 是两个独立字段：前者只用于 HTTP Basic 登录，后者才用于加解密同步文件；管理后台必须明确区分。
+- Floccus WebDAV `password` 与加密 `passphrase` 仍是客户端中的两个字段，但新配置由后台生成同一串“Floccus 专用密码”同时填入两处，避免用户自行维护两套口令。
+- 专用密码只在创建成功时返回一次。服务端同时保存 WebDAV 认证哈希与主密钥加密信封，两个写入必须在同一数据库事务内完成。
+- 旧配置仍可能使用两串不同的值；旧密文解锁继续接受原来的独立 passphrase，并保留遗失口令后的安全基线重建流程。
 - Floccus 新建 WebDAV 配置时 `passphrase` 默认为空，不会自动开启加密。删除配置并重建后，旧密文仍只能由生成它的旧 passphrase 解密。
 
 ## 数据与 API
@@ -36,6 +38,8 @@
 新增 `floccus_secrets`：`user_id`、`key_version`、`nonce`、`encrypted_passphrase`、时间戳。
 
 - `GET /api/v1/storage/encryption`：返回文件是否加密、口令是否已保存、当前是否已解锁，不返回秘密。
+- `POST /api/v1/floccus/credentials`：一次生成 Floccus 专用密码，事务性写入 WebDAV 认证哈希与 passphrase 加密信封，明文只返回一次。
+- 若服务器仍存在旧加密基线，该接口返回冲突并要求先备份后重建，避免随机新密码使客户端无法读取旧密文。
 - `POST /api/v1/storage/encryption/unlock`：用当前加密文件验证 passphrase；成功后保存加密信封并重建索引。
 - `DELETE /api/v1/storage/encryption/passphrase`：删除信封；若当前文件加密，同时清除可搜索索引，但保留同步文件与历史版本。
 

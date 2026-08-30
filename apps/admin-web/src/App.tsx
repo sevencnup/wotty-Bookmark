@@ -352,7 +352,7 @@ function LoginCard({ onLogin }: { onLogin: (session: api.Session) => void }) {
         {error && <p className="form-error">{error}</p>}
         <button className="primary-button" disabled={loading || !loginIdentifier || !password} onClick={() => void submit()} type="button">{loading ? '处理中…' : mode === 'login' ? '登录' : '创建账户'}</button>
         <button className="switch-button" onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError('') }} type="button">{mode === 'login' ? '还没有账户？创建账户' : '已有账户？返回登录'}</button>
-        <p className="form-hint">账户密码只用于登录，Floccus passphrase 不会上传到服务器。</p>
+        <p className="form-hint">账户密码只用于登录；Floccus 专用密码会单独生成，不要填写账户密码。</p>
       </section>
     </main>
   )
@@ -708,9 +708,9 @@ function BookmarkOrganizer({ token, onOpenFloccus, mode = 'organizer' }: { token
         <section className="panel bookmark-encrypted-state">
           <span className="bookmark-encrypted-icon">◆</span>
           <strong>{encryption?.passphraseStored ? '保存的 Floccus 加密口令已失效' : '输入 Floccus 加密口令解锁后台管理'}</strong>
-          <p>请输入 Floccus 配置中“加密 / Passphrase”字段的口令。它不是后台生成的 WebDAV 应用密码；应用密码只负责连接服务器。</p>
+          <p>新向导创建的配置请填写同一串“Floccus 专用密码”；旧配置请填写当时单独设置的 Passphrase。</p>
           <div className="bookmark-encryption-warning">验证成功后不再是零知识加密：拥有服务器主密钥和数据库的管理员可以解密书签。Floccus 加密口令不会显示在页面或写入日志。</div>
-          <div className="bookmark-unlock-form"><input aria-label="Floccus 加密 Passphrase（不是 WebDAV 应用密码）" autoComplete="current-password" onChange={(event) => setPassphrase(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') void unlockEncryptedBookmarks() }} placeholder="Floccus 加密 Passphrase（不是应用密码）" type="password" value={passphrase} /><button className="primary-button compact" disabled={!passphrase || unlocking} onClick={() => void unlockEncryptedBookmarks()} type="button">{unlocking ? '验证中…' : '验证并解锁'}</button></div>
+          <div className="bookmark-unlock-form"><input aria-label="Floccus 专用密码或旧配置 Passphrase" autoComplete="current-password" onChange={(event) => setPassphrase(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') void unlockEncryptedBookmarks() }} placeholder="Floccus 专用密码 / 旧 Passphrase" type="password" value={passphrase} /><button className="primary-button compact" disabled={!passphrase || unlocking} onClick={() => void unlockEncryptedBookmarks()} type="button">{unlocking ? '验证中…' : '验证并解锁'}</button></div>
           <div className="bookmark-encrypted-actions bookmark-recovery-actions"><button className="toolbar-button compact" onClick={onOpenFloccus} type="button">查看 Floccus 配置</button>{encryption?.passphraseStored && <button className="toolbar-button compact" disabled={unlocking || resettingBaseline} onClick={() => void forgetPassphrase()} type="button">移除已保存口令</button>}<button className="danger-button compact" disabled={unlocking || resettingBaseline} onClick={() => void resetEncryptedBaseline()} type="button">{resettingBaseline ? '正在保存旧密文…' : '忘记旧口令，备份后重建'}</button></div>
           <small className="bookmark-recovery-hint">只有确认浏览器本地书签仍完整、旧 Passphrase 确实找不回时才使用重建。</small>
         </section>
@@ -790,7 +790,6 @@ function AppPasswords({ token }: { token: string }) {
 
 function FloccusGuide({ token, loginIdentifier }: { token: string; loginIdentifier: string }) {
   const davUrl = getWebDavUrl(loginIdentifier)
-  const [passwordName, setPasswordName] = useState('Floccus 书签同步')
   const [createdSecret, setCreatedSecret] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState('')
@@ -798,14 +797,15 @@ function FloccusGuide({ token, loginIdentifier }: { token: string; loginIdentifi
   const [pairing, setPairing] = useState(false)
 
   async function handleCreate() {
-    if (!passwordName.trim()) return
     setCreating(true)
     setError('')
     try {
-      const item = await api.createAppPassword(token, passwordName.trim())
+      const item = await api.createFloccusCredential(token, 'Floccus 书签同步')
       setCreatedSecret(item.secret ?? null)
     } catch (e) {
-      setError(e instanceof Error ? e.message : '创建失败')
+      setError(e instanceof api.ApiRequestError && e.code === 'encrypted_baseline_exists'
+        ? '服务器仍有旧加密文件。请先到分类管理点击“忘记旧口令，备份后重建”，然后回来创建专用密码。'
+        : e instanceof Error ? e.message : '创建失败')
     } finally {
       setCreating(false)
     }
@@ -832,27 +832,25 @@ function FloccusGuide({ token, loginIdentifier }: { token: string; loginIdentifi
           <h3>Floccus 配置向导</h3>
         </div>
       </div>
-      <p className="floccus-intro">先完成 Floccus 的 WebDAV 配置，再用 API 地址和一次性设备码把侧边栏接入当前后台。侧边栏不需要再次填写 WebDAV 账号。</p>
+      <p className="floccus-intro">先创建一串 Floccus 专用密码，在 WebDAV Password 和 Encryption Passphrase 两处填写同一串。完成同步后，后台会自动建立可管理索引。</p>
 
       <div className="guide-step-card">
         <div className="guide-step-num">1</div>
         <div className="guide-step-body">
-          <h4>为 Floccus 创建应用密码</h4>
-          <p>应用密码只用于 WebDAV 认证，撤销时不影响账号登录。</p>
+          <h4>创建 Floccus 专用密码</h4>
+          <p>这一串同时用于 WebDAV 连接和书签加密。只显示一次，请先复制保存。</p>
           {createdSecret ? (
             <div className="secret-box">
-              <strong>请立即保存，此密码只显示一次</strong>
+              <strong>复制这一串，后面两处都填它</strong>
               <code>{createdSecret}</code>
               <button className="ghost-button" onClick={() => { void navigator.clipboard?.writeText(createdSecret) }} type="button">复制</button>
+              <p>WebDAV Password = Encryption Passphrase；后台已自动保存受保护副本。</p>
             </div>
           ) : (
             <>
-              <div className="password-create">
-                <input value={passwordName} onChange={(e) => setPasswordName(e.target.value)} placeholder="例如：Chrome 工作浏览器" />
-                <button className="primary-button compact" disabled={creating || !passwordName.trim()} onClick={() => { void handleCreate() }} type="button">
-                  {creating ? '创建中…' : '创建应用密码'}
-                </button>
-              </div>
+              <button className="primary-button compact" disabled={creating} onClick={() => { void handleCreate() }} type="button">
+                {creating ? '创建中…' : '创建 Floccus 专用密码'}
+              </button>
               {error && <p className="form-error">{error}</p>}
             </>
           )}
@@ -880,7 +878,7 @@ function FloccusGuide({ token, loginIdentifier }: { token: string; loginIdentifi
           <div className="config-fields">
             <ConfigField label="WebDAV 地址" value={davUrl} />
             <ConfigField label="用户名" value={loginIdentifier} />
-            <ConfigField label="应用密码" value={createdSecret ?? '（请先在上方创建应用密码）'} copyable={Boolean(createdSecret)} />
+            <ConfigField label="WebDAV Password" value={createdSecret ?? '（请先在上方创建 Floccus 专用密码）'} copyable={Boolean(createdSecret)} />
             <ConfigField label="文件名（Bookmarks file）" value="bookmarks.xbel" />
           </div>
         </div>
@@ -889,10 +887,14 @@ function FloccusGuide({ token, loginIdentifier }: { token: string; loginIdentifi
       <div className="guide-step-card">
         <div className="guide-step-num">4</div>
         <div className="guide-step-body">
-          <h4>客户端加密（可选）</h4>
-          <div className="security-notice">
-            <span>!</span>
-            <p>Floccus 的 <strong>Passphrase</strong> 是书签加密口令，与上面的 WebDAV 应用密码不同。启用加密后，可在书签管理页输入相同 Passphrase，让服务器受保护地保存并建立后台索引。</p>
+          <h4>开启加密，并再次填写同一串</h4>
+          <p>在 Floccus 中开启加密，将第一步生成的专用密码粘贴到 Passphrase：</p>
+          <div className="config-fields">
+            <ConfigField label="Encryption Passphrase" value={createdSecret ?? '（与 WebDAV Password 使用同一串）'} copyable={Boolean(createdSecret)} />
+          </div>
+          <div className="floccus-same-secret-notice">
+            <span>✓</span>
+            <p><strong>两处填写同一串。</strong>同步完成后不需要再去分类管理验证，服务器会自动解密并建立索引。</p>
           </div>
         </div>
       </div>

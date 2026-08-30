@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   cleanupFileVersions,
+  createFloccusCredential,
   emptyTrash,
   exportStorageFile,
   forgetFloccusPassphrase,
@@ -69,6 +70,30 @@ describe('admin API contract', () => {
         body: JSON.stringify({ login_identifier: 'qa@example.com', password: 'password-123456' }),
       }),
     )
+  })
+
+  it('creates one Floccus credential for WebDAV and encryption', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(response({
+      id: 'credential-id',
+      name: 'Floccus 书签同步',
+      secret: 'bv_shared-secret',
+      lastUsedAt: null,
+      expiresAt: null,
+      createdAt: '2026-08-30T00:00:00Z',
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const credential = await createFloccusCredential('session-token', 'Floccus 书签同步')
+
+    expect(credential.secret).toBe('bv_shared-secret')
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/v1/floccus/credentials',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ name: 'Floccus 书签同步' }),
+      }),
+    )
+    expect(new Headers(fetchMock.mock.calls[0][1].headers).get('authorization')).toBe('Bearer session-token')
   })
 
   it('calls bookmark tree and move endpoints with encoded data', async () => {
