@@ -850,27 +850,59 @@ async fn acquire_lock(target: &DavTarget, owner_id: uuid::Uuid) -> Response {
             return StatusCode::INTERNAL_SERVER_ERROR.into_response();
         }
     }
-    match fs::OpenOptions::new()
+    let temp_path = target.file_path.with_file_name(format!(
+        ".bookmarks.xbel.lock-{}",
+        uuid::Uuid::new_v4()
+    ));
+    let mut temp_file = match fs::OpenOptions::new()
         .write(true)
         .create_new(true)
-        .open(&target.file_path)
+        .open(&temp_path)
         .await
     {
-        Ok(mut file) => {
-            if file.write_all(marker.as_bytes()).await.is_err() || file.flush().await.is_err() {
-                let _ = fs::remove_file(&target.file_path).await;
-                return StatusCode::INTERNAL_SERVER_ERROR.into_response();
-            }
-            StatusCode::CREATED.into_response()
+        Ok(file) => file,
+        Err(error) => {
+            tracing::error!(?error, "create temporary WebDAV lock failed");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
         }
+    };
+    if temp_file.write_all(marker.as_bytes()).await.is_err() || temp_file.flush().await.is_err() {
+        let _ = fs::remove_file(&temp_path).await;
+        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+    }
+    drop(temp_file);
+
+    let result = match fs::hard_link(&temp_path, &target.file_path).await {
+        Ok(()) => StatusCode::CREATED.into_response(),
         Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
-            StatusCode::LOCKED.into_response()
+            match fs::read(&target.file_path).await {
+                Ok(contents) if contents == marker.as_bytes() => {
+                    match fs::write(&target.file_path, marker.as_bytes()).await {
+                        Ok(()) => StatusCode::NO_CONTENT.into_response(),
+                        Err(error) => {
+                            tracing::error!(?error, "refresh concurrently acquired WebDAV lock failed");
+                            StatusCode::INTERNAL_SERVER_ERROR.into_response()
+                        }
+                    }
+                }
+                Ok(_) => StatusCode::LOCKED.into_response(),
+                Err(error) => {
+                    tracing::error!(?error, "read concurrently acquired WebDAV lock failed");
+                    StatusCode::INTERNAL_SERVER_ERROR.into_response()
+                }
+            }
         }
         Err(error) => {
-            tracing::error!(?error, "create WebDAV lock failed");
+            tracing::error!(?error, "publish WebDAV lock failed");
             StatusCode::INTERNAL_SERVER_ERROR.into_response()
         }
+    };
+    if let Err(error) = fs::remove_file(&temp_path).await {
+        if error.kind() != std::io::ErrorKind::NotFound {
+            tracing::warn!(?error, "remove temporary WebDAV lock failed");
+        }
     }
+    result
 }
 
 async fn delete_file(
@@ -1511,6 +1543,45 @@ mod tests {
                 .into_response()
                 .status(),
             StatusCode::LOCKED
+        );
+
+        fs::remove_dir_all(data_root).expect("remove test WebDAV directory");
+    }
+
+    #[tokio::test]
+    async fn same_owner_can_concurrently_acquire_floccus_lock() {
+        let user_id = Uuid::new_v4();
+        let data_root = std::env::temp_dir().join(format!("bookmark-vault-lock-race-{user_id}"));
+        let user_directory = data_root.join(user_id.to_string());
+        fs::create_dir_all(&user_directory).expect("create test WebDAV directory");
+        let target = DavTarget {
+            user_id,
+            relative_path: "alice/bookmarks.xbel.lock".to_owned(),
+            file_path: user_directory.join("bookmarks.xbel.lock"),
+            data_root: data_root.clone(),
+        };
+        let owner = Uuid::new_v4();
+
+        let first_target = target.clone();
+        let second_target = target.clone();
+        let (first, second) = tokio::join!(
+            acquire_lock(&first_target, owner),
+            acquire_lock(&second_target, owner),
+        );
+        let mut statuses = [first.status(), second.status()];
+        statuses.sort_by_key(|status| status.as_u16());
+        assert_eq!(statuses, [StatusCode::CREATED, StatusCode::NO_CONTENT]);
+        assert_eq!(
+            fs::read(&target.file_path).expect("read final lock marker"),
+            format!("bookmark-vault-lock:{owner}").as_bytes()
+        );
+        assert_eq!(
+            fs::read_dir(&user_directory)
+                .expect("read lock directory")
+                .filter_map(Result::ok)
+                .filter(|entry| entry.file_name().to_string_lossy().starts_with(".bookmarks.xbel.lock-"))
+                .count(),
+            0
         );
 
         fs::remove_dir_all(data_root).expect("remove test WebDAV directory");
