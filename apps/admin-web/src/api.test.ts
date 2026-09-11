@@ -27,6 +27,10 @@ import {
   trashBookmark,
   trashBookmarks,
   unlockFloccusEncryption,
+  getBackupSettings,
+  updateBackupSettings,
+  getBackupRuns,
+  runBackupNow,
 } from './api'
 
 function response(payload: unknown, status = 200): Response {
@@ -145,6 +149,29 @@ describe('admin API contract', () => {
       expect.objectContaining({ method: 'POST' }),
     )
     expect(new Headers(fetchMock.mock.calls[0][1].headers).get('authorization')).toBe('Bearer session-token')
+  })
+
+  it('manages scheduled backup settings and runs', async () => {
+    const settings = { enabled: true, dailyTime: '03:30', retentionCount: 5, lastStartedAt: null, lastFinishedAt: null, lastStatus: null, lastError: null, nextRunAt: '2026-09-12T03:30:00+08:00' }
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(response(settings))
+      .mockResolvedValueOnce(response({ ...settings, enabled: false }))
+      .mockResolvedValueOnce(response([]))
+      .mockResolvedValueOnce(response({ id: 'run-1', backupName: 'backup-20260911-033000', byteSize: 1234, status: 'success', errorMessage: null, createdAt: '2026-09-11T03:30:00Z', completedAt: '2026-09-11T03:30:03Z' }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await getBackupSettings('token')
+    await updateBackupSettings('token', { enabled: false, dailyTime: '03:30', retentionCount: 5 })
+    await getBackupRuns('token')
+    await runBackupNow('token')
+
+    expect(fetchMock.mock.calls.map(([path, init]) => [path, init?.method ?? 'GET'])).toEqual([
+      ['/api/v1/backups/settings', 'GET'],
+      ['/api/v1/backups/settings', 'PUT'],
+      ['/api/v1/backups/runs', 'GET'],
+      ['/api/v1/backups/run', 'POST'],
+    ])
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({ enabled: false, dailyTime: '03:30', retentionCount: 5 })
   })
 
   it('manages the protected Floccus passphrase without reading it back', async () => {

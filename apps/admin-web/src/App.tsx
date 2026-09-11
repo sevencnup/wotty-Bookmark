@@ -39,6 +39,7 @@ import {
   ImportExportPage,
   HelpPage,
   AboutPage,
+  BackupPage,
 } from './FeaturePages'
 import { CategoryManagementPage } from './CategoryManagementPage'
 import * as api from './api'
@@ -299,11 +300,12 @@ function App() {
                 {activeSection === 'trash' && <TrashPage navigate={navigate} token={session.token} />}
                 {activeSection === 'tags' && <TagsPage navigate={navigate} token={session.token} />}
                 {activeSection === 'devices' && <DevicesPage navigate={navigate} onSessionRevoked={() => handleSessionChange(null)} token={session.token} />}
+                {activeSection === 'backup' && <BackupPage token={session.token} />}
                 {activeSection === 'preferences' && <PreferencesPage onChange={handlePreferencesChange} preferences={preferences} />}
                 {activeSection === 'import-export' && <ImportExportPage navigate={navigate} token={session.token} />}
                 {activeSection === 'help' && <HelpPage navigate={navigate} token={session.token} />}
                 {activeSection === 'about' && <AboutPage />}
-                {!['overview', 'app-passwords', 'account', 'categories', 'floccus', 'security', 'trash', 'tags', 'devices', 'preferences', 'import-export', 'help', 'about'].includes(activeSection) && <ComingSoon label={activeLabel} />}
+                {!['overview', 'app-passwords', 'account', 'categories', 'floccus', 'security', 'trash', 'tags', 'devices', 'backup', 'preferences', 'import-export', 'help', 'about'].includes(activeSection) && <ComingSoon label={activeLabel} />}
             </>
           )}
         </div>

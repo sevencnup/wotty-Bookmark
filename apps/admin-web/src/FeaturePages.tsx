@@ -1,6 +1,7 @@
 import {
   AlertCircle,
   ArchiveRestore,
+  CalendarClock,
   Check,
   ChevronDown,
   ChevronRight,
@@ -123,6 +124,82 @@ export function DevicesPage({ token, navigate, onSessionRevoked }: PageProps & {
 export function PreferencesPage({ preferences, onChange }: { preferences: Preferences; onChange: (next: Preferences) => void }) {
   function update(patch: Partial<Preferences>) { const next = { ...preferences, ...patch }; onChange(next); savePreferences(next) }
   return <div className="feature-page"><section className="panel settings-panel"><PreferenceSelect label="界面密度" description="调整面板和列表的留白。" value={preferences.density} onChange={(value) => update({ density: value as Preferences['density'] })} options={[['comfortable', '舒适'], ['compact', '紧凑']]} /><PreferenceSelect label="默认打开页面" description="下次打开后台时优先进入的页面。" value={preferences.defaultSection} onChange={(value) => update({ defaultSection: value })} options={[['overview', '概览'], ['storage', '存储文件'], ['categories', '分类管理'], ['devices', '设备管理'], ['import-export', '导入/导出'], ['help', '帮助中心']]} /><PreferenceToggle label="减少界面动效" description="关闭页面过渡和悬停位移动效。" checked={preferences.reduceMotion} onChange={(checked) => update({ reduceMotion: checked })} /><PreferenceToggle label="危险操作始终确认" description="永久删除、清空和撤销操作前显示确认弹窗。" checked={preferences.confirmDangerousActions} onChange={(checked) => update({ confirmDangerousActions: checked })} /></section><section className="panel security-notice"><span><ShieldCheck size={14} /></span><p>不会在偏好设置中保存登录密码、应用密码、Floccus passphrase、书签明文或导入文件。</p></section></div>
+}
+
+export function BackupPage({ token }: { token: string }) {
+  const [settings, setSettings] = useState<api.BackupSettings | null>(null)
+  const [runs, setRuns] = useState<api.BackupRun[]>([])
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [running, setRunning] = useState(false)
+  const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
+
+  async function load() {
+    setError('')
+    try {
+      const [nextSettings, nextRuns] = await Promise.all([api.getBackupSettings(token), api.getBackupRuns(token)])
+      setSettings(nextSettings)
+      setRuns(nextRuns)
+    } catch (requestError) {
+      setError(errorMessage(requestError, '备份状态读取失败'))
+    } finally {
+      setLoading(false)
+    }
+  }
+  useEffect(() => { void load() }, [token])
+
+  async function save() {
+    if (!settings) return
+    setSaving(true)
+    setError('')
+    try {
+      setSettings(await api.updateBackupSettings(token, { enabled: settings.enabled, dailyTime: settings.dailyTime, retentionCount: settings.retentionCount }))
+      setNotice('备份设置已保存。')
+    } catch (requestError) {
+      setError(errorMessage(requestError, '备份设置保存失败'))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function runNow() {
+    setRunning(true)
+    setError('')
+    try {
+      const result = await api.runBackupNow(token)
+      setRuns((current) => [result, ...current.filter((run) => run.id !== result.id)])
+      setSettings(await api.getBackupSettings(token))
+      setNotice('备份已完成：' + formatBytes(result.byteSize) + '。')
+    } catch (requestError) {
+      setError(errorMessage(requestError, '备份执行失败'))
+    } finally {
+      setRunning(false)
+    }
+  }
+
+  if (loading) return <div className="feature-page full-page-state"><section className="panel feature-loading"><LoaderCircle className="spin" size={28} /><strong>正在读取备份设置…</strong><p>正在检查自动备份状态和最近记录。</p></section></div>
+  if (!settings) return <div className="feature-page full-page-state"><section className="panel capability-state"><CloudUpload size={28} /><h3>备份服务暂时无法连接</h3><p>{error || '请稍后重试。'}</p><button className="primary-button" onClick={() => void load()} type="button">重新连接</button></section></div>
+  return <div className="feature-page backup-page">
+    {notice && <PageAlert tone="success"><strong>{notice}</strong></PageAlert>}
+    {error && <PageAlert>{error}</PageAlert>}
+    <section className="panel backup-hero-panel">
+      <div className="backup-hero-icon"><CloudUpload size={25} /></div>
+      <div><p className="eyebrow">SERVER PROTECTION</p><h3>自动备份</h3><p>将数据库、主密钥、同步文件和历史版本保存为一份可迁移的服务器快照。</p></div>
+      <span className={'service-status ' + (settings.enabled ? 'online' : 'offline')}><i />{settings.enabled ? '自动备份已开启' : '自动备份已关闭'}</span>
+    </section>
+    <section className="panel backup-settings-panel">
+      <div className="panel-heading"><div><p className="eyebrow">SCHEDULE</p><h3>备份计划</h3></div><button className="primary-button compact" disabled={running} onClick={() => void runNow()} type="button"><CloudUpload size={15} /> {running ? '备份中…' : '立即备份'}</button></div>
+      <div className="backup-form-grid">
+        <label className="backup-toggle-row"><span><strong>启用每日自动备份</strong><small>按服务器本地时间执行。服务重启后会继续运行。</small></span><input aria-label="启用每日自动备份" checked={settings.enabled} className="toggle-input" onChange={(event) => setSettings({ ...settings, enabled: event.target.checked })} type="checkbox" /></label>
+        <label className="backup-input-row"><span><strong>每天执行时间</strong><small>24 小时制，例如 03:00。</small></span><input aria-label="每天执行时间" max="23:59" min="00:00" onChange={(event) => setSettings({ ...settings, dailyTime: event.target.value })} pattern="[0-9]{2}:[0-9]{2}" type="time" value={settings.dailyTime} /></label>
+        <label className="backup-input-row"><span><strong>最多保留份数</strong><small>超出后自动删除最旧的备份目录和记录。</small></span><input aria-label="最多保留份数" max="100" min="1" onChange={(event) => setSettings({ ...settings, retentionCount: Number(event.target.value) || 1 })} type="number" value={settings.retentionCount} /></label>
+      </div>
+      <div className="backup-save-row"><span>{settings.enabled && settings.nextRunAt ? '下一次备份：' + formatDate(settings.nextRunAt) : '关闭后不会执行定时备份。'}</span><button className="ghost-button" disabled={saving} onClick={() => void save()} type="button">{saving ? '保存中…' : '保存设置'}</button></div>
+    </section>
+    <section className="panel"><div className="panel-heading"><div><p className="eyebrow">BACKUP HISTORY</p><h3>最近备份</h3></div><button className="toolbar-button compact" onClick={() => void load()} type="button"><RefreshCw size={14} /> 刷新</button></div>{runs.length === 0 ? <div className="feature-empty compact-empty"><CalendarClock size={25} /><h3>还没有备份记录</h3><p>点击“立即备份”创建第一份服务器快照。</p></div> : <div className="backup-run-list">{runs.map((run) => <div className="backup-run-row" key={run.id}><span className={'backup-run-status ' + run.status}><i />{run.status === 'success' ? '成功' : run.status === 'running' ? '执行中' : '失败'}</span><div><strong>{run.backupName}</strong><span>{run.completedAt ? formatDate(run.completedAt) : formatDate(run.createdAt)} · {formatBytes(run.byteSize)}</span>{run.errorMessage && <small>{run.errorMessage}</small>}</div></div>)}</div>}</section>
+    <p className="workspace-note">备份目录位于服务器数据目录的 backups 子目录。备份包含主密钥，请像保护数据库一样保护备份文件。</p>
+  </div>
 }
 function PreferenceSelect({ label, description, value, onChange, options }: { label: string; description: string; value: string; onChange: (value: string) => void; options: string[][] }) { return <label className="preference-row"><span><strong>{label}</strong><small>{description}</small></span><select value={value} onChange={(event) => onChange(event.target.value)}>{options.map(([option, text]) => <option key={option} value={option}>{text}</option>)}</select></label> }
 function PreferenceToggle({ label, description, checked, onChange }: { label: string; description: string; checked: boolean; onChange: (value: boolean) => void }) { return <label className="preference-row"><span><strong>{label}</strong><small>{description}</small></span><input aria-label={label} checked={checked} className="toggle-input" onChange={(event) => onChange(event.target.checked)} type="checkbox" /></label> }

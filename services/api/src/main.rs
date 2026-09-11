@@ -1,4 +1,5 @@
 mod auth;
+mod backup;
 mod bookmarks;
 mod devices;
 mod floccus_crypto;
@@ -68,6 +69,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         master_key: Arc::new(master_key),
     };
 
+    let scheduler_db = state.db.clone();
+    let scheduler_data_dir = state.data_dir.clone();
+    tokio::spawn(backup::scheduler(scheduler_db, scheduler_data_dir));
     let app = app_router(state);
 
     let listener = TcpListener::bind(bind_addr).await?;
@@ -101,6 +105,12 @@ fn app_router(state: AppState) -> Router {
         )
         .route(APP_PASSWORD_BY_ID_ROUTE, delete(auth::revoke_app_password))
         .route("/api/v1/storage/status", get(auth::storage_status))
+        .route(
+            "/api/v1/backups/settings",
+            get(backup::get_settings).put(backup::update_settings),
+        )
+        .route("/api/v1/backups/runs", get(backup::list_runs))
+        .route("/api/v1/backups/run", post(backup::run_now))
         .route(
             "/api/v1/storage/encryption",
             get(floccus_secrets::encryption_status),

@@ -130,6 +130,27 @@ export type ResetSyncBaselineResult = {
   backupCreated: boolean
 }
 
+export type BackupSettings = {
+  enabled: boolean
+  dailyTime: string
+  retentionCount: number
+  lastStartedAt: string | null
+  lastFinishedAt: string | null
+  lastStatus: string | null
+  lastError: string | null
+  nextRunAt: string | null
+}
+
+export type BackupRun = {
+  id: string
+  backupName: string
+  byteSize: number
+  status: string
+  errorMessage: string | null
+  createdAt: string
+  completedAt: string | null
+}
+
 export type MoveFolderResponse = {
   moved: boolean
   unchanged?: boolean
@@ -327,6 +348,22 @@ export function importStorageFile(token: string, file: Blob) {
 
 export function resetSyncBaseline(token: string) {
   return request<ResetSyncBaselineResult>('/api/v1/storage/reset-sync-baseline', { method: 'POST' }, token)
+}
+
+export function getBackupSettings(token: string) {
+  return request<BackupSettings>('/api/v1/backups/settings', {}, token)
+}
+
+export function updateBackupSettings(token: string, settings: Pick<BackupSettings, 'enabled' | 'dailyTime' | 'retentionCount'>) {
+  return request<BackupSettings>('/api/v1/backups/settings', { method: 'PUT', body: JSON.stringify(settings) }, token)
+}
+
+export function getBackupRuns(token: string) {
+  return request<BackupRun[]>('/api/v1/backups/runs', {}, token)
+}
+
+export function runBackupNow(token: string) {
+  return request<BackupRun>('/api/v1/backups/run', { method: 'POST' }, token)
 }
 
 export function createSidebarPairing(token: string) {
