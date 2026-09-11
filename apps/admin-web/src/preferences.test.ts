@@ -24,4 +24,9 @@ describe('admin preferences', () => {
     savePreferences({ ...preferences, density: 'compact' }, target)
     expect(loadPreferences(target).density).toBe('compact')
   })
+
+  it('falls back when a removed section is stored as the default', () => {
+    const target = storage(JSON.stringify({ version: 1, defaultSection: 'audit-log' }))
+    expect(loadPreferences(target).defaultSection).toBe('overview')
+  })
 })

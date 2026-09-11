@@ -28,7 +28,11 @@ export function loadPreferences(storage: Storage | null = typeof window === 'und
       : defaultPreferences.defaultSection
     return {
       density: value.density === 'compact' ? 'compact' : 'comfortable',
-      defaultSection: storedDefaultSection === 'bookmark-organizer' ? 'categories' : storedDefaultSection,
+      defaultSection: storedDefaultSection === 'bookmark-organizer'
+        ? 'categories'
+        : storedDefaultSection === 'audit-log'
+          ? defaultPreferences.defaultSection
+          : storedDefaultSection,
       reduceMotion: value.reduceMotion === true,
       confirmDangerousActions: value.confirmDangerousActions !== false,
     }

@@ -9,7 +9,6 @@ import {
   RefreshCw,
   Cloud,
   Laptop,
-  ScrollText,
   User,
   Sliders,
   ArrowUpDown,
@@ -55,7 +54,6 @@ type AdminSection =
   | 'app-passwords'
   | 'backup'
   | 'devices'
-  | 'audit-log'
   | 'account'
   | 'preferences'
   | 'import-export'
@@ -73,7 +71,6 @@ type NavIconName =
   | 'passwords'
   | 'backup'
   | 'devices'
-  | 'audit-log'
   | 'account'
   | 'preferences'
   | 'import-export'
@@ -103,7 +100,6 @@ const navGroups: NavGroup[] = [
       { id: 'floccus', label: 'Floccus 配置', icon: 'sync' },
       { id: 'backup', label: '数据备份', icon: 'backup' },
       { id: 'devices', label: '设备管理', icon: 'devices' },
-      { id: 'audit-log', label: '操作日志', icon: 'audit-log' },
     ],
   },
   {
@@ -147,8 +143,6 @@ function NavIcon({ name, size = 18 }: { name: NavIconName; size?: number }) {
       return <Cloud size={size} strokeWidth={1.8} />
     case 'devices':
       return <Laptop size={size} strokeWidth={1.8} />
-    case 'audit-log':
-      return <ScrollText size={size} strokeWidth={1.8} />
     case 'account':
       return <User size={size} strokeWidth={1.8} />
     case 'preferences':
