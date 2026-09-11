@@ -40,7 +40,6 @@
 .capability-points { display: grid; gap: 8px; margin-top: 20px; text-align: left; }
 .capability-points div { display: flex; align-items: center; gap: 8px; color: var(--ink-secondary); font-size: 13px; }
 .capability-points svg { flex: 0 0 auto; color: var(--success); }
-.tags-state .inline-actions { margin-top: 20px; }
 .device-card { justify-content: flex-start; }
 .device-card .device-icon { color: var(--primary); background: var(--primary-soft); }
 .device-card.current { border-color: var(--primary-border); background: var(--primary-soft); }
@@ -147,6 +146,7 @@ html.reduce-motion *, html.reduce-motion *::before, html.reduce-motion *::after 
 .backup-save-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 4px; color: var(--muted); font-size: 12px; }
 .backup-run-list { display: grid; gap: 8px; }
 .backup-run-row { display: flex; align-items: flex-start; gap: 12px; padding: 13px 14px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-subtle); }
+.backup-run-row > .inline-actions { margin-left: auto; flex-wrap: nowrap; }
 .backup-run-status { display: inline-flex; align-items: center; gap: 6px; min-width: 48px; padding-top: 2px; color: var(--muted); font-size: 11px; font-weight: 700; }
 .backup-run-status i { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
 .backup-run-status.success { color: var(--success); }.backup-run-status.success i { background: var(--success); }

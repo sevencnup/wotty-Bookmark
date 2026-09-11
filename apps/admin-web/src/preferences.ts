@@ -32,6 +32,8 @@ export function loadPreferences(storage: Storage | null = typeof window === 'und
         ? 'categories'
         : storedDefaultSection === 'audit-log'
           ? defaultPreferences.defaultSection
+          : storedDefaultSection === 'tags'
+            ? defaultPreferences.defaultSection
           : storedDefaultSection,
       reduceMotion: value.reduceMotion === true,
       confirmDangerousActions: value.confirmDangerousActions !== false,

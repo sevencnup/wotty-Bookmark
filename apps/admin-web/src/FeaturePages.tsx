@@ -2,7 +2,6 @@ import {
   AlertCircle,
   ArchiveRestore,
   CalendarClock,
-  Check,
   ChevronDown,
   ChevronRight,
   CircleHelp,
@@ -15,7 +14,6 @@ import {
   LoaderCircle,
   RefreshCw,
   ShieldCheck,
-  Tag,
   Trash2,
   Upload,
 } from 'lucide-react'
@@ -87,10 +85,6 @@ export function TrashPage({ token, navigate }: PageProps) {
   </div>
 }
 
-export function TagsPage({ navigate }: PageProps) {
-  return <div className="feature-page full-page-state"><section className="panel capability-state tags-state"><span className="capability-icon purple"><Tag size={28} /></span><h3>当前同步模式尚未提供云端标签</h3><p>官方 Floccus 以一个 XBEL 文件同步书签，服务器不会解析客户端加密内容，也没有稳定的跨设备标签数据模型。为了避免标签与书签失去关联，这里不会显示演示数据或提供虚假的云端 CRUD。</p><div className="capability-points"><div><Check size={16} /><span>加密文件不会泄露标签名称</span></div><div><Check size={16} /><span>明文索引目前只包含标题、网址和文件夹</span></div><div><Check size={16} /><span>未来自有客户端协议稳定后再开放跨设备标签</span></div></div><div className="inline-actions"><button className="primary-button" onClick={() => navigate('floccus')} type="button">查看同步配置</button><button className="ghost-button" onClick={() => navigate('help')} type="button">了解加密边界</button></div></section></div>
-}
-
 const DEVICE_CLIENT_KEY = 'bookmark-vault.device-client-id'
 function getClientId() { let value = localStorage.getItem(DEVICE_CLIENT_KEY); if (!value) { value = crypto.randomUUID(); localStorage.setItem(DEVICE_CLIENT_KEY, value) } return value }
 
@@ -134,6 +128,7 @@ export function BackupPage({ token }: { token: string }) {
   const [running, setRunning] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const [confirmRestore, setConfirmRestore] = useState<string | null>(null)
 
   async function load() {
     setError('')
@@ -178,6 +173,31 @@ export function BackupPage({ token }: { token: string }) {
     }
   }
 
+  async function download(run: api.BackupRun) {
+    setError('')
+    try {
+      const blob = await api.downloadBackup(token, run.backupName)
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `${run.backupName}.tar.gz`
+      link.click()
+      URL.revokeObjectURL(url)
+      setNotice('备份归档已开始下载。')
+    } catch (requestError) { setError(errorMessage(requestError, '备份下载失败')) }
+  }
+
+  async function restore(name: string) {
+    setRunning(true)
+    setError('')
+    try {
+      const result = await api.restoreBackup(token, name)
+      setConfirmRestore(null)
+      setNotice(`备份已还原。当前数据已自动保护为 ${result.protectionBackup}；请重启 API 服务使数据库和主密钥完全生效。`)
+      await load()
+    } catch (requestError) { setError(errorMessage(requestError, '备份还原失败')) } finally { setRunning(false) }
+  }
+
   if (loading) return <div className="feature-page full-page-state"><section className="panel feature-loading"><LoaderCircle className="spin" size={28} /><strong>正在读取备份设置…</strong><p>正在检查自动备份状态和最近记录。</p></section></div>
   if (!settings) return <div className="feature-page full-page-state"><section className="panel capability-state"><CloudUpload size={28} /><h3>备份服务暂时无法连接</h3><p>{error || '请稍后重试。'}</p><button className="primary-button" onClick={() => void load()} type="button">重新连接</button></section></div>
   return <div className="feature-page backup-page">
@@ -197,8 +217,9 @@ export function BackupPage({ token }: { token: string }) {
       </div>
       <div className="backup-save-row"><span>{settings.enabled && settings.nextRunAt ? '下一次备份：' + formatDate(settings.nextRunAt) : '关闭后不会执行定时备份。'}</span><button className="ghost-button" disabled={saving} onClick={() => void save()} type="button">{saving ? '保存中…' : '保存设置'}</button></div>
     </section>
-    <section className="panel"><div className="panel-heading"><div><p className="eyebrow">BACKUP HISTORY</p><h3>最近备份</h3></div><button className="toolbar-button compact" onClick={() => void load()} type="button"><RefreshCw size={14} /> 刷新</button></div>{runs.length === 0 ? <div className="feature-empty compact-empty"><CalendarClock size={25} /><h3>还没有备份记录</h3><p>点击“立即备份”创建第一份服务器快照。</p></div> : <div className="backup-run-list">{runs.map((run) => <div className="backup-run-row" key={run.id}><span className={'backup-run-status ' + run.status}><i />{run.status === 'success' ? '成功' : run.status === 'running' ? '执行中' : '失败'}</span><div><strong>{run.backupName}</strong><span>{run.completedAt ? formatDate(run.completedAt) : formatDate(run.createdAt)} · {formatBytes(run.byteSize)}</span>{run.errorMessage && <small>{run.errorMessage}</small>}</div></div>)}</div>}</section>
-    <p className="workspace-note">备份目录位于服务器数据目录的 backups 子目录。备份包含主密钥，请像保护数据库一样保护备份文件。</p>
+    <section className="panel"><div className="panel-heading"><div><p className="eyebrow">BACKUP HISTORY</p><h3>最近备份</h3></div><button className="toolbar-button compact" onClick={() => void load()} type="button"><RefreshCw size={14} /> 刷新</button></div>{runs.length === 0 ? <div className="feature-empty compact-empty"><CalendarClock size={25} /><h3>还没有备份记录</h3><p>点击“立即备份”创建第一份服务器快照。</p></div> : <div className="backup-run-list">{runs.map((run) => <div className="backup-run-row" key={run.id}><span className={'backup-run-status ' + run.status}><i />{run.status === 'success' ? '成功' : run.status === 'running' ? '执行中' : '失败'}</span><div><strong>{run.backupName}</strong><span>{run.completedAt ? formatDate(run.completedAt) : formatDate(run.createdAt)} · {formatBytes(run.byteSize)}</span>{run.errorMessage && <small>{run.errorMessage}</small>}</div>{run.status === 'success' && <div className="inline-actions"><button className="ghost-button compact" disabled={running} onClick={() => void download(run)} type="button"><CloudDownload size={14} /> 下载</button><button className="danger-button compact" disabled={running} onClick={() => setConfirmRestore(run.backupName)} type="button"><ArchiveRestore size={14} /> 还原</button></div>}</div>)}</div>}</section>
+    <p className="workspace-note">下载为完整服务器归档，包含数据库、主密钥、同步文件和历史版本。还原会先自动创建当前数据保护备份，并需要重启 API 服务。</p>
+    {confirmRestore && <ConfirmDialog danger confirmLabel="确认还原" description={`这会覆盖当前数据库、主密钥、同步文件和历史版本。系统会先自动保护当前数据；还原后必须重启 API 服务。`} loading={running} onCancel={() => setConfirmRestore(null)} onConfirm={() => void restore(confirmRestore)} title={`还原 ${confirmRestore}？`} />}
   </div>
 }
 function PreferenceSelect({ label, description, value, onChange, options }: { label: string; description: string; value: string; onChange: (value: string) => void; options: string[][] }) { return <label className="preference-row"><span><strong>{label}</strong><small>{description}</small></span><select value={value} onChange={(event) => onChange(event.target.value)}>{options.map(([option, text]) => <option key={option} value={option}>{text}</option>)}</select></label> }

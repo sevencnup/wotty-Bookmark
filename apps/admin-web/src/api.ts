@@ -366,6 +366,16 @@ export function runBackupNow(token: string) {
   return request<BackupRun>('/api/v1/backups/run', { method: 'POST' }, token)
 }
 
+export async function downloadBackup(token: string, backupName: string) {
+  const response = await fetch(`/api/v1/backups/${encodeURIComponent(backupName)}/download`, { headers: { authorization: `Bearer ${token}` } })
+  if (!response.ok) throw new ApiRequestError('备份下载失败', response.status)
+  return response.blob()
+}
+
+export function restoreBackup(token: string, backupName: string) {
+  return request<{ restored: boolean; restartRequired: boolean; protectionBackup: string }>(`/api/v1/backups/${encodeURIComponent(backupName)}/restore`, { method: 'POST' }, token)
+}
+
 export function createSidebarPairing(token: string) {
   return request<SidebarPairing>('/api/v1/sidebar/pairing-codes', { method: 'POST' }, token)
 }

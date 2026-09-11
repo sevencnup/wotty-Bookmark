@@ -3,7 +3,6 @@ import {
   LayoutDashboard,
   HardDrive,
   FolderTree,
-  Tags,
   Trash2,
   KeyRound,
   RefreshCw,
@@ -33,7 +32,6 @@ import {
 } from 'lucide-react'
 import {
   TrashPage,
-  TagsPage,
   DevicesPage,
   PreferencesPage,
   ImportExportPage,
@@ -50,7 +48,6 @@ type AdminSection =
   | 'overview'
   | 'storage'
   | 'categories'
-  | 'tags'
   | 'trash'
   | 'app-passwords'
   | 'backup'
@@ -67,7 +64,6 @@ type NavIconName =
   | 'overview'
   | 'storage'
   | 'categories'
-  | 'tags'
   | 'trash'
   | 'passwords'
   | 'backup'
@@ -90,7 +86,6 @@ const navGroups: NavGroup[] = [
     items: [
       { id: 'storage', label: '存储文件', icon: 'storage' },
       { id: 'categories', label: '分类管理', icon: 'categories' },
-      { id: 'tags', label: '标签管理', icon: 'tags' },
       { id: 'trash', label: '回收站', icon: 'trash' },
     ],
   },
@@ -132,8 +127,6 @@ function NavIcon({ name, size = 18 }: { name: NavIconName; size?: number }) {
       return <HardDrive size={size} strokeWidth={1.8} />
     case 'categories':
       return <FolderTree size={size} strokeWidth={1.8} />
-    case 'tags':
-      return <Tags size={size} strokeWidth={1.8} />
     case 'trash':
       return <Trash2 size={size} strokeWidth={1.8} />
     case 'passwords':
@@ -298,14 +291,13 @@ function App() {
                 {activeSection === 'account' && <AccountSettings loginIdentifier={session.user.loginIdentifier} onOpenAppPasswords={() => navigate('app-passwords')} />}
                 {activeSection === 'security' && <Security />}
                 {activeSection === 'trash' && <TrashPage navigate={navigate} token={session.token} />}
-                {activeSection === 'tags' && <TagsPage navigate={navigate} token={session.token} />}
                 {activeSection === 'devices' && <DevicesPage navigate={navigate} onSessionRevoked={() => handleSessionChange(null)} token={session.token} />}
                 {activeSection === 'backup' && <BackupPage token={session.token} />}
                 {activeSection === 'preferences' && <PreferencesPage onChange={handlePreferencesChange} preferences={preferences} />}
                 {activeSection === 'import-export' && <ImportExportPage navigate={navigate} token={session.token} />}
                 {activeSection === 'help' && <HelpPage navigate={navigate} token={session.token} />}
                 {activeSection === 'about' && <AboutPage />}
-                {!['overview', 'app-passwords', 'account', 'categories', 'floccus', 'security', 'trash', 'tags', 'devices', 'backup', 'preferences', 'import-export', 'help', 'about'].includes(activeSection) && <ComingSoon label={activeLabel} />}
+                {!['overview', 'app-passwords', 'account', 'categories', 'floccus', 'security', 'trash', 'devices', 'backup', 'preferences', 'import-export', 'help', 'about'].includes(activeSection) && <ComingSoon label={activeLabel} />}
             </>
           )}
         </div>

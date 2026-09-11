@@ -45,7 +45,11 @@ pub async fn list(State(state): State<AppState>, headers: HeaderMap) -> Response
         Ok(rows) => Json(rows.into_iter().map(device_from_row).collect::<Vec<_>>()).into_response(),
         Err(error) => {
             tracing::error!(?error, "list devices failed");
-            auth::error(StatusCode::INTERNAL_SERVER_ERROR, "devices_list_failed", "设备列表读取失败")
+            auth::error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "devices_list_failed",
+                "设备列表读取失败",
+            )
         }
     }
 }
@@ -62,9 +66,17 @@ pub async fn register(
     let name = payload.name.trim();
     let device_type = payload.device_type.trim();
     if client_id.is_empty() || client_id.len() > 160 || name.is_empty() || name.len() > 80 {
-        return auth::error(StatusCode::BAD_REQUEST, "invalid_device", "设备标识或名称无效");
+        return auth::error(
+            StatusCode::BAD_REQUEST,
+            "invalid_device",
+            "设备标识或名称无效",
+        );
     }
-    let device_type = if device_type.is_empty() { "browser" } else { device_type };
+    let device_type = if device_type.is_empty() {
+        "browser"
+    } else {
+        device_type
+    };
     let user_agent = headers
         .get(header::USER_AGENT)
         .and_then(|value| value.to_str().ok())
@@ -91,7 +103,11 @@ pub async fn register(
     .await;
     if let Err(error) = result {
         tracing::error!(?error, "register device failed");
-        return auth::error(StatusCode::INTERNAL_SERVER_ERROR, "device_register_failed", "设备登记失败");
+        return auth::error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "device_register_failed",
+            "设备登记失败",
+        );
     }
     let Some(row) = sqlx::query(
         "SELECT id, client_id, name, device_type, user_agent_summary, last_seen_at, created_at, revoked_at
@@ -136,20 +152,30 @@ pub async fn revoke(
     .await;
     match result {
         Ok(result) if result.rows_affected() == 1 => {
-            if sqlx::query("UPDATE sessions SET revoked_at = CURRENT_TIMESTAMP WHERE device_id = $1")
-                .bind(id)
-                .execute(&state.db)
-                .await
-                .is_err()
+            if sqlx::query(
+                "UPDATE sessions SET revoked_at = CURRENT_TIMESTAMP WHERE device_id = $1",
+            )
+            .bind(id)
+            .execute(&state.db)
+            .await
+            .is_err()
             {
                 tracing::warn!(%id, "revoke device sessions failed");
             }
             StatusCode::NO_CONTENT.into_response()
         }
-        Ok(_) => auth::error(StatusCode::NOT_FOUND, "device_not_found", "设备不存在或已撤销"),
+        Ok(_) => auth::error(
+            StatusCode::NOT_FOUND,
+            "device_not_found",
+            "设备不存在或已撤销",
+        ),
         Err(error) => {
             tracing::error!(?error, "revoke device failed");
-            auth::error(StatusCode::INTERNAL_SERVER_ERROR, "device_revoke_failed", "设备撤销失败")
+            auth::error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "device_revoke_failed",
+                "设备撤销失败",
+            )
         }
     }
 }
@@ -170,11 +196,17 @@ fn device_from_row(row: sqlx::sqlite::SqliteRow) -> DeviceResponse {
 fn summarize_user_agent(user_agent: &str) -> String {
     let summary = user_agent
         .split_whitespace()
-        .filter(|part| !part.starts_with('(') && !part.contains("Mozilla/") && !part.contains("AppleWebKit/"))
+        .filter(|part| {
+            !part.starts_with('(') && !part.contains("Mozilla/") && !part.contains("AppleWebKit/")
+        })
         .take(3)
         .collect::<Vec<_>>()
         .join(" ");
-    if summary.is_empty() { "未知浏览器".into() } else { summary.chars().take(120).collect() }
+    if summary.is_empty() {
+        "未知浏览器".into()
+    } else {
+        summary.chars().take(120).collect()
+    }
 }
 
 #[cfg(test)]
@@ -183,6 +215,9 @@ mod tests {
 
     #[test]
     fn summarizes_user_agent_without_full_browser_noise() {
-        assert_eq!(summarize_user_agent("Mozilla/5.0 (Windows) Chrome/123.0.0.0"), "Chrome/123.0.0.0");
+        assert_eq!(
+            summarize_user_agent("Mozilla/5.0 (Windows) Chrome/123.0.0.0"),
+            "Chrome/123.0.0.0"
+        );
     }
 }

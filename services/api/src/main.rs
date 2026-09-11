@@ -111,6 +111,8 @@ fn app_router(state: AppState) -> Router {
         )
         .route("/api/v1/backups/runs", get(backup::list_runs))
         .route("/api/v1/backups/run", post(backup::run_now))
+        .route("/api/v1/backups/:name/download", get(backup::download))
+        .route("/api/v1/backups/:name/restore", post(backup::restore))
         .route(
             "/api/v1/storage/encryption",
             get(floccus_secrets::encryption_status),

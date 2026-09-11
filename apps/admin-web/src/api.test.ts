@@ -31,6 +31,8 @@ import {
   updateBackupSettings,
   getBackupRuns,
   runBackupNow,
+  downloadBackup,
+  restoreBackup,
 } from './api'
 
 function response(payload: unknown, status = 200): Response {
@@ -172,6 +174,23 @@ describe('admin API contract', () => {
       ['/api/v1/backups/run', 'POST'],
     ])
     expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({ enabled: false, dailyTime: '03:30', retentionCount: 5 })
+  })
+
+  it('downloads and restores a complete server backup', async () => {
+    const blob = new Blob(['archive'])
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(blob, { status: 200 }))
+      .mockResolvedValueOnce(response({ restored: true, restartRequired: true, protectionBackup: 'backup-protect' }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await downloadBackup('session-token', 'backup-20260911-033000-abcd1234')
+    await restoreBackup('session-token', 'backup-20260911-033000-abcd1234')
+
+    expect(fetchMock.mock.calls.map(([path, init]) => [path, init?.method ?? 'GET'])).toEqual([
+      ['/api/v1/backups/backup-20260911-033000-abcd1234/download', 'GET'],
+      ['/api/v1/backups/backup-20260911-033000-abcd1234/restore', 'POST'],
+    ])
+    expect(new Headers(fetchMock.mock.calls[0][1].headers).get('authorization')).toBe('Bearer session-token')
   })
 
   it('manages the protected Floccus passphrase without reading it back', async () => {
