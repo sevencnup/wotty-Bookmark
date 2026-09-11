@@ -129,6 +129,9 @@ pub async fn scheduler(db: SqlitePool, data_dir: PathBuf) {
         if !settings.enabled || settings.daily_time != Local::now().format("%H:%M").to_string() {
             continue;
         }
+        if settings.last_status.as_deref() == Some("running") {
+            continue;
+        }
         if settings.last_status.as_deref() == Some("success")
             && settings
                 .last_finished_at
