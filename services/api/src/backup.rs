@@ -172,7 +172,7 @@ pub async fn restore(
         );
     }
     let guard = BACKUP_LOCK.get_or_init(|| Mutex::new(())).lock().await;
-    let protection = match run_backup_locked(&state.db, &state.data_dir).await {
+    let protection = match run_backup_locked(&state.db, &state.data_dir, false).await {
         Ok(run) => run,
         Err(error) => {
             drop(guard);
@@ -201,9 +201,8 @@ pub async fn restore(
             "还原失败，当前数据已恢复",
         );
     }
-    drop(guard);
     let _ = sqlx::query(
-        "INSERT OR IGNORE INTO backup_runs (id, backup_name, byte_size, status, created_at, completed_at) VALUES ($1, $2, $3, 'success', $4, $5)",
+        "INSERT INTO backup_runs (id, backup_name, byte_size, status, created_at, completed_at) VALUES ($1, $2, $3, 'success', $4, $5) ON CONFLICT(id) DO UPDATE SET backup_name = excluded.backup_name, byte_size = excluded.byte_size, status = excluded.status, created_at = excluded.created_at, completed_at = excluded.completed_at, error_message = NULL",
     )
     .bind(&protection.id)
     .bind(&protection.backup_name)
@@ -212,6 +211,8 @@ pub async fn restore(
     .bind(&protection.completed_at)
     .execute(&state.db)
     .await;
+    drop(guard);
+    let _ = enforce_retention(&state.db, &state.data_dir).await;
     Json(serde_json::json!({
         "restored": true,
         "restartRequired": true,
@@ -429,12 +430,16 @@ async fn load_runs(db: &SqlitePool) -> Result<Vec<BackupRun>, sqlx::Error> {
 
 pub async fn run_backup(db: &SqlitePool, data_dir: &Path) -> Result<BackupRun, String> {
     let guard = BACKUP_LOCK.get_or_init(|| Mutex::new(())).lock().await;
-    let result = run_backup_locked(db, data_dir).await;
+    let result = run_backup_locked(db, data_dir, true).await;
     drop(guard);
     result
 }
 
-async fn run_backup_locked(db: &SqlitePool, data_dir: &Path) -> Result<BackupRun, String> {
+async fn run_backup_locked(
+    db: &SqlitePool,
+    data_dir: &Path,
+    apply_retention: bool,
+) -> Result<BackupRun, String> {
     let run_id = uuid::Uuid::new_v4().to_string();
     let stamp = Local::now().format("%Y%m%d-%H%M%S").to_string();
     let backup_name = format!("backup-{stamp}-{}", &run_id[..8]);
@@ -448,7 +453,9 @@ async fn run_backup_locked(db: &SqlitePool, data_dir: &Path) -> Result<BackupRun
     let finished = Utc::now().to_rfc3339();
     match result {
         Ok(byte_size) => {
-            let _ = enforce_retention(db, data_dir).await;
+            if apply_retention {
+                let _ = enforce_retention(db, data_dir).await;
+            }
             sqlx::query("UPDATE backup_runs SET status = 'success', byte_size = $1, completed_at = $2 WHERE id = $3")
                 .bind(byte_size).bind(&finished).bind(&run_id).execute(db).await.map_err(|e| e.to_string())?;
             sqlx::query("UPDATE backup_settings SET last_finished_at = $1, last_status = 'success', last_error = NULL WHERE id = 1")
