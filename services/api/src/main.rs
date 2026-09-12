@@ -41,6 +41,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .parse()?;
     let data_dir = env::var("DATA_DIR").unwrap_or_else(|_| "./data".into());
     fs::create_dir_all(&data_dir)?;
+    // Keep the favicon cache visible and writable even before the first successful
+    // remote icon resolution. Individual files are created lazily by favicon.rs.
+    fs::create_dir_all(std::path::Path::new(&data_dir).join("favicon-cache"))?;
     let database_url = match env::var("DATABASE_URL") {
         Ok(value) => value,
         Err(_) => {
