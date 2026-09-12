@@ -234,8 +234,15 @@ html.reduce-motion *, html.reduce-motion *::before, html.reduce-motion *::after 
 }
 
 .library-search:focus-within {
-  border-color: var(--primary);
+  border-color: #d7deea;
   background: #ffffff;
+  box-shadow: none;
+}
+
+.library-search input:focus,
+.library-search input:focus-visible {
+  outline: 0;
+  box-shadow: none;
 }
 
 .library-search input {
