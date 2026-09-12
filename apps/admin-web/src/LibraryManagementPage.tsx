@@ -146,37 +146,66 @@ function LibrarySiteIcon({ title, url, source }: { title: string; url: string; s
   const initial = (host || title || '?').trim().charAt(0).toUpperCase()
   const candidates = useMemo(() => getLibraryFaviconCandidates(url), [url])
   const [candidateIndex, setCandidateIndex] = useState(0)
-  const [sourceFailed, setSourceFailed] = useState(false)
+  const [failedSource, setFailedSource] = useState<string | null>(null)
   const [cachedFallback, setCachedFallback] = useState<string | null>(() => getCachedLibraryFavicon(url))
-  const fallbackSource = candidates[candidateIndex] ?? null
-  const visibleSource = source && !sourceFailed ? source : cachedFallback ?? fallbackSource
+  const [resolvedSource, setResolvedSource] = useState<string | null>(() => source?.startsWith('data:') ? source : null)
+  const [resolvedUrl, setResolvedUrl] = useState(url)
+  const preferredSource = source && failedSource !== source
+    ? source
+    : cachedFallback && cachedFallback !== failedSource
+      ? cachedFallback
+      : candidates[candidateIndex] ?? null
+  const visibleSource = resolvedUrl === url ? resolvedSource : null
 
   useEffect(() => {
     setCandidateIndex(0)
-    setSourceFailed(false)
+    setFailedSource(null)
     setCachedFallback(getCachedLibraryFavicon(url))
-  }, [url, source])
+    setResolvedSource(source?.startsWith('data:') ? source : null)
+    setResolvedUrl(url)
+  }, [url])
 
-  const handleError = () => {
-    if (source && !sourceFailed) {
-      setSourceFailed(true)
-      return
+  useEffect(() => {
+    if (!preferredSource || preferredSource === visibleSource) return
+    let active = true
+    let settled = false
+    const image = new Image()
+    const timeout = window.setTimeout(() => finish(false), 3500)
+    const finish = (loaded: boolean) => {
+      if (!active || settled) return
+      settled = true
+      window.clearTimeout(timeout)
+      if (loaded) {
+        setResolvedSource(preferredSource)
+        setResolvedUrl(url)
+        if (preferredSource !== source) {
+          rememberLibraryFavicon(url, preferredSource)
+          setCachedFallback(preferredSource)
+        }
+        return
+      }
+      if (preferredSource === source) {
+        setFailedSource(preferredSource)
+        setResolvedSource(null)
+      } else if (preferredSource === cachedFallback) {
+        forgetLibraryFavicon(url, preferredSource)
+        setCachedFallback(null)
+        setResolvedSource(null)
+        setCandidateIndex(0)
+      } else {
+        setCandidateIndex((index) => index + 1)
+      }
     }
-    if (cachedFallback && visibleSource === cachedFallback) {
-      forgetLibraryFavicon(url, cachedFallback)
-      setCachedFallback(null)
-      setCandidateIndex(0)
-      return
+    image.onload = () => finish(true)
+    image.onerror = () => finish(false)
+    image.src = preferredSource
+    return () => {
+      active = false
+      window.clearTimeout(timeout)
+      image.onload = null
+      image.onerror = null
     }
-    setCandidateIndex((index) => index + 1)
-  }
+  }, [cachedFallback, preferredSource, source, url, visibleSource])
 
-  const handleLoad = () => {
-    if (visibleSource && visibleSource !== source) {
-      rememberLibraryFavicon(url, visibleSource)
-      setCachedFallback(visibleSource)
-    }
-  }
-
-  return <span className={'library-site-icon ' + (!visibleSource ? 'is-fallback' : '')} title={host || '网站图标'}>{visibleSource ? <img alt="" decoding="async" height={20} loading="lazy" onError={handleError} onLoad={handleLoad} referrerPolicy="no-referrer" src={visibleSource} width={20} /> : <span aria-hidden="true">{initial}</span>}</span>
+  return <span className={'library-site-icon ' + (!visibleSource ? 'is-fallback' : '')} title={host || '网站图标'}>{visibleSource ? <img alt="" decoding="async" height={20} loading="eager" referrerPolicy="no-referrer" src={visibleSource} width={20} /> : <span aria-hidden="true">{initial}</span>}</span>
 }

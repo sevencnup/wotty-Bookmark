@@ -172,10 +172,14 @@ async fn discover_favicon(
     client: &Client,
     origin: &str,
 ) -> Result<Option<CachedIcon>, reqwest::Error> {
-    let homepage = client.get(origin).send().await?;
-    let page_url = homepage.url().clone();
-    let html = read_limited(homepage, MAX_HTML_BYTES).await?;
-    let mut candidates = parse_icon_links(&html, &page_url);
+    let (page_url, mut candidates) = match client.get(origin).send().await {
+        Ok(homepage) => {
+            let page_url = homepage.url().clone();
+            let html = read_limited(homepage, MAX_HTML_BYTES).await.unwrap_or_default();
+            (page_url.clone(), parse_icon_links(&html, &page_url))
+        }
+        Err(_) => (Url::parse(origin).expect("origin was normalized before discovery"), Vec::new()),
+    };
     for path in [
         "/favicon.ico",
         "/favicon.svg",
