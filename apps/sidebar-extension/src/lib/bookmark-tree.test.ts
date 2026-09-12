@@ -51,7 +51,7 @@ describe('bookmark tree helpers', () => {
     expect(tree[0]?.children?.[0]?.url).toBeUndefined();
   });
 
-  it('keeps nested folder depth available for progressively shorter rows', () => {
+  it('keeps nested folder depth available for sidebar indentation', () => {
     const rows = flattenVisibleNodes(tree, new Set(['bar', 'design']));
     expect(rows.find((row) => row.id === 'bar')?.depth).toBe(0);
     expect(rows.find((row) => row.id === 'design')?.depth).toBe(1);

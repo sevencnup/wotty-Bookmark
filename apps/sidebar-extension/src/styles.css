@@ -559,8 +559,8 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 .bookmark-row:hover { background: #f8fafc; }
 .bookmark-folder-row {
   min-height: 50px;
-  width: calc(100% - 8px - (var(--folder-depth, 0) * 14px));
-  margin: 3px 4px 3px calc(4px + (var(--folder-depth, 0) * 14px));
+  width: calc(100% - 8px);
+  margin: 3px 4px;
   border: 1px solid #c9d8f2;
   border-radius: var(--radius-sm);
   background: linear-gradient(90deg, #dce9ff 0%, #e8f1ff 58%, #f0f5ff 100%);
@@ -663,6 +663,24 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 .bookmark-folder-row .bookmark-title {
   color: #334155;
   font-weight: 600;
+}
+
+.folder-count-badge {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid #b7cdf7;
+  border-radius: 999px;
+  color: #315aaa;
+  background: rgba(255, 255, 255, 0.78);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  line-height: 1;
 }
 .bookmark-folder-row .folder-toggle:hover,
 .bookmark-folder-row .folder-toggle:focus-visible {
