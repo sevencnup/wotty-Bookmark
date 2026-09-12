@@ -4,13 +4,14 @@ mod bookmarks;
 mod devices;
 mod floccus_crypto;
 mod floccus_secrets;
+mod library;
 mod state;
 mod trash;
 mod webdav;
 
 use axum::{
     http::{header, HeaderName, Method},
-    routing::{any, delete, get, post},
+    routing::{any, delete, get, patch, post},
     Router,
 };
 use sqlx::sqlite::SqlitePoolOptions;
@@ -126,6 +127,24 @@ fn app_router(state: AppState) -> Router {
             delete(floccus_secrets::forget_passphrase),
         )
         .route("/api/v1/bookmarks", get(bookmarks::list_bookmarks))
+        .route("/api/v1/library", get(library::list))
+        .route("/api/v1/library/bookmarks", post(library::create_bookmark))
+        .route("/api/v1/library/folders", post(library::create_folder))
+        .route(
+            "/api/v1/library/nodes/:id",
+            patch(library::update_node).delete(library::delete_node),
+        )
+        .route("/api/v1/library/nodes/:id/move", post(library::move_node))
+        .route("/api/v1/library/trash", get(library::list_trash))
+        .route(
+            "/api/v1/library/trash/:id/restore",
+            post(library::restore_node),
+        )
+        .route("/api/v1/library/import", post(library::import_xbel))
+        .route(
+            "/api/v1/library/import-from-sync",
+            post(library::import_from_sync),
+        )
         .route("/api/v1/bookmarks/move", post(bookmarks::move_bookmark))
         .route(
             "/api/v1/bookmarks/move-batch",
@@ -199,6 +218,7 @@ fn cors_layer_for_origins(configured_origins: &str) -> CorsLayer {
             Method::GET,
             Method::HEAD,
             Method::POST,
+            Method::PATCH,
             Method::DELETE,
             Method::OPTIONS,
             Method::from_bytes(b"PROPFIND").expect("valid WebDAV method"),

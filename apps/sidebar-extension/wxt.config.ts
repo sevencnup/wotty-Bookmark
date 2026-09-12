@@ -14,12 +14,12 @@ export default defineConfig({
   manifest: {
     name: 'WOTTY BOOKMARK Sidebar',
     short_name: 'Bookmarks',
-    description: 'A focused sidebar for your browser-native bookmarks.',
-    version: '0.1.3',
-    permissions: ['bookmarks', 'tabs', 'storage'],
+    description: 'A private sidebar for your self-hosted bookmark library.',
+    version: '0.2.0',
+    permissions: ['tabs', 'storage'],
     host_permissions: ['http://*/*', 'https://*/*'],
     action: {
-      default_title: '打开书签侧边栏',
+      default_title: '打开服务器书签库',
       default_icon: {
         16: 'logo.png',
         32: 'logo.png',

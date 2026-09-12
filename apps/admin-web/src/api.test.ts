@@ -33,6 +33,14 @@ import {
   runBackupNow,
   downloadBackup,
   restoreBackup,
+  getLibrary,
+  createLibraryBookmark,
+  createLibraryFolder,
+  moveLibraryNode,
+  deleteLibraryNode,
+  restoreLibraryNode,
+  importLibraryXbel,
+  importLibraryFromSync,
 } from './api'
 
 function response(payload: unknown, status = 200): Response {
@@ -121,6 +129,40 @@ describe('admin API contract', () => {
     expect(JSON.parse(fetchMock.mock.calls[2][1].body)).toEqual({ bookmarkIds: ['bookmark-1', 'bookmark-2'], parentId: 'folder-2', expectedEtag: 'etag-2' })
     expect(fetchMock.mock.calls[3][0]).toBe('/api/v1/bookmarks/folders/move')
     expect(JSON.parse(fetchMock.mock.calls[3][1].body)).toEqual({ folderId: 'folder-3', parentId: null, expectedEtag: 'etag-3' })
+  })
+
+  it('keeps self-hosted library requests separate from Floccus endpoints', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(response({ folders: [], bookmarks: [] }))
+      .mockResolvedValueOnce(response({ node: {} }))
+      .mockResolvedValueOnce(response({ node: {} }))
+      .mockResolvedValueOnce(response({ moved: true }))
+      .mockResolvedValueOnce(response({ deleted: true }))
+      .mockResolvedValueOnce(response({ restored: true }))
+      .mockResolvedValueOnce(response({ imported: true, count: 2 }))
+      .mockResolvedValueOnce(response({ imported: true, count: 2 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await getLibrary('token')
+    await createLibraryBookmark('token', { title: 'Example', url: 'https://example.com', parentId: null })
+    await createLibraryFolder('token', { title: 'Work', parentId: null })
+    await moveLibraryNode('token', 'node/one', null)
+    await deleteLibraryNode('token', 'node/one')
+    await restoreLibraryNode('token', 'node/one')
+    await importLibraryXbel('token', '<xbel/>', true)
+    await importLibraryFromSync('token')
+
+    expect(fetchMock.mock.calls.map(([path, init]) => [path, init?.method ?? 'GET'])).toEqual([
+      ['/api/v1/library', 'GET'],
+      ['/api/v1/library/bookmarks', 'POST'],
+      ['/api/v1/library/folders', 'POST'],
+      ['/api/v1/library/nodes/node%2Fone/move', 'POST'],
+      ['/api/v1/library/nodes/node%2Fone', 'DELETE'],
+      ['/api/v1/library/trash/node%2Fone/restore', 'POST'],
+      ['/api/v1/library/import', 'POST'],
+      ['/api/v1/library/import-from-sync', 'POST'],
+    ])
+    expect(JSON.parse(fetchMock.mock.calls[6][1].body)).toEqual({ xbel: '<xbel/>', replace: true })
   })
   it('uses binary requests for storage import and export', async () => {
     const fetchMock = vi.fn()

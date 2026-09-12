@@ -7,34 +7,9 @@ export interface BookmarkNode {
   children?: BookmarkNode[];
 }
 
-export interface BookmarkCreateDetails {
-  parentId?: string;
-  index?: number;
-  title: string;
-  url?: string;
-}
-
-export interface BookmarkUpdateDetails {
-  title?: string;
-  url?: string;
-}
-
 interface BookmarkListener {
   addListener(listener: (...args: any[]) => void): void;
   removeListener(listener: (...args: any[]) => void): void;
-}
-
-interface BookmarkApi {
-  getTree(): Promise<BookmarkNode[]>;
-  create(details: BookmarkCreateDetails): Promise<BookmarkNode>;
-  update(id: string, changes: BookmarkUpdateDetails): Promise<BookmarkNode>;
-  move(id: string, destination: { parentId?: string; index?: number }): Promise<BookmarkNode>;
-  remove(id: string): Promise<void>;
-  removeTree(id: string): Promise<void>;
-  onCreated: BookmarkListener;
-  onChanged: BookmarkListener;
-  onMoved: BookmarkListener;
-  onRemoved: BookmarkListener;
 }
 
 interface TabsApi {
@@ -44,27 +19,12 @@ interface TabsApi {
 }
 
 interface BrowserGlobals {
-  browser?: { bookmarks?: BookmarkApi; tabs?: TabsApi };
-  chrome?: { bookmarks?: BookmarkApi; tabs?: TabsApi };
+  browser?: { tabs?: TabsApi };
+  chrome?: { tabs?: TabsApi };
 }
 
 function getGlobals(): BrowserGlobals {
   return globalThis as unknown as BrowserGlobals;
-}
-
-export function getBookmarksApi(): BookmarkApi {
-  const globals = getGlobals();
-  const api = globals.browser?.bookmarks ?? globals.chrome?.bookmarks;
-
-  if (!api) {
-    throw new Error('Bookmarks API is not available in this browser context.');
-  }
-
-  return api;
-}
-
-export async function getBookmarkTree(): Promise<BookmarkNode[]> {
-  return getBookmarksApi().getTree();
 }
 
 export async function getActiveTab(): Promise<{ title: string; url: string } | null> {

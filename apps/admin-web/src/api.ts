@@ -118,6 +118,33 @@ export class ApiRequestError extends Error {
   }
 }
 
+export type LibraryFolder = {
+  id: string
+  title: string
+  bookmarkCount: number
+  children: LibraryFolder[]
+}
+
+export type LibraryBookmark = {
+  id: string
+  title: string
+  url: string
+  parentId: string | null
+  folderPath: string
+}
+
+export type LibraryTree = {
+  folders: LibraryFolder[]
+  bookmarks: LibraryBookmark[]
+}
+
+export type LibraryTrashItem = {
+  id: string
+  title: string
+  nodeType: 'folder' | 'bookmark'
+  deletedAt: string
+}
+
 export type EncryptionStatus = {
   encryptedFile: boolean
   passphraseStored: boolean
@@ -383,6 +410,46 @@ export function createSidebarPairing(token: string) {
 export function getBookmarks(token: string, query = '') {
   const suffix = query.trim() ? `?q=${encodeURIComponent(query.trim())}` : ''
   return request<BookmarkTree>(`/api/v1/bookmarks${suffix}`, {}, token)
+}
+
+export function getLibrary(token: string) {
+  return request<LibraryTree>('/api/v1/library', {}, token)
+}
+
+export function createLibraryBookmark(token: string, value: { title: string; url: string; parentId: string | null }) {
+  return request('/api/v1/library/bookmarks', { method: 'POST', body: JSON.stringify(value) }, token)
+}
+
+export function createLibraryFolder(token: string, value: { title: string; parentId: string | null }) {
+  return request('/api/v1/library/folders', { method: 'POST', body: JSON.stringify(value) }, token)
+}
+
+export function updateLibraryNode(token: string, id: string, value: { title: string; url?: string }) {
+  return request(`/api/v1/library/nodes/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(value) }, token)
+}
+
+export function moveLibraryNode(token: string, id: string, parentId: string | null) {
+  return request(`/api/v1/library/nodes/${encodeURIComponent(id)}/move`, { method: 'POST', body: JSON.stringify({ parentId }) }, token)
+}
+
+export function deleteLibraryNode(token: string, id: string) {
+  return request(`/api/v1/library/nodes/${encodeURIComponent(id)}`, { method: 'DELETE' }, token)
+}
+
+export function getLibraryTrash(token: string) {
+  return request<LibraryTrashItem[]>('/api/v1/library/trash', {}, token)
+}
+
+export function restoreLibraryNode(token: string, id: string) {
+  return request(`/api/v1/library/trash/${encodeURIComponent(id)}/restore`, { method: 'POST' }, token)
+}
+
+export function importLibraryXbel(token: string, xbel: string, replace = false) {
+  return request<{ imported: boolean; count: number }>('/api/v1/library/import', { method: 'POST', body: JSON.stringify({ xbel, replace }) }, token)
+}
+
+export function importLibraryFromSync(token: string) {
+  return request<{ imported: boolean; count: number }>('/api/v1/library/import-from-sync', { method: 'POST' }, token)
 }
 
 export function moveBookmark(token: string, bookmarkId: string, parentId: string, expectedEtag: string | null) {

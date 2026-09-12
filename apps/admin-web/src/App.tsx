@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import {
   LayoutDashboard,
+  Bookmark,
   HardDrive,
   FolderTree,
   Trash2,
@@ -40,6 +41,7 @@ import {
   BackupPage,
 } from './FeaturePages'
 import { CategoryManagementPage } from './CategoryManagementPage'
+import { LibraryManagementPage } from './LibraryManagementPage'
 import * as api from './api'
 import { loadPreferences, savePreferences, type Preferences } from './preferences'
 import { descendantFolderIds, flattenFolders, findFolder, folderHasChildren, resolveDraggedBookmarkIds, visibleFolders, type FlatBookmarkFolder } from './bookmark-tree'
@@ -48,6 +50,7 @@ type AdminSection =
   | 'overview'
   | 'storage'
   | 'categories'
+  | 'library'
   | 'trash'
   | 'app-passwords'
   | 'backup'
@@ -64,6 +67,7 @@ type NavIconName =
   | 'overview'
   | 'storage'
   | 'categories'
+  | 'library'
   | 'trash'
   | 'passwords'
   | 'backup'
@@ -85,6 +89,7 @@ const navGroups: NavGroup[] = [
     label: '数据管理',
     items: [
       { id: 'storage', label: '存储文件', icon: 'storage' },
+      { id: 'library', label: '我的书签库', icon: 'library' },
       { id: 'categories', label: '分类管理', icon: 'categories' },
       { id: 'trash', label: '回收站', icon: 'trash' },
     ],
@@ -127,6 +132,8 @@ function NavIcon({ name, size = 18 }: { name: NavIconName; size?: number }) {
       return <HardDrive size={size} strokeWidth={1.8} />
     case 'categories':
       return <FolderTree size={size} strokeWidth={1.8} />
+    case 'library':
+      return <Bookmark size={size} strokeWidth={1.8} />
     case 'trash':
       return <Trash2 size={size} strokeWidth={1.8} />
     case 'passwords':
@@ -287,6 +294,7 @@ function App() {
                 {activeSection === 'overview' && <Overview token={session.token} />}
                 {activeSection === 'app-passwords' && <AppPasswords token={session.token} />}
                 {activeSection === 'categories' && <CategoryManagementPage token={session.token} onOpenFloccus={() => navigate('floccus')} />}
+                {activeSection === 'library' && <LibraryManagementPage token={session.token} />}
                 {activeSection === 'floccus' && <FloccusGuide token={session.token} loginIdentifier={session.user.loginIdentifier} />}
                 {activeSection === 'account' && <AccountSettings loginIdentifier={session.user.loginIdentifier} onOpenAppPasswords={() => navigate('app-passwords')} />}
                 {activeSection === 'security' && <Security />}
@@ -297,7 +305,7 @@ function App() {
                 {activeSection === 'import-export' && <ImportExportPage navigate={navigate} token={session.token} />}
                 {activeSection === 'help' && <HelpPage navigate={navigate} token={session.token} />}
                 {activeSection === 'about' && <AboutPage />}
-                {!['overview', 'app-passwords', 'account', 'categories', 'floccus', 'security', 'trash', 'devices', 'backup', 'preferences', 'import-export', 'help', 'about'].includes(activeSection) && <ComingSoon label={activeLabel} />}
+                {!['overview', 'app-passwords', 'account', 'categories', 'library', 'floccus', 'security', 'trash', 'devices', 'backup', 'preferences', 'import-export', 'help', 'about'].includes(activeSection) && <ComingSoon label={activeLabel} />}
             </>
           )}
         </div>

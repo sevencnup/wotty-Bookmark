@@ -10,14 +10,6 @@ export interface BackendConnection {
   connectedAt: string;
 }
 
-export interface BackendBookmarkTree {
-  status: 'ready' | 'encrypted' | 'migrationRequired' | 'notReady';
-  etag: string | null;
-  version: number | null;
-  folders: Array<{ id: string; title: string; bookmarkCount: number; children: unknown[] }>;
-  bookmarks: Array<{ id: string; title: string; url: string; parentId: string | null; folderPath: string }>;
-}
-
 interface SessionResponse {
   token: string;
   user: { id: string; loginIdentifier: string };
@@ -55,15 +47,4 @@ export async function connectToBackend(serverUrlValue: string, deviceCodeValue: 
   };
   await browser.storage.local.set({ [CONNECTION_KEY]: connection });
   return connection;
-}
-
-export async function getBackendBookmarks(connection: BackendConnection): Promise<BackendBookmarkTree> {
-  const response = await fetch(`${connection.serverUrl}/api/v1/bookmarks`, {
-    headers: { authorization: `Bearer ${connection.token}` },
-  });
-  const payload = await response.json().catch(() => null) as BackendBookmarkTree | { message?: string } | null;
-  if (!response.ok || !payload || !('status' in payload)) {
-    throw new Error(payload && 'message' in payload && payload.message ? payload.message : '读取后台书签失败');
-  }
-  return payload;
 }

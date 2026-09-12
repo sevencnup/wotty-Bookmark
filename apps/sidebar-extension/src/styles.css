@@ -419,6 +419,28 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   line-height: 1.4;
 }
 
+/* ── 服务器书签库边界 ─────────────────────────────────────── */
+.server-library-banner {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 10px 0;
+  padding: 8px 10px;
+  border: 1px solid #bfdbfe;
+  border-radius: var(--radius-sm);
+  color: #1d4ed8;
+  background: #eff6ff;
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.server-library-banner strong { color: #1e3a8a; }
+.heading-actions { display: flex; align-items: center; gap: 6px; }
+.new-bookmark-button.primary { border-color: var(--brand-primary); color: #fff; background: var(--brand-primary); }
+.new-bookmark-button.primary:hover { color: #fff; background: var(--brand-primary-hover); }
+.inline-error { margin: 10px 0 0; color: var(--danger); font-size: 11px; }
+.self-hosted-library .loading-state { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 110px; color: var(--muted); font-size: 12px; }
+
 /* ── 书签列表与树形行 ─────────────────────────────────────── */
 .bookmark-list {
   border: 1px solid var(--line);
