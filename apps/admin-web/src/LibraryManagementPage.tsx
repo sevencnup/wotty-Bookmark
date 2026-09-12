@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Bookmark, CheckCircle2, ExternalLink, Folder, FolderInput, HardDriveUpload, LoaderCircle, Plus, RefreshCw, RotateCcw, Search, Server, Trash2, X } from 'lucide-react'
 import * as api from './api'
+import { resolveLibraryFavicon } from './library-favicon'
 
 type CreateKind = 'bookmark' | 'folder'
 
@@ -98,19 +99,20 @@ function getLibraryHost(value: string) {
   try { return new URL(value).hostname.replace(/^www\./, '') } catch { return value }
 }
 
-function getLibraryFaviconUrl(value: string) {
-  try {
-    const parsed = new URL(value)
-    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null
-    return new URL('/favicon.ico', parsed.origin).toString()
-  } catch { return null }
-}
-
 function LibrarySiteIcon({ title, url }: { title: string; url: string }) {
-  const [failed, setFailed] = useState(false)
-  useEffect(() => setFailed(false), [url])
-  const favicon = getLibraryFaviconUrl(url)
+  const [favicon, setFavicon] = useState<string | null>(null)
+  const [loadedUrl, setLoadedUrl] = useState('')
+  useEffect(() => {
+    let active = true
+    setFavicon(null)
+    setLoadedUrl(url)
+    void resolveLibraryFavicon(url).then((source) => {
+      if (active) setFavicon(source)
+    })
+    return () => { active = false }
+  }, [url])
   const host = getLibraryHost(url)
   const initial = (host || title || '?').trim().charAt(0).toUpperCase()
-  return <span className={`library-site-icon ${failed || !favicon ? 'is-fallback' : ''}`} title={host || '网站图标'}>{favicon && !failed ? <img alt="" decoding="async" loading="lazy" onError={() => setFailed(true)} src={favicon} /> : <span aria-hidden="true">{initial}</span>}</span>
+  const visibleFavicon = loadedUrl === url ? favicon : null
+  return <span className={`library-site-icon ${!visibleFavicon ? 'is-fallback' : ''}`} title={host || '网站图标'}>{visibleFavicon ? <img alt="" decoding="async" height={20} loading="lazy" referrerPolicy="no-referrer" src={visibleFavicon} width={20} /> : <span aria-hidden="true">{initial}</span>}</span>
 }
