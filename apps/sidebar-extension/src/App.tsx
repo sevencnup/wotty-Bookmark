@@ -28,6 +28,10 @@ function toNodes(tree: LibraryTree): BookmarkNode[] {
 
 function hostname(value: string) { try { return new URL(value).hostname.replace(/^www\./, ''); } catch { return value; } }
 
+function flattenLibraryFolders(folders: LibraryFolder[], depth = 0): Array<LibraryFolder & { depth: number }> {
+  return folders.flatMap((folder) => [{ ...folder, depth }, ...flattenLibraryFolders(folder.children, depth + 1)]);
+}
+
 function App() {
   const [connection, setConnection] = useState<BackendConnection | null>(null);
   const [tree, setTree] = useState<LibraryTree | null>(null);
@@ -38,6 +42,7 @@ function App() {
   const [query, setQuery] = useState('');
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [activeTab, setActiveTab] = useState<{ title: string; url: string } | null>(null);
+  const [quickSaveFolder, setQuickSaveFolder] = useState('');
 
   const refresh = useCallback(async (current = connection) => {
     if (!current) { setTree(null); setLoading(false); return; }
@@ -51,10 +56,14 @@ function App() {
 
   const nodes = useMemo(() => tree ? toNodes(tree) : [], [tree]);
   const folders = useMemo(() => collectFolders(nodes), [nodes]);
+  const folderOptions = useMemo(() => flattenLibraryFolders(tree?.folders ?? []), [tree]);
   const visible = useMemo(() => flattenVisibleNodes(nodes, expanded), [nodes, expanded]);
   const results = useMemo(() => searchBookmarks(nodes, query), [nodes, query]);
   const currentSaved = Boolean(activeTab && tree?.bookmarks.some((item) => item.url === activeTab.url));
   useEffect(() => { setExpanded((value) => new Set([...value, ...folders])); }, [folders]);
+  useEffect(() => {
+    if (quickSaveFolder && !folderOptions.some((folder) => folder.id === quickSaveFolder)) setQuickSaveFolder('');
+  }, [folderOptions, quickSaveFolder]);
 
   const perform = useCallback(async (operation: (active: BackendConnection) => Promise<unknown>) => {
     if (!connection) { setModal({ type: 'connect' }); return; }
@@ -79,12 +88,12 @@ function App() {
     <section className="workspace">
       <div className="server-library-banner"><Server size={15} /><span><strong>只保存到服务器</strong> · 不读取或写入浏览器原生书签</span></div>
       <div className="search-shell"><Search size={16} /><input aria-label="搜索服务器书签" disabled={!connection} onChange={(event) => setQuery(event.target.value)} placeholder="搜索服务器书签或网址" type="search" value={query} />{query && <button className="icon-button" onClick={() => setQuery('')} type="button"><X size={14} /></button>}</div>
-      <section className={`quick-save-card ${!activeTab || !connection ? 'is-disabled' : ''}`}><div className="quick-save-icon"><Globe size={17} /></div><div className="quick-save-copy"><span className="eyebrow">收藏当前页 · SERVER</span><strong>{activeTab?.title ?? '当前页面不可收藏'}</strong><span>{activeTab ? hostname(activeTab.url) : '请在普通网页中打开侧边栏'}</span></div><button className={`save-current-button ${currentSaved ? 'is-saved' : ''}`} disabled={!activeTab || !connection || currentSaved || busy} onClick={() => activeTab && void perform((active) => createLibraryBookmark(active, { title: activeTab.title, url: activeTab.url, parentId: null }))} type="button">{currentSaved ? <Check size={15} /> : <Plus size={15} />}{currentSaved ? '已收藏' : '收藏'}</button></section>
+      <section className={`quick-save-card ${!activeTab || !connection ? 'is-disabled' : ''}`}><div className="quick-save-icon"><Globe size={17} /></div><div className="quick-save-copy"><span className="eyebrow">收藏当前页 · SERVER</span><strong>{activeTab?.title ?? '当前页面不可收藏'}</strong><span>{activeTab ? hostname(activeTab.url) : '请在普通网页中打开侧边栏'}</span></div><label className="quick-save-folder"><Folder size={13} /><span className="sr-only">保存到文件夹</span><select aria-label="收藏到文件夹" disabled={!activeTab || !connection || currentSaved || busy} onChange={(event) => setQuickSaveFolder(event.target.value)} value={quickSaveFolder}><option value="">根目录</option>{folderOptions.map((folder) => <option key={folder.id} value={folder.id}>{'　'.repeat(folder.depth)}{folder.title}</option>)}</select></label><button className={`save-current-button ${currentSaved ? 'is-saved' : ''}`} disabled={!activeTab || !connection || currentSaved || busy} onClick={() => activeTab && void perform((active) => createLibraryBookmark(active, { title: activeTab.title, url: activeTab.url, parentId: quickSaveFolder || null }))} type="button">{currentSaved ? <Check size={15} /> : <Plus size={15} />}{currentSaved ? '已收藏' : '收藏'}</button></section>
       <div className="section-heading"><div><span className="section-kicker">PRIVATE LIBRARY</span><h1>我的服务器书签</h1></div><div className="heading-actions"><button className="new-bookmark-button" disabled={!connection} onClick={() => setModal({ type: 'create', kind: 'folder' })} type="button"><Folder size={15} />文件夹</button><button className="new-bookmark-button primary" disabled={!connection} onClick={() => setModal({ type: 'create', kind: 'bookmark' })} type="button"><Plus size={15} />新增</button></div></div>
       <div className="library-meta"><span>{countBookmarks(nodes)} 个书签</span><span className="meta-separator">·</span><span>{countFolders(nodes)} 个文件夹</span><span className="meta-spacer" /><button className="refresh-button" disabled={!connection || loading} onClick={() => void refresh()} type="button"><RefreshCw className={loading ? 'spin' : ''} size={13} />刷新</button></div>
       {!connection ? <Disconnected onConnect={() => setModal({ type: 'connect' })} /> : error && !tree ? <Failure message={error} onRetry={() => void refresh()} /> : loading ? <Loading /> : query.trim() ? <SearchList results={results} onEdit={(nodeId) => setModal({ type: 'edit', nodeId })} onMove={(nodeId) => setModal({ type: 'move', nodeId })} onDelete={(nodeId) => setModal({ type: 'delete', nodeId })} /> : visible.length ? <div className="bookmark-list">{visible.map((node) => <NodeRow key={node.id} node={node} expanded={expanded.has(node.id)} onDelete={() => setModal({ type: 'delete', nodeId: node.id })} onEdit={() => setModal({ type: 'edit', nodeId: node.id })} onMove={() => setModal({ type: 'move', nodeId: node.id })} onOpen={() => node.url && void openBookmark(node.url)} onToggle={() => setExpanded((current) => { const next = new Set(current); if (next.has(node.id)) next.delete(node.id); else next.add(node.id); return next; })} />)}</div> : <Empty onCreate={() => setModal({ type: 'create', kind: 'bookmark' })} />}{error && tree && <p className="inline-error">{error}</p>}
     </section>
-    <footer className="app-footer"><span><span className="footer-dot" /> 服务器是唯一数据源</span><span className="footer-version">v0.1.4</span></footer>
+    <footer className="app-footer"><span><span className="footer-dot" /> 服务器是唯一数据源</span><span className="footer-version">v0.1.5</span></footer>
     {modal?.type === 'connect' && <ConnectionModal busy={busy} connection={connection} onClose={() => setModal(null)} onConnect={(serverUrl, code) => { setBusy(true); setError(null); void connectToBackend(serverUrl, code).then(async (next) => { setConnection(next); await refresh(next); setModal(null); }).catch((reason: unknown) => setError(reason instanceof Error ? reason.message : '连接失败')).finally(() => setBusy(false)); }} onDisconnect={() => { setBusy(true); void clearBackendConnection().then(() => { setConnection(null); setTree(null); setModal(null); }).finally(() => setBusy(false)); }} />}
     {modal?.type === 'create' && <EditorModal busy={busy} initial={{ kind: modal.kind, parentId: modal.parentId ?? '' }} nodes={nodes} onClose={() => setModal(null)} onSubmit={submitEditor} />}
     {modal?.type === 'edit' && <EditorModal busy={busy} node={findNode(nodes, modal.nodeId)} nodes={nodes} onClose={() => setModal(null)} onSubmit={submitEditor} />}

@@ -18,7 +18,7 @@ describe('server library client', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     await getLibrary(connection);
-    await createLibraryBookmark(connection, { title: 'Example', url: 'https://example.com', parentId: null });
+    await createLibraryBookmark(connection, { title: 'Example', url: 'https://example.com', parentId: 'folder-1' });
     await moveLibraryNode(connection, 'node/one', null);
 
     expect(fetchMock.mock.calls.map(([path, init]) => [path, init?.method ?? 'GET'])).toEqual([
@@ -29,5 +29,6 @@ describe('server library client', () => {
     const bookmarkRequest = fetchMock.mock.calls[1];
     expect(bookmarkRequest).toBeDefined();
     expect(new Headers(bookmarkRequest![1].headers).get('authorization')).toBe('Bearer sidebar-token');
+    expect(JSON.parse(bookmarkRequest![1].body as string)).toEqual({ title: 'Example', url: 'https://example.com', parentId: 'folder-1' });
   });
 });
