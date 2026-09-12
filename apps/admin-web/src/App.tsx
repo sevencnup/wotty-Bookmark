@@ -42,6 +42,7 @@ import {
 } from './FeaturePages'
 import { CategoryManagementPage } from './CategoryManagementPage'
 import { LibraryManagementPage } from './LibraryManagementPage'
+import { copyText } from './clipboard'
 import * as api from './api'
 import { loadPreferences, savePreferences, type Preferences } from './preferences'
 import { descendantFolderIds, flattenFolders, findFolder, folderHasChildren, resolveDraggedBookmarkIds, visibleFolders, type FlatBookmarkFolder } from './bookmark-tree'
@@ -781,7 +782,7 @@ function AppPasswords({ token }: { token: string }) {
   useEffect(() => { void loadPasswords() }, [token])
   async function create() { if (!name.trim()) return; try { const item = await api.createAppPassword(token, name.trim()); setItems((current) => [item, ...current]); setNewSecret(item.secret ?? null); setName(''); setError('') } catch (requestError) { setError(requestError instanceof Error ? requestError.message : '创建失败') } }
   async function revoke(id: string) { try { await api.revokeAppPassword(token, id); setItems((current) => current.filter((item) => item.id !== id)); setError('') } catch (requestError) { setError(requestError instanceof Error ? requestError.message : '撤销失败') } }
-  return <section className="panel"><div className="panel-heading"><div><p className="eyebrow">ACCESS CONTROL</p><h3>应用密码</h3></div></div><div className="password-create"><input value={name} onChange={(event) => setName(event.target.value)} placeholder="例如：Chrome 工作浏览器" /><button className="primary-button compact" onClick={() => void create()} type="button">创建应用密码</button></div>{error && <p className="form-error">{error}</p>}{newSecret && <div className="secret-box"><strong>请立即保存这串应用密码</strong><code>{newSecret}</code><button className="ghost-button" onClick={() => navigator.clipboard?.writeText(newSecret)} type="button">复制</button><p>它只会在创建成功时显示一次。</p></div>}{loadError ? <div className="empty-state"><span>!</span><h4>无法读取应用密码</h4><p>{loadError}</p><button className="toolbar-button compact" onClick={() => void loadPasswords()} type="button"><RefreshCw size={14} /> 重新连接</button></div> : items.length === 0 ? <div className="empty-state"><span>◇</span><h4>还没有应用密码</h4><p>建议为每个浏览器或设备创建独立的应用密码，撤销时不会影响账户登录。</p></div> : <div className="password-list">{items.map((item) => <div className="password-row" key={item.id}><div><strong>{item.name}</strong><span>创建于 {new Date(item.createdAt).toLocaleString()}</span></div><button className="danger-button" onClick={() => void revoke(item.id)} type="button">撤销</button></div>)}</div>}</section>
+  return <section className="panel"><div className="panel-heading"><div><p className="eyebrow">ACCESS CONTROL</p><h3>应用密码</h3></div></div><div className="password-create"><input value={name} onChange={(event) => setName(event.target.value)} placeholder="例如：Chrome 工作浏览器" /><button className="primary-button compact" onClick={() => void create()} type="button">创建应用密码</button></div>{error && <p className="form-error">{error}</p>}{newSecret && <div className="secret-box"><strong>请立即保存这串应用密码</strong><code>{newSecret}</code><CopyButton className="ghost-button" value={newSecret} /><p>它只会在创建成功时显示一次。</p></div>}{loadError ? <div className="empty-state"><span>!</span><h4>无法读取应用密码</h4><p>{loadError}</p><button className="toolbar-button compact" onClick={() => void loadPasswords()} type="button"><RefreshCw size={14} /> 重新连接</button></div> : items.length === 0 ? <div className="empty-state"><span>◇</span><h4>还没有应用密码</h4><p>建议为每个浏览器或设备创建独立的应用密码，撤销时不会影响账户登录。</p></div> : <div className="password-list">{items.map((item) => <div className="password-row" key={item.id}><div><strong>{item.name}</strong><span>创建于 {new Date(item.createdAt).toLocaleString()}</span></div><button className="danger-button" onClick={() => void revoke(item.id)} type="button">撤销</button></div>)}</div>}</section>
 }
 
 function FloccusGuide({ token, loginIdentifier }: { token: string; loginIdentifier: string }) {
@@ -839,7 +840,7 @@ function FloccusGuide({ token, loginIdentifier }: { token: string; loginIdentifi
             <div className="secret-box">
               <strong>复制这一串，后面两处都填它</strong>
               <code>{createdSecret}</code>
-              <button className="ghost-button" onClick={() => { void navigator.clipboard?.writeText(createdSecret) }} type="button">复制</button>
+              <CopyButton className="ghost-button" value={createdSecret} />
               <p>WebDAV Password = Encryption Passphrase；后台已自动保存受保护副本。</p>
             </div>
           ) : (
@@ -974,22 +975,24 @@ function AccountSettings({ loginIdentifier, onOpenAppPasswords }: { loginIdentif
   )
 }
 
-function ConfigField({ label, value, copyable = true }: { label: string; value: string; copyable?: boolean }) {
-  const [copied, setCopied] = useState(false)
-  function copy() {
-    if (!copyable) return
-    void navigator.clipboard?.writeText(value)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+function CopyButton({ className = 'copy-btn', value }: { className?: string; value: string }) {
+  const [state, setState] = useState<'idle' | 'copied' | 'failed'>('idle')
+  async function copy() {
+    const copied = await copyText(value)
+    setState(copied ? 'copied' : 'failed')
+    window.setTimeout(() => setState('idle'), 2400)
   }
+  const label = state === 'copied' ? '✓ 已复制' : state === 'failed' ? '复制失败' : '复制'
+  return <button aria-label={label} className={className} onClick={() => void copy()} title={state === 'failed' ? '浏览器拒绝访问剪贴板，请手动选择文本复制' : '复制'} type="button">{label}</button>
+}
+
+function ConfigField({ label, value, copyable = true }: { label: string; value: string; copyable?: boolean }) {
   return (
     <div className="config-field">
       <span className="config-field-label">{label}</span>
       <code className={`config-field-value ${!copyable ? 'config-field-muted' : ''}`}>{value}</code>
       {copyable && (
-        <button className="copy-btn" onClick={copy} title="复制" type="button">
-          {copied ? '✓ 已复制' : '复制'}
-        </button>
+        <CopyButton value={value} />
       )}
     </div>
   )
