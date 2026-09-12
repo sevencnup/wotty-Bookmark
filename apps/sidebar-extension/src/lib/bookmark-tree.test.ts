@@ -45,4 +45,9 @@ describe('bookmark tree helpers', () => {
     expect(getFolderOptions(tree, 'bar')).toEqual([]);
     expect(getFolderOptions(tree)).toMatchObject([{ id: 'bar' }, { id: 'design' }]);
   });
+
+  it('keeps folder rows eligible for expanded and collapsed folder icons', () => {
+    expect(tree[0]?.children?.[0]?.children).toBeDefined();
+    expect(tree[0]?.children?.[0]?.url).toBeUndefined();
+  });
 });

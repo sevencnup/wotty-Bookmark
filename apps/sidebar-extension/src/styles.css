@@ -652,13 +652,12 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
-  border: 1px solid #b2c7ee;
-  border-radius: var(--radius-md);
-  color: #2f5fbd;
-  background: #ffffff;
-  box-shadow: 0 2px 5px rgba(47, 95, 189, 0.1);
+  width: 28px;
+  height: 28px;
+  border: 1px solid rgba(96, 136, 204, 0.18);
+  border-radius: 8px;
+  color: #356fc8;
+  background: rgba(255, 255, 255, 0.72);
 }
 .bookmark-folder-row .bookmark-title {
   color: #334155;
