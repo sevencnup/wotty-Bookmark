@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Bookmark, Check, ChevronDown, ChevronRight, Folder, Globe, LoaderCircle, LogIn, Pencil, Plus, RefreshCw, Search, Server, Trash2, X } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ArrowUp, Bookmark, Check, ChevronDown, ChevronRight, Folder, Globe, LoaderCircle, LogIn, Pencil, Plus, RefreshCw, Search, Server, Trash2, X } from 'lucide-react';
 import { getActiveTab, getTabsApi, openBookmark } from './lib/browser-api';
 import type { BookmarkNode } from './lib/browser-api';
 import { collectFolders, countBookmarks, countFolders, findNode, flattenVisibleNodes, getFolderOptions, isFolder, searchBookmarks } from './lib/bookmark-tree';
@@ -43,6 +43,8 @@ function App() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [activeTab, setActiveTab] = useState<{ title: string; url: string } | null>(null);
   const [quickSaveFolder, setQuickSaveFolder] = useState('');
+  const workspaceRef = useRef<HTMLElement>(null);
+  const [showBackToTop, setShowBackToTop] = useState(false);
 
   const refresh = useCallback(async (current = connection) => {
     if (!current) { setTree(null); setLoading(false); return; }
@@ -85,7 +87,7 @@ function App() {
 
   return <main className="app-shell self-hosted-library">
     <header className="topbar"><div className="brand-lockup"><div className="brand-mark"><img alt="WOTTY BOOKMARK" className="brand-logo-img" src="/logo.png" /></div><div><div className="brand-title">书签库</div><div className="brand-subtitle">WOTTY · SERVER LIBRARY</div></div></div><button className={`sync-status ${connection ? 'is-connected' : 'is-disconnected'}`} onClick={() => setModal({ type: 'connect' })} type="button"><span className="status-dot" />{connection ? '服务器已连接' : '连接服务器'}<Server size={13} /></button></header>
-    <section className="workspace">
+    <section className="workspace" onScroll={(event) => setShowBackToTop(event.currentTarget.scrollTop > 220)} ref={workspaceRef}>
       <div className="server-library-banner"><Server size={15} /><span><strong>只保存到服务器</strong> · 不读取或写入浏览器原生书签</span></div>
       <div className="search-shell"><Search size={16} /><input aria-label="搜索服务器书签" disabled={!connection} onChange={(event) => setQuery(event.target.value)} placeholder="搜索服务器书签或网址" type="search" value={query} />{query && <button className="icon-button" onClick={() => setQuery('')} type="button"><X size={14} /></button>}</div>
       <section className={`quick-save-card ${!activeTab || !connection ? 'is-disabled' : ''}`}><div className="quick-save-icon"><Globe size={17} /></div><div className="quick-save-copy"><span className="eyebrow">收藏当前页 · SERVER</span><strong>{activeTab?.title ?? '当前页面不可收藏'}</strong><span>{activeTab ? hostname(activeTab.url) : '请在普通网页中打开侧边栏'}</span></div><label className="quick-save-folder"><Folder size={13} /><span className="sr-only">保存到文件夹</span><select aria-label="收藏到文件夹" disabled={!activeTab || !connection || currentSaved || busy} onChange={(event) => setQuickSaveFolder(event.target.value)} value={quickSaveFolder}><option value="">根目录</option>{folderOptions.map((folder) => <option key={folder.id} value={folder.id}>{'　'.repeat(folder.depth)}{folder.title}</option>)}</select></label><button className={`save-current-button ${currentSaved ? 'is-saved' : ''}`} disabled={!activeTab || !connection || currentSaved || busy} onClick={() => activeTab && void perform((active) => createLibraryBookmark(active, { title: activeTab.title, url: activeTab.url, parentId: quickSaveFolder || null }))} type="button">{currentSaved ? <Check size={15} /> : <Plus size={15} />}{currentSaved ? '已收藏' : '收藏'}</button></section>
@@ -93,7 +95,8 @@ function App() {
       <div className="library-meta"><span>{countBookmarks(nodes)} 个书签</span><span className="meta-separator">·</span><span>{countFolders(nodes)} 个文件夹</span><span className="meta-spacer" /><button className="refresh-button" disabled={!connection || loading} onClick={() => void refresh()} type="button"><RefreshCw className={loading ? 'spin' : ''} size={13} />刷新</button></div>
       {!connection ? <Disconnected onConnect={() => setModal({ type: 'connect' })} /> : error && !tree ? <Failure message={error} onRetry={() => void refresh()} /> : loading ? <Loading /> : query.trim() ? <SearchList results={results} onEdit={(nodeId) => setModal({ type: 'edit', nodeId })} onMove={(nodeId) => setModal({ type: 'move', nodeId })} onDelete={(nodeId) => setModal({ type: 'delete', nodeId })} /> : visible.length ? <div className="bookmark-list">{visible.map((node) => <NodeRow key={node.id} node={node} expanded={expanded.has(node.id)} onDelete={() => setModal({ type: 'delete', nodeId: node.id })} onEdit={() => setModal({ type: 'edit', nodeId: node.id })} onMove={() => setModal({ type: 'move', nodeId: node.id })} onOpen={() => node.url && void openBookmark(node.url)} onToggle={() => setExpanded((current) => { const next = new Set(current); if (next.has(node.id)) next.delete(node.id); else next.add(node.id); return next; })} />)}</div> : <Empty onCreate={() => setModal({ type: 'create', kind: 'bookmark' })} />}{error && tree && <p className="inline-error">{error}</p>}
     </section>
-    <footer className="app-footer"><span><span className="footer-dot" /> 服务器是唯一数据源</span><span className="footer-version">v0.1.5</span></footer>
+    {showBackToTop && <button aria-label="回到顶部" className="back-to-top-button" onClick={() => workspaceRef.current?.scrollTo({ top: 0, behavior: 'smooth' })} title="回到顶部" type="button"><ArrowUp size={16} /></button>}
+    <footer className="app-footer"><span><span className="footer-dot" /> 服务器是唯一数据源</span><span className="footer-version">v0.1.6</span></footer>
     {modal?.type === 'connect' && <ConnectionModal busy={busy} connection={connection} onClose={() => setModal(null)} onConnect={(serverUrl, code) => { setBusy(true); setError(null); void connectToBackend(serverUrl, code).then(async (next) => { setConnection(next); await refresh(next); setModal(null); }).catch((reason: unknown) => setError(reason instanceof Error ? reason.message : '连接失败')).finally(() => setBusy(false)); }} onDisconnect={() => { setBusy(true); void clearBackendConnection().then(() => { setConnection(null); setTree(null); setModal(null); }).finally(() => setBusy(false)); }} />}
     {modal?.type === 'create' && <EditorModal busy={busy} initial={{ kind: modal.kind, parentId: modal.parentId ?? '' }} nodes={nodes} onClose={() => setModal(null)} onSubmit={submitEditor} />}
     {modal?.type === 'edit' && <EditorModal busy={busy} node={findNode(nodes, modal.nodeId)} nodes={nodes} onClose={() => setModal(null)} onSubmit={submitEditor} />}
