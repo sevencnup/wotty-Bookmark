@@ -264,6 +264,35 @@ html.reduce-motion *, html.reduce-motion *::before, html.reduce-motion *::after 
   gap: 7px;
 }
 
+.library-virtual-viewport {
+  height: min(62vh, 640px);
+  min-height: 220px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  contain: strict;
+  border-radius: var(--radius-md);
+}
+
+.library-virtual-spacer {
+  position: relative;
+  width: 100%;
+}
+
+.library-virtual-items {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  display: grid;
+  gap: 7px;
+  will-change: transform;
+}
+
+.library-virtual-row {
+  height: 69px;
+  min-height: 69px;
+}
+
 .library-bookmark-row {
   grid-template-columns: 38px minmax(0, 1fr) minmax(150px, 260px) auto;
   gap: 13px;
@@ -461,6 +490,15 @@ html.reduce-motion *, html.reduce-motion *::before, html.reduce-motion *::after 
     grid-template-columns: 34px minmax(0, 1fr) auto;
     gap: 10px;
     padding: 10px;
+  }
+
+  .library-virtual-viewport {
+    height: min(58vh, 520px);
+  }
+
+  .library-virtual-row {
+    height: 68px;
+    min-height: 68px;
   }
 
   .library-site-icon {
