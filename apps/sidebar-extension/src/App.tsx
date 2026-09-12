@@ -28,6 +28,23 @@ function toNodes(tree: LibraryTree): BookmarkNode[] {
 
 function hostname(value: string) { try { return new URL(value).hostname.replace(/^www\./, ''); } catch { return value; } }
 
+function scrollToTop(workspace: HTMLElement | null) {
+  if (workspace) {
+    workspace.scrollTop = 0;
+    try { workspace.scrollTo({ top: 0, behavior: 'auto' }); } catch { workspace.scrollTop = 0; }
+  }
+  if (typeof document !== 'undefined') {
+    const root = document.scrollingElement;
+    if (root && root !== workspace) {
+      root.scrollTop = 0;
+      try { root.scrollTo({ top: 0, behavior: 'auto' }); } catch { root.scrollTop = 0; }
+    }
+  }
+  if (typeof window !== 'undefined') {
+    try { window.scrollTo({ top: 0, behavior: 'auto' }); } catch { try { window.scrollTo(0, 0); } catch { /* 某些扩展环境禁用窗口滚动时，工作区和文档根节点仍已回顶 */ } }
+  }
+}
+
 function flattenLibraryFolders(folders: LibraryFolder[], depth = 0): Array<LibraryFolder & { depth: number }> {
   return folders.flatMap((folder) => [{ ...folder, depth }, ...flattenLibraryFolders(folder.children, depth + 1)]);
 }
@@ -94,8 +111,8 @@ function App() {
       <div className="library-meta"><span>{countBookmarks(nodes)} 个书签</span><span className="meta-separator">·</span><span>{countFolders(nodes)} 个文件夹</span><span className="meta-spacer" /><button className="refresh-button" disabled={!connection || loading} onClick={() => void refresh()} type="button"><RefreshCw className={loading ? 'spin' : ''} size={13} />刷新</button></div>
       {!connection ? <Disconnected onConnect={() => setModal({ type: 'connect' })} /> : error && !tree ? <Failure message={error} onRetry={() => void refresh()} /> : loading ? <Loading /> : query.trim() ? <SearchList results={results} onEdit={(nodeId) => setModal({ type: 'edit', nodeId })} onMove={(nodeId) => setModal({ type: 'move', nodeId })} onDelete={(nodeId) => setModal({ type: 'delete', nodeId })} /> : visible.length ? <div className="bookmark-list">{visible.map((node) => <NodeRow key={node.id} node={node} expanded={expanded.has(node.id)} onDelete={() => setModal({ type: 'delete', nodeId: node.id })} onEdit={() => setModal({ type: 'edit', nodeId: node.id })} onMove={() => setModal({ type: 'move', nodeId: node.id })} onOpen={() => node.url && void openBookmark(node.url)} onToggle={() => setExpanded((current) => { const next = new Set(current); if (next.has(node.id)) next.delete(node.id); else next.add(node.id); return next; })} />)}</div> : <Empty onCreate={() => setModal({ type: 'create', kind: 'bookmark' })} />}{error && tree && <p className="inline-error">{error}</p>}
     </section>
-    <button aria-label="回到顶部" className="back-to-top-button" onClick={() => workspaceRef.current?.scrollTo({ top: 0, behavior: 'smooth' })} title="回到顶部" type="button"><ArrowUp size={16} /></button>
-    <footer className="app-footer"><span><span className="footer-dot" /> 服务器是唯一数据源</span><span className="footer-version">v0.1.12</span></footer>
+    <button aria-label="回到顶部" className="back-to-top-button" onClick={() => scrollToTop(workspaceRef.current)} title="回到顶部" type="button"><ArrowUp size={16} /></button>
+    <footer className="app-footer"><span><span className="footer-dot" /> 服务器是唯一数据源</span><span className="footer-version">v0.1.13</span></footer>
     {modal?.type === 'connect' && <ConnectionModal busy={busy} connection={connection} onClose={() => setModal(null)} onConnect={(serverUrl, code) => { setBusy(true); setError(null); void connectToBackend(serverUrl, code).then(async (next) => { setConnection(next); await refresh(next); setModal(null); }).catch((reason: unknown) => setError(reason instanceof Error ? reason.message : '连接失败')).finally(() => setBusy(false)); }} onDisconnect={() => { setBusy(true); void clearBackendConnection().then(() => { setConnection(null); setTree(null); setModal(null); }).finally(() => setBusy(false)); }} />}
     {modal?.type === 'create' && <EditorModal busy={busy} initial={{ kind: modal.kind, parentId: modal.parentId ?? '' }} nodes={nodes} onClose={() => setModal(null)} onSubmit={submitEditor} />}
     {modal?.type === 'edit' && <EditorModal busy={busy} node={findNode(nodes, modal.nodeId)} nodes={nodes} onClose={() => setModal(null)} onSubmit={submitEditor} />}
