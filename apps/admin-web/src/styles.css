@@ -2476,6 +2476,9 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   border-color: #dbe5f2;
   background: rgba(255, 255, 255, 0.96);
   box-shadow: 0 4px 12px rgba(30, 64, 175, 0.06);
+  width: calc(214px - (var(--folder-depth, 0) * 14px));
+  min-width: 150px;
+  margin-left: calc(var(--folder-depth, 0) * 14px);
 }
 
 .category-management-page .organization-folder-row:hover {
@@ -3146,6 +3149,25 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   }
 }
 
+/* 文件夹层级长度：每深入一级，背景条从左侧再收进一段 */
+.category-management-page .organization-folder-row {
+  flex: 0 0 max(150px, calc(214px - (var(--folder-depth, 0) * 14px)));
+  width: max(150px, calc(214px - (var(--folder-depth, 0) * 14px)));
+  margin-left: calc(var(--folder-depth, 0) * 14px);
+}
+
+.category-management-page .category-bookmark-group-header {
+  width: max(0px, calc(100% - (var(--folder-depth, 0) * 14px))) !important;
+  margin-left: calc(var(--folder-depth, 0) * 14px);
+}
+
+@media (max-width: 880px) {
+  .category-management-page .organization-folder-row {
+    flex-basis: max(150px, calc(190px - (var(--folder-depth, 0) * 14px)));
+    width: max(150px, calc(190px - (var(--folder-depth, 0) * 14px)));
+  }
+}
+
 /* 分类管理：文件夹整棵分支拖动 */
 .category-management-page .category-tree-panel .organization-toggle,
 .category-management-page .category-tree-panel .organization-toggle-spacer {
@@ -3250,6 +3272,8 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   border-left: 1px solid #c9d8f2 !important;
   background: linear-gradient(90deg, #dce9ff 0%, #e8f1ff 58%, #f0f5ff 100%) !important;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72), 0 2px 7px rgba(63, 91, 153, 0.08) !important;
+  width: calc(100% - (var(--folder-depth, 0) * 14px)) !important;
+  margin-left: calc(var(--folder-depth, 0) * 14px);
 }
 
 .category-management-page .category-bookmark-group > .category-bookmark-group-header:hover {
@@ -3581,7 +3605,8 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   display: grid !important;
   grid-template-columns: 24px 26px minmax(0, 1fr) auto !important;
   align-items: center !important;
-  width: 100% !important;
+  width: calc(100% - (var(--folder-depth, 0) * 14px)) !important;
+  margin-left: calc(var(--folder-depth, 0) * 14px);
   min-width: 0 !important;
   min-height: 48px !important;
   gap: 4px !important;
