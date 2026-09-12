@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Bookmark, CheckCircle2, ExternalLink, Folder, FolderInput, HardDriveUpload, LoaderCircle, Plus, RefreshCw, RotateCcw, Search, Server, Trash2, X } from 'lucide-react'
 import * as api from './api'
 import { forgetLibraryFavicon, getCachedLibraryFavicon, getLibraryFaviconCandidates, rememberLibraryFavicon } from './library-favicon'
@@ -30,8 +30,8 @@ export function LibraryManagementPage({ token }: { token: string }) {
   const [favicons, setFavicons] = useState<Record<string, string>>({})
   const fileInput = useRef<HTMLInputElement>(null)
 
-  const load = async () => {
-    setLoading(true)
+  const load = useCallback(async ({ silent = false }: { silent?: boolean } = {}) => {
+    if (!silent) setLoading(true)
     setError('')
     try {
       const [nextLibrary, nextTrash] = await Promise.all([api.getLibrary(token), api.getLibraryTrash(token)])
@@ -40,11 +40,24 @@ export function LibraryManagementPage({ token }: { token: string }) {
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : '无法读取服务器书签库')
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
-  }
+  }, [token])
 
-  useEffect(() => { void load() }, [token])
+  useEffect(() => { void load() }, [load])
+  useEffect(() => {
+    const refreshSilently = () => {
+      if (document.visibilityState === 'visible') void load({ silent: true })
+    }
+    window.addEventListener('focus', refreshSilently)
+    document.addEventListener('visibilitychange', refreshSilently)
+    const interval = window.setInterval(refreshSilently, 10_000)
+    return () => {
+      window.removeEventListener('focus', refreshSilently)
+      document.removeEventListener('visibilitychange', refreshSilently)
+      window.clearInterval(interval)
+    }
+  }, [load])
   const folders = useMemo(() => flattenFolders(library?.folders ?? []), [library])
   const visibleBookmarks = useMemo(() => (library?.bookmarks ?? []).filter((bookmark) => `${bookmark.title} ${bookmark.url} ${bookmark.folderPath}`.toLowerCase().includes(query.trim().toLowerCase())), [library, query])
   useEffect(() => {
