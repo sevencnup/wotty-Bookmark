@@ -2,6 +2,7 @@ mod auth;
 mod backup;
 mod bookmarks;
 mod devices;
+mod favicon;
 mod floccus_crypto;
 mod floccus_secrets;
 mod library;
@@ -145,6 +146,8 @@ fn app_router(state: AppState) -> Router {
             "/api/v1/library/import-from-sync",
             post(library::import_from_sync),
         )
+        .route("/api/v1/library/favicons", post(favicon::resolve_batch))
+        .route("/api/v1/library/favicons/:key", get(favicon::serve_cached))
         .route("/api/v1/bookmarks/move", post(bookmarks::move_bookmark))
         .route(
             "/api/v1/bookmarks/move-batch",

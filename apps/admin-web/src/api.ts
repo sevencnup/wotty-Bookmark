@@ -145,6 +145,28 @@ export type LibraryTrashItem = {
   deletedAt: string
 }
 
+export type LibraryFaviconMap = Record<string, string>
+
+const LIBRARY_FAVICON_STORAGE_KEY = 'wotty.admin.library-favicons.v2'
+const libraryFaviconCache = new Map<string, string>()
+
+function readLibraryFaviconCache() {
+  try {
+    const value = JSON.parse(localStorage.getItem(LIBRARY_FAVICON_STORAGE_KEY) ?? '{}') as Record<string, unknown>
+    Object.entries(value).forEach(([key, source]) => { if (typeof source === 'string') libraryFaviconCache.set(key, source) })
+  } catch {
+    // Persistence is optional.
+  }
+}
+
+function writeLibraryFaviconCache() {
+  try {
+    localStorage.setItem(LIBRARY_FAVICON_STORAGE_KEY, JSON.stringify(Object.fromEntries(libraryFaviconCache)))
+  } catch {
+    // Persistence is optional.
+  }
+}
+
 export type EncryptionStatus = {
   encryptedFile: boolean
   passphraseStored: boolean
@@ -450,6 +472,53 @@ export function importLibraryXbel(token: string, xbel: string, replace = false) 
 
 export function importLibraryFromSync(token: string) {
   return request<{ imported: boolean; count: number }>('/api/v1/library/import-from-sync', { method: 'POST' }, token)
+}
+
+export async function resolveLibraryFavicons(token: string, urls: string[]): Promise<LibraryFaviconMap> {
+  if (typeof localStorage !== 'undefined' && libraryFaviconCache.size === 0) readLibraryFaviconCache()
+  const origins = Array.from(new Set(urls.map((value) => {
+    try {
+      const parsed = new URL(value)
+      return parsed.protocol === 'http:' || parsed.protocol === 'https:' ? parsed.origin : null
+    } catch {
+      return null
+    }
+  }).filter((value): value is string => Boolean(value))))
+  const output: LibraryFaviconMap = {}
+  const pendingOrigins = origins.filter((origin) => {
+    const cached = libraryFaviconCache.get(origin)
+    if (cached) output[origin] = cached
+    return !cached
+  })
+  for (let index = 0; index < pendingOrigins.length; index += 2000) {
+    const payload = await request<{ items: Array<{ origin: string; url: string; dataUrl?: string }> }>('/api/v1/library/favicons', {
+      method: 'POST',
+      body: JSON.stringify({ urls: pendingOrigins.slice(index, index + 2000) }),
+    }, token)
+    await Promise.all(payload.items.map(async (item) => {
+      if (item.dataUrl) {
+        output[item.origin] = item.dataUrl
+        libraryFaviconCache.set(item.origin, item.dataUrl)
+        return
+      }
+      try {
+        const response = await fetch(item.url, { headers: { authorization: `Bearer ${token}` } })
+        if (!response.ok) return
+        const blob = await response.blob()
+        const source = await new Promise<string | null>((resolve) => {
+          const reader = new FileReader()
+          reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : null)
+          reader.onerror = () => resolve(null)
+          reader.readAsDataURL(blob)
+        })
+        if (source) { output[item.origin] = source; libraryFaviconCache.set(item.origin, source) }
+      } catch {
+        // Individual icons are best-effort; the list still renders without them.
+      }
+    }))
+  }
+  if (typeof localStorage !== 'undefined') writeLibraryFaviconCache()
+  return output
 }
 
 export function moveBookmark(token: string, bookmarkId: string, parentId: string, expectedEtag: string | null) {

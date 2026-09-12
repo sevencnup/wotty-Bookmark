@@ -41,6 +41,7 @@ import {
   restoreLibraryNode,
   importLibraryXbel,
   importLibraryFromSync,
+  resolveLibraryFavicons,
 } from './api'
 
 function response(payload: unknown, status = 200): Response {
@@ -163,6 +164,18 @@ describe('admin API contract', () => {
       ['/api/v1/library/import-from-sync', 'POST'],
     ])
     expect(JSON.parse(fetchMock.mock.calls[6][1].body)).toEqual({ xbel: '<xbel/>', replace: true })
+  })
+
+  it('resolves server-cached favicons in one deduplicated batch', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(response({ items: [{ origin: 'https://example.com', url: '/api/v1/library/favicons/key', dataUrl: 'data:image/png;base64,abc' }] }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(resolveLibraryFavicons('token', ['https://example.com/a', 'https://example.com/b'])).resolves.toEqual({
+      'https://example.com': 'data:image/png;base64,abc',
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/v1/library/favicons')
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ urls: ['https://example.com'] })
   })
   it('uses binary requests for storage import and export', async () => {
     const fetchMock = vi.fn()

@@ -24,6 +24,7 @@ sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio-r
 tokio = { version = "1", features = ["macros", "net", "rt-multi-thread", "time", "sync"] }
 tar = "0.4"
 flate2 = "1"
+reqwest = { version = "0.11.27", default-features = false, features = ["rustls-tls", "stream"] }
 tower-http = { version = "0.5.2", features = ["cors", "trace"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }

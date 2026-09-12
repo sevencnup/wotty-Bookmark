@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Bookmark, CheckCircle2, ExternalLink, Folder, FolderInput, HardDriveUpload, LoaderCircle, Plus, RefreshCw, RotateCcw, Search, Server, Trash2, X } from 'lucide-react'
 import * as api from './api'
-import { resolveLibraryFavicon } from './library-favicon'
 
 type CreateKind = 'bookmark' | 'folder'
 
@@ -26,6 +25,7 @@ export function LibraryManagementPage({ token }: { token: string }) {
   const [title, setTitle] = useState('')
   const [url, setUrl] = useState('')
   const [parentId, setParentId] = useState('')
+  const [favicons, setFavicons] = useState<Record<string, string>>({})
   const fileInput = useRef<HTMLInputElement>(null)
 
   const load = async () => {
@@ -45,6 +45,14 @@ export function LibraryManagementPage({ token }: { token: string }) {
   useEffect(() => { void load() }, [token])
   const folders = useMemo(() => flattenFolders(library?.folders ?? []), [library])
   const visibleBookmarks = useMemo(() => (library?.bookmarks ?? []).filter((bookmark) => `${bookmark.title} ${bookmark.url} ${bookmark.folderPath}`.toLowerCase().includes(query.trim().toLowerCase())), [library, query])
+  useEffect(() => {
+    let active = true
+    if (!library?.bookmarks.length) { setFavicons({}); return () => { active = false } }
+    void api.resolveLibraryFavicons(token, library.bookmarks.map((bookmark) => bookmark.url)).then((next) => {
+      if (active) setFavicons((current) => ({ ...current, ...next }))
+    }).catch(() => { if (active) setFavicons({}) })
+    return () => { active = false }
+  }, [token, library])
 
   const run = async (action: () => Promise<unknown>, success: string) => {
     setBusy(true)
@@ -89,7 +97,7 @@ export function LibraryManagementPage({ token }: { token: string }) {
     <section className="panel library-list-panel">
       <div className="panel-heading library-list-heading"><div><p className="eyebrow">SERVER LIBRARY</p><h3>{library?.bookmarks.length ?? 0} 条书签 <span>·</span> {folders.length} 个文件夹</h3></div><div className="library-heading-actions"><span className="library-result-count">显示 {visibleBookmarks.length} 条</span><button className="toolbar-button" disabled={loading || busy} onClick={() => void load()} type="button"><RefreshCw className={loading ? 'spin' : ''} size={15} />刷新</button></div></div>
       <div className="library-list-toolbar"><label className="bookmark-search library-search"><Search size={15} /><input aria-label="搜索服务器书签" onChange={(event) => setQuery(event.target.value)} placeholder="搜索书签名称、网址或文件夹" type="search" value={query} />{query && <button aria-label="清除搜索" className="library-search-clear" onClick={() => setQuery('')} type="button"><X size={14} /></button>}</label>{query && <span className="library-search-hint">当前筛选：{visibleBookmarks.length} 条</span>}</div>
-      {loading ? <div className="feature-loading compact-loading"><LoaderCircle className="spin" size={25} /><strong>正在读取服务器书签库…</strong></div> : visibleBookmarks.length ? <div className="library-table" role="list">{visibleBookmarks.map((bookmark) => <article className="library-bookmark-row" key={bookmark.id} role="listitem"><LibrarySiteIcon title={bookmark.title} url={bookmark.url} /><div className="library-bookmark-copy"><a className="library-bookmark-title" href={bookmark.url} rel="noreferrer" target="_blank" title={bookmark.title}><strong>{bookmark.title || '未命名书签'}</strong><ExternalLink aria-hidden="true" size={12} /></a><div className="library-bookmark-meta"><span className="library-bookmark-host">{getLibraryHost(bookmark.url)}</span><span className="library-bookmark-url" title={bookmark.url}>{bookmark.url}</span></div></div><span className="category-pill library-bookmark-folder" title={bookmark.folderPath || '根目录'}>{bookmark.folderPath || '根目录'}</span><div className="library-row-actions"><a aria-label={`打开 ${bookmark.title || bookmark.url}`} className="library-open-button" href={bookmark.url} rel="noreferrer" target="_blank" title="打开书签"><ExternalLink size={14} /></a><button aria-label={`删除 ${bookmark.title || bookmark.url}`} className="library-delete-button row-action danger-action" disabled={busy} onClick={() => { if (window.confirm(`将“${bookmark.title}”移入服务器书签库回收站？`)) void run(() => api.deleteLibraryNode(token, bookmark.id), '已移入服务器书签库回收站') }} title="移入回收站" type="button"><Trash2 size={15} /></button></div></article>)}</div> : <div className="feature-empty compact-empty"><Bookmark size={25} /><h3>{query ? '没有匹配的书签' : '服务器书签库还是空的'}</h3><p>{query ? '请更换搜索关键词。' : '可在侧边栏收藏当前页，或从上方迁移 / 导入书签。'}</p></div>}
+      {loading ? <div className="feature-loading compact-loading"><LoaderCircle className="spin" size={25} /><strong>正在读取服务器书签库…</strong></div> : visibleBookmarks.length ? <div className="library-table" role="list">{visibleBookmarks.map((bookmark) => <article className="library-bookmark-row" key={bookmark.id} role="listitem"><LibrarySiteIcon title={bookmark.title} url={bookmark.url} source={getFaviconSource(bookmark.url, favicons)} /><div className="library-bookmark-copy"><a className="library-bookmark-title" href={bookmark.url} rel="noreferrer" target="_blank" title={bookmark.title}><strong>{bookmark.title || '未命名书签'}</strong><ExternalLink aria-hidden="true" size={12} /></a><div className="library-bookmark-meta"><span className="library-bookmark-host">{getLibraryHost(bookmark.url)}</span><span className="library-bookmark-url" title={bookmark.url}>{bookmark.url}</span></div></div><span className="category-pill library-bookmark-folder" title={bookmark.folderPath || '根目录'}>{bookmark.folderPath || '根目录'}</span><div className="library-row-actions"><a aria-label={`打开 ${bookmark.title || bookmark.url}`} className="library-open-button" href={bookmark.url} rel="noreferrer" target="_blank" title="打开书签"><ExternalLink size={14} /></a><button aria-label={`删除 ${bookmark.title || bookmark.url}`} className="library-delete-button row-action danger-action" disabled={busy} onClick={() => { if (window.confirm(`将“${bookmark.title}”移入服务器书签库回收站？`)) void run(() => api.deleteLibraryNode(token, bookmark.id), '已移入服务器书签库回收站') }} title="移入回收站" type="button"><Trash2 size={15} /></button></div></article>)}</div> : <div className="feature-empty compact-empty"><Bookmark size={25} /><h3>{query ? '没有匹配的书签' : '服务器书签库还是空的'}</h3><p>{query ? '请更换搜索关键词。' : '可在侧边栏收藏当前页，或从上方迁移 / 导入书签。'}</p></div>}
     </section>
     <section className="panel library-trash-panel"><div className="panel-heading"><div><p className="eyebrow">SERVER LIBRARY TRASH</p><h3>服务器书签库回收站</h3></div><span>{trash.length} 项</span></div>{trash.length ? <div className="library-trash-list">{trash.map((item) => <div className="library-trash-row" key={item.id}><span>{item.nodeType === 'folder' ? <Folder size={16} /> : <Bookmark size={16} />}</span><div><strong>{item.title}</strong><small>删除于 {prettyDate(item.deletedAt)}</small></div><button className="toolbar-button compact" disabled={busy} onClick={() => void run(() => api.restoreLibraryNode(token, item.id), '已从回收站恢复到服务器书签库')} type="button"><RotateCcw size={14} />恢复</button></div>)}</div> : <p className="form-hint">暂无已删除的服务器书签。这里与 Floccus 同步回收站完全独立。</p>}</section>
   </div>
@@ -99,20 +107,12 @@ function getLibraryHost(value: string) {
   try { return new URL(value).hostname.replace(/^www\./, '') } catch { return value }
 }
 
-function LibrarySiteIcon({ title, url }: { title: string; url: string }) {
-  const [favicon, setFavicon] = useState<string | null>(null)
-  const [loadedUrl, setLoadedUrl] = useState('')
-  useEffect(() => {
-    let active = true
-    setFavicon(null)
-    setLoadedUrl(url)
-    void resolveLibraryFavicon(url).then((source) => {
-      if (active) setFavicon(source)
-    })
-    return () => { active = false }
-  }, [url])
+function getFaviconSource(url: string, favicons: Record<string, string>) {
+  try { return favicons[new URL(url).origin] ?? null } catch { return null }
+}
+
+function LibrarySiteIcon({ title, url, source }: { title: string; url: string; source: string | null }) {
   const host = getLibraryHost(url)
   const initial = (host || title || '?').trim().charAt(0).toUpperCase()
-  const visibleFavicon = loadedUrl === url ? favicon : null
-  return <span className={`library-site-icon ${!visibleFavicon ? 'is-fallback' : ''}`} title={host || '网站图标'}>{visibleFavicon ? <img alt="" decoding="async" height={20} loading="lazy" referrerPolicy="no-referrer" src={visibleFavicon} width={20} /> : <span aria-hidden="true">{initial}</span>}</span>
+  return <span className={`library-site-icon ${!source ? 'is-fallback' : ''}`} title={host || '网站图标'}>{source ? <img alt="" decoding="async" height={20} loading="lazy" src={source} width={20} /> : <span aria-hidden="true">{initial}</span>}</span>
 }
