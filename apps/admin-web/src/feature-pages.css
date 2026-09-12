@@ -178,6 +178,309 @@ html.reduce-motion *, html.reduce-motion *::before, html.reduce-motion *::after 
   .library-bookmark-row { grid-template-columns: auto minmax(0, 1fr) auto; }.library-bookmark-row .category-pill { display: none; }
 }
 
+/* ── 服务器书签库列表展示优化 ─────────────────────────────── */
+.library-list-panel {
+  padding: 22px 24px 24px;
+  background: linear-gradient(180deg, #ffffff 0%, #fbfcff 100%);
+}
+
+.library-list-heading {
+  align-items: flex-end;
+  margin-bottom: 14px;
+}
+
+.library-list-heading h3 {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  letter-spacing: -0.02em;
+}
+
+.library-list-heading h3 span {
+  color: var(--soft-muted);
+  font-weight: 400;
+}
+
+.library-heading-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.library-result-count,
+.library-search-hint {
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.library-list-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.library-search {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  max-width: none;
+  height: 42px;
+  margin: 0;
+  padding: 0 11px 0 13px;
+  border-color: #d7deea;
+  background: #f8fafc;
+}
+
+.library-search:focus-within {
+  border-color: var(--primary);
+  background: #ffffff;
+}
+
+.library-search input {
+  min-width: 0;
+}
+
+.library-search-clear {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: var(--muted);
+  background: transparent;
+}
+
+.library-search-clear:hover {
+  color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.library-table {
+  gap: 7px;
+}
+
+.library-bookmark-row {
+  grid-template-columns: 38px minmax(0, 1fr) minmax(150px, 260px) auto;
+  gap: 13px;
+  min-height: 68px;
+  padding: 11px 12px;
+  border-color: #dce3ee;
+  background: rgba(248, 250, 252, 0.8);
+  transition: border-color var(--duration) var(--ease), background var(--duration) var(--ease), box-shadow var(--duration) var(--ease), transform var(--duration) var(--ease);
+}
+
+.library-bookmark-row:hover {
+  border-color: #b9c8e5;
+  background: #ffffff;
+  box-shadow: 0 5px 16px rgba(44, 63, 94, 0.07);
+  transform: translateY(-1px);
+}
+
+.library-site-icon {
+  display: grid;
+  flex: 0 0 34px;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  overflow: hidden;
+  border: 1px solid #dbe5fb;
+  border-radius: 10px;
+  color: var(--primary);
+  background: #eef4ff;
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.library-site-icon img {
+  display: block;
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+}
+
+.library-site-icon.is-fallback {
+  border-color: #d9e2f5;
+  color: #3b63bc;
+  background: linear-gradient(135deg, #edf3ff, #f8faff);
+}
+
+.library-bookmark-copy {
+  min-width: 0;
+}
+
+.library-bookmark-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.35;
+  text-decoration: none;
+}
+
+.library-bookmark-title strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.library-bookmark-title svg {
+  flex: 0 0 auto;
+  color: var(--soft-muted);
+  opacity: 0;
+  transition: opacity var(--duration) var(--ease), color var(--duration) var(--ease);
+}
+
+.library-bookmark-row:hover .library-bookmark-title svg,
+.library-bookmark-title:focus-visible svg {
+  color: var(--primary);
+  opacity: 1;
+}
+
+.library-bookmark-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  margin-top: 4px;
+}
+
+.library-bookmark-host {
+  flex: 0 0 auto;
+  max-width: 180px;
+  overflow: hidden;
+  color: var(--primary);
+  font-size: 11px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.library-bookmark-url {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.library-bookmark-folder {
+  justify-self: start;
+  max-width: 260px;
+  color: #53627a;
+  background: #f1f4f9;
+}
+
+.library-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.library-open-button,
+.library-delete-button {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+  background: transparent;
+  text-decoration: none;
+}
+
+.library-open-button:hover,
+.library-open-button:focus-visible {
+  border-color: var(--primary-border);
+  color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.library-delete-button {
+  border-color: #cfd6e0;
+  color: #4a5568;
+  background: #ffffff;
+}
+
+.library-delete-button:hover:not(:disabled),
+.library-delete-button:focus-visible {
+  border-color: var(--danger-border);
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+
+@media (max-width: 900px) {
+  .library-bookmark-row {
+    grid-template-columns: 38px minmax(0, 1fr) auto;
+  }
+
+  .library-bookmark-folder {
+    grid-column: 2;
+    grid-row: 2;
+    max-width: min(100%, 320px);
+  }
+
+  .library-row-actions {
+    grid-column: 3;
+    grid-row: 1 / span 2;
+  }
+}
+
+@media (max-width: 680px) {
+  .library-list-panel {
+    padding: 18px;
+  }
+
+  .library-list-heading,
+  .library-list-toolbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .library-heading-actions,
+  .library-search {
+    width: 100%;
+  }
+
+  .library-heading-actions {
+    justify-content: space-between;
+  }
+
+  .library-bookmark-row {
+    grid-template-columns: 34px minmax(0, 1fr) auto;
+    gap: 10px;
+    padding: 10px;
+  }
+
+  .library-site-icon {
+    width: 32px;
+    height: 32px;
+  }
+
+  .library-bookmark-url {
+    display: none;
+  }
+
+  .library-bookmark-host {
+    max-width: 100%;
+  }
+
+  .library-bookmark-folder {
+    max-width: 100%;
+  }
+}
+
 @media (max-width: 880px) {
   .import-export-grid, .about-grid { grid-template-columns: 1fr; }
   .help-layout { grid-template-columns: 1fr; }
