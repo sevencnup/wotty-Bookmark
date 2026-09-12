@@ -222,20 +222,25 @@ async fn fetch_icon_candidate(client: &Client, candidate: Url) -> Option<CachedI
         .get("content-type")
         .and_then(|value| value.to_str().ok())
         .map(str::trim)
-        .filter(|value| !value.is_empty());
-    let content_type = declared_content_type
-        .and_then(normalize_image_content_type)
-        .or_else(|| {
-            declared_content_type
-                .is_none()
-                .then(|| infer_image_content_type(&candidate))
-                .flatten()
-        })?;
+        .filter(|value| !value.is_empty())
+        .map(str::to_owned);
     let bytes = read_limited(response, MAX_ICON_BYTES).await.ok()?;
-    (!bytes.is_empty()).then_some(CachedIcon {
-        bytes,
-        content_type,
-    })
+    if bytes.is_empty() {
+        return None;
+    }
+    let content_type = declared_content_type
+        .as_deref()
+        .and_then(normalize_image_content_type)
+        .or_else(|| infer_image_content_type_from_bytes(&bytes))
+        .or_else(|| {
+            let declared_is_missing = declared_content_type.is_none();
+            let declared_is_generic = declared_content_type
+                .as_deref()
+                .map(|value| value.split(';').next().unwrap_or(value).trim().eq_ignore_ascii_case("application/octet-stream"))
+                .unwrap_or(false);
+            (declared_is_missing || declared_is_generic).then(|| infer_image_content_type(&candidate)).flatten()
+        })?;
+    Some(CachedIcon { bytes, content_type })
 }
 
 async fn read_limited(
@@ -368,6 +373,24 @@ fn infer_image_content_type(url: &Url) -> Option<String> {
     }
 }
 
+fn infer_image_content_type_from_bytes(bytes: &[u8]) -> Option<String> {
+    if bytes.starts_with(b"\x89PNG\r\n\x1a\n") {
+        Some("image/png".to_owned())
+    } else if bytes.starts_with(b"GIF87a") || bytes.starts_with(b"GIF89a") {
+        Some("image/gif".to_owned())
+    } else if bytes.starts_with(&[0xff, 0xd8, 0xff]) {
+        Some("image/jpeg".to_owned())
+    } else if bytes.starts_with(b"RIFF") && bytes.get(8..12) == Some(b"WEBP") {
+        Some("image/webp".to_owned())
+    } else if bytes.starts_with(&[0x00, 0x00, 0x01, 0x00]) {
+        Some("image/x-icon".to_owned())
+    } else {
+        let text = String::from_utf8_lossy(bytes);
+        let trimmed = text.trim_start_matches(['\u{feff}', ' ', '\t', '\r', '\n']);
+        trimmed.contains("<svg").then_some("image/svg+xml".to_owned())
+    }
+}
+
 fn normalize_origin(value: &str) -> Option<String> {
     let parsed = Url::parse(value).ok()?;
     if !is_safe_remote_url(&parsed) {
@@ -497,7 +520,7 @@ async fn read_cached_icon(path: &FilePath) -> Option<CachedIcon> {
 mod tests {
     use super::{
         attribute_value, is_private_ipv4, is_private_ipv6, is_safe_remote_url, normalize_origin,
-        parse_icon_links,
+        infer_image_content_type_from_bytes, parse_icon_links,
     };
     use std::net::{Ipv4Addr, Ipv6Addr};
     use url::Url;
@@ -537,5 +560,18 @@ mod tests {
             attribute_value("link href=icon.png", "href").as_deref(),
             Some("icon.png")
         );
+    }
+
+    #[test]
+    fn infers_image_type_when_servers_send_missing_or_wrong_mime() {
+        assert_eq!(
+            infer_image_content_type_from_bytes(b"\x89PNG\r\n\x1a\nrest"),
+            Some("image/png".to_owned())
+        );
+        assert_eq!(
+            infer_image_content_type_from_bytes(b"<?xml version=\"1.0\"?><svg></svg>"),
+            Some("image/svg+xml".to_owned())
+        );
+        assert_eq!(infer_image_content_type_from_bytes(b"not an image"), None);
     }
 }

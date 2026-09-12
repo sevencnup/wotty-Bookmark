@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Bookmark, CheckCircle2, ExternalLink, Folder, FolderInput, HardDriveUpload, LoaderCircle, Plus, RefreshCw, RotateCcw, Search, Server, Trash2, X } from 'lucide-react'
 import * as api from './api'
+import { forgetLibraryFavicon, getCachedLibraryFavicon, getLibraryFaviconCandidates, rememberLibraryFavicon } from './library-favicon'
 import { getVirtualWindow } from './virtual-list'
 
 type CreateKind = 'bookmark' | 'folder'
@@ -51,7 +52,9 @@ export function LibraryManagementPage({ token }: { token: string }) {
     if (!library?.bookmarks.length) { setFavicons({}); return () => { active = false } }
     void api.resolveLibraryFavicons(token, library.bookmarks.map((bookmark) => bookmark.url)).then((next) => {
       if (active) setFavicons((current) => ({ ...current, ...next }))
-    }).catch(() => { if (active) setFavicons({}) })
+    }).catch(() => {
+      // The browser-side favicon fallback still works when the API cannot reach a site.
+    })
     return () => { active = false }
   }, [token, library])
 
@@ -141,5 +144,34 @@ function VirtualBookmarkList({ bookmarks, favicons, busy, onDelete }: { bookmark
 function LibrarySiteIcon({ title, url, source }: { title: string; url: string; source: string | null }) {
   const host = getLibraryHost(url)
   const initial = (host || title || '?').trim().charAt(0).toUpperCase()
-  return <span className={`library-site-icon ${!source ? 'is-fallback' : ''}`} title={host || '网站图标'}>{source ? <img alt="" decoding="async" height={20} loading="lazy" src={source} width={20} /> : <span aria-hidden="true">{initial}</span>}</span>
+  const candidates = useMemo(() => getLibraryFaviconCandidates(url), [url])
+  const [candidateIndex, setCandidateIndex] = useState(0)
+  const [sourceFailed, setSourceFailed] = useState(false)
+  const cachedFallback = getCachedLibraryFavicon(url)
+  const fallbackSource = candidates[candidateIndex] ?? null
+  const visibleSource = source && !sourceFailed ? source : cachedFallback ?? fallbackSource
+
+  useEffect(() => {
+    setCandidateIndex(0)
+    setSourceFailed(false)
+  }, [url, source])
+
+  const handleError = () => {
+    if (source && !sourceFailed) {
+      setSourceFailed(true)
+      return
+    }
+    if (cachedFallback && visibleSource === cachedFallback) {
+      forgetLibraryFavicon(url, cachedFallback)
+      setCandidateIndex(0)
+      return
+    }
+    setCandidateIndex((index) => index + 1)
+  }
+
+  const handleLoad = () => {
+    if (visibleSource && visibleSource !== source) rememberLibraryFavicon(url, visibleSource)
+  }
+
+  return <span className={'library-site-icon ' + (!visibleSource ? 'is-fallback' : '')} title={host || '网站图标'}>{visibleSource ? <img alt="" decoding="async" height={20} loading="lazy" onError={handleError} onLoad={handleLoad} referrerPolicy="no-referrer" src={visibleSource} width={20} /> : <span aria-hidden="true">{initial}</span>}</span>
 }
