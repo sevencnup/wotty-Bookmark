@@ -147,13 +147,14 @@ function LibrarySiteIcon({ title, url, source }: { title: string; url: string; s
   const candidates = useMemo(() => getLibraryFaviconCandidates(url), [url])
   const [candidateIndex, setCandidateIndex] = useState(0)
   const [sourceFailed, setSourceFailed] = useState(false)
-  const cachedFallback = getCachedLibraryFavicon(url)
+  const [cachedFallback, setCachedFallback] = useState<string | null>(() => getCachedLibraryFavicon(url))
   const fallbackSource = candidates[candidateIndex] ?? null
   const visibleSource = source && !sourceFailed ? source : cachedFallback ?? fallbackSource
 
   useEffect(() => {
     setCandidateIndex(0)
     setSourceFailed(false)
+    setCachedFallback(getCachedLibraryFavicon(url))
   }, [url, source])
 
   const handleError = () => {
@@ -163,6 +164,7 @@ function LibrarySiteIcon({ title, url, source }: { title: string; url: string; s
     }
     if (cachedFallback && visibleSource === cachedFallback) {
       forgetLibraryFavicon(url, cachedFallback)
+      setCachedFallback(null)
       setCandidateIndex(0)
       return
     }
@@ -170,7 +172,10 @@ function LibrarySiteIcon({ title, url, source }: { title: string; url: string; s
   }
 
   const handleLoad = () => {
-    if (visibleSource && visibleSource !== source) rememberLibraryFavicon(url, visibleSource)
+    if (visibleSource && visibleSource !== source) {
+      rememberLibraryFavicon(url, visibleSource)
+      setCachedFallback(visibleSource)
+    }
   }
 
   return <span className={'library-site-icon ' + (!visibleSource ? 'is-fallback' : '')} title={host || '网站图标'}>{visibleSource ? <img alt="" decoding="async" height={20} loading="lazy" onError={handleError} onLoad={handleLoad} referrerPolicy="no-referrer" src={visibleSource} width={20} /> : <span aria-hidden="true">{initial}</span>}</span>
