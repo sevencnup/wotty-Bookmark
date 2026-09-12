@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { getSiteFaviconUrl, getSiteFaviconUrls } from './site-favicon';
 
 describe('site favicon helpers', () => {
@@ -19,5 +21,14 @@ describe('site favicon helpers', () => {
     expect(getSiteFaviconUrl('chrome://settings')).toBeNull();
     expect(getSiteFaviconUrl('not a url')).toBeNull();
     expect(getSiteFaviconUrl('')).toBeNull();
+  });
+
+  it('constrains raster favicon rendering to the bookmark icon slot', () => {
+    const app = readFileSync(resolve(import.meta.dirname, '..', 'App.tsx'), 'utf8');
+    const styles = readFileSync(resolve(import.meta.dirname, '..', 'styles.css'), 'utf8');
+
+    expect(app).toContain('height={16}');
+    expect(app).toContain('width={16}');
+    expect(styles).toMatch(/\.site-favicon\s*\{[\s\S]*width:\s*16px;[\s\S]*height:\s*16px;/);
   });
 });

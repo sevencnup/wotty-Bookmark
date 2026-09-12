@@ -542,6 +542,9 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 
 .site-favicon {
   display: block;
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
   object-fit: contain;
   border-radius: 2px;
 }
