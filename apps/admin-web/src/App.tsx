@@ -44,7 +44,7 @@ import { CategoryManagementPage } from './CategoryManagementPage'
 import { LibraryManagementPage } from './LibraryManagementPage'
 import { copyText } from './clipboard'
 import * as api from './api'
-import { loadPreferences, savePreferences, type Preferences } from './preferences'
+import { loadActiveSection, loadPreferences, saveActiveSection, savePreferences, type Preferences } from './preferences'
 import { descendantFolderIds, flattenFolders, findFolder, folderHasChildren, resolveDraggedBookmarkIds, visibleFolders, type FlatBookmarkFolder } from './bookmark-tree'
 
 type AdminSection =
@@ -197,7 +197,11 @@ function persistSession(session: api.Session | null) {
 }
 
 function App() {
-  const [activeSection, setActiveSection] = useState<AdminSection>(() => loadPreferences().defaultSection as AdminSection)
+  const validSections = allNavItems().map((item) => item.id)
+  const [activeSection, setActiveSection] = useState<AdminSection>(() => {
+    const preferences = loadPreferences()
+    return loadActiveSection(validSections, preferences.defaultSection, localStorage) as AdminSection
+  })
   const [preferences, setPreferences] = useState<Preferences>(() => loadPreferences())
   const [session, setSession] = useState<api.Session | null>(() => loadStoredSession())
 
@@ -207,7 +211,9 @@ function App() {
   }
 
   function navigate(section: string) {
+    if (!validSections.includes(section as AdminSection)) return
     setActiveSection(section as AdminSection)
+    saveActiveSection(section, validSections)
   }
 
   function handlePreferencesChange(next: Preferences) {

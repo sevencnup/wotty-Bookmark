@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { defaultPreferences, loadPreferences, PREFERENCES_STORAGE_KEY, savePreferences } from './preferences'
+import { ACTIVE_SECTION_STORAGE_KEY, defaultPreferences, loadActiveSection, loadPreferences, PREFERENCES_STORAGE_KEY, saveActiveSection, savePreferences } from './preferences'
 
 function storage(initial?: string) {
   const values = new Map<string, string>(initial ? [[PREFERENCES_STORAGE_KEY, initial]] : [])
@@ -28,5 +28,21 @@ describe('admin preferences', () => {
   it('falls back when a removed section is stored as the default', () => {
     const target = storage(JSON.stringify({ version: 1, defaultSection: 'audit-log' }))
     expect(loadPreferences(target).defaultSection).toBe('overview')
+  })
+
+  it('persists the last valid active section independently from the default preference', () => {
+    const target = storage()
+    const sections = ['overview', 'library', 'categories']
+    expect(loadActiveSection(sections, 'overview', target)).toBe('overview')
+
+    saveActiveSection('library', sections, target)
+    expect(target.getItem(ACTIVE_SECTION_STORAGE_KEY)).toBe('library')
+    expect(loadActiveSection(sections, 'overview', target)).toBe('library')
+    expect(loadActiveSection(['overview', 'categories'], 'overview', target)).toBe('overview')
+
+    saveActiveSection('removed-page', sections, target)
+    expect(loadActiveSection(sections, 'overview', target)).toBe('library')
+    expect(loadActiveSection(sections, 'removed-page', target)).toBe('library')
+    expect(loadActiveSection(['library'], 'removed-page', target)).toBe('library')
   })
 })

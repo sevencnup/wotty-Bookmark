@@ -1,4 +1,5 @@
 export const PREFERENCES_STORAGE_KEY = 'bookmark-vault.preferences.v1'
+export const ACTIVE_SECTION_STORAGE_KEY = 'bookmark-vault.active-section.v1'
 
 export type Density = 'comfortable' | 'compact'
 
@@ -50,4 +51,20 @@ export function savePreferences(preferences: Preferences, storage: Storage | nul
   } catch {
     // Private browsing or storage quota errors should not block the settings page.
   }
+}
+
+export function loadActiveSection(validSections: readonly string[], fallback: string, storage: Storage | null = typeof window === 'undefined' ? null : window.localStorage): string {
+  const safeFallback = validSections.includes(fallback) ? fallback : validSections[0] ?? 'overview'
+  if (!storage) return safeFallback
+  try {
+    const value = storage.getItem(ACTIVE_SECTION_STORAGE_KEY)
+    return value && validSections.includes(value) ? value : safeFallback
+  } catch {
+    return safeFallback
+  }
+}
+
+export function saveActiveSection(section: string, validSections: readonly string[], storage: Storage | null = typeof window === 'undefined' ? null : window.localStorage) {
+  if (!storage || !validSections.includes(section)) return
+  try { storage.setItem(ACTIVE_SECTION_STORAGE_KEY, section) } catch { /* optional persistence */ }
 }
