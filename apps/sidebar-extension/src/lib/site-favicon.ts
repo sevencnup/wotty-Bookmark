@@ -27,11 +27,71 @@ export function getSiteFaviconUrl(url: string): string | null {
 const faviconDiscoveryCache = new Map<string, Promise<string[]>>();
 const faviconAssetCache = new Map<string, Promise<SiteFaviconAsset | null>>();
 
+// Cache Storage survives side-panel reloads and is shared by all extension pages.
+// The extension package itself is read-only at runtime, so this is the durable
+// local directory equivalent for downloaded favicon assets.
+const FAVICON_CACHE_NAME = 'wotty-site-favicons-v1';
+const FAVICON_CACHE_PREFIX = 'https://wotty-bookmark-cache.invalid/favicon/';
+
+function getFaviconOrigin(url: string): string | null {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:' ? parsed.origin : null;
+  } catch {
+    return null;
+  }
+}
+
+function getFaviconCacheRequest(origin: string): Request {
+  return new Request(`${FAVICON_CACHE_PREFIX}${encodeURIComponent(origin)}`);
+}
+
+async function readCachedFavicon(origin: string): Promise<SiteFaviconAsset | undefined> {
+  if (typeof caches === 'undefined') return undefined;
+  try {
+    const cache = await caches.open(FAVICON_CACHE_NAME);
+    const response = await cache.match(getFaviconCacheRequest(origin));
+    if (!response) return undefined;
+    const kind = response.headers.get('x-wotty-favicon-kind');
+    const source = await response.text();
+    if (!source || (kind !== 'image' && kind !== 'svg')) return undefined;
+    return { kind, source };
+  } catch {
+    return undefined;
+  }
+}
+
+async function writeCachedFavicon(origin: string, asset: SiteFaviconAsset): Promise<void> {
+  if (typeof caches === 'undefined') return;
+  try {
+    const cache = await caches.open(FAVICON_CACHE_NAME);
+    await cache.put(
+      getFaviconCacheRequest(origin),
+      new Response(asset.source, {
+        headers: {
+          'content-type': asset.kind === 'svg' ? 'image/svg+xml' : 'text/plain;charset=utf-8',
+          'x-wotty-favicon-kind': asset.kind,
+        },
+      }),
+    );
+  } catch {
+    // Favicon loading must remain best-effort if Cache Storage is unavailable.
+  }
+}
+
 export async function loadSiteFavicon(url: string): Promise<SiteFaviconAsset | null> {
-  const cached = faviconAssetCache.get(url);
+  const origin = getFaviconOrigin(url);
+  if (!origin) return null;
+  const cached = faviconAssetCache.get(origin);
   if (cached) return cached;
-  const loading = fetchSiteFaviconAsset(url);
-  faviconAssetCache.set(url, loading);
+  const loading = (async () => {
+    const persisted = await readCachedFavicon(origin);
+    if (persisted) return persisted;
+    const asset = await fetchSiteFaviconAsset(url);
+    if (asset) await writeCachedFavicon(origin, asset);
+    return asset;
+  })();
+  faviconAssetCache.set(origin, loading);
   return loading;
 }
 

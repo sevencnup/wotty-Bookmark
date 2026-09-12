@@ -31,4 +31,13 @@ describe('site favicon helpers', () => {
     expect(app).toContain('width={16}');
     expect(styles).toMatch(/\.site-favicon\s*\{[\s\S]*width:\s*16px;[\s\S]*height:\s*16px;/);
   });
+
+  it('persists one favicon asset per site origin for reuse across side-panel reloads', () => {
+    const source = readFileSync(resolve(import.meta.dirname, 'site-favicon.ts'), 'utf8');
+
+    expect(source).toContain("caches.open(FAVICON_CACHE_NAME)");
+    expect(source).toContain("faviconAssetCache.get(origin)");
+    expect(source).toContain("faviconAssetCache.set(origin, loading)");
+    expect(source).toContain("x-wotty-favicon-kind");
+  });
 });
