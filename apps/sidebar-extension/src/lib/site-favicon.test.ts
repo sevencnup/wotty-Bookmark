@@ -29,6 +29,8 @@ describe('site favicon helpers', () => {
 
     expect(app).toContain('height={16}');
     expect(app).toContain('width={16}');
+    expect(app).toContain('site-favicon-svg');
+    expect(app).toContain('dangerouslySetInnerHTML');
     expect(styles).toMatch(/\.site-favicon\s*\{[\s\S]*width:\s*16px;[\s\S]*height:\s*16px;/);
   });
 

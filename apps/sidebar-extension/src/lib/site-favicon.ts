@@ -111,7 +111,9 @@ async function fetchSiteFaviconAsset(url: string): Promise<SiteFaviconAsset | nu
         if (svg) return { kind: 'svg', source: svg };
         continue;
       }
-      if (!type?.startsWith('image/')) continue;
+      const candidatePath = candidate.toLowerCase().split('?')[0] ?? '';
+      const looksLikeImage = /\.(?:ico|png|jpe?g|gif|webp|avif)(?:$|\.)/i.test(candidatePath);
+      if (!type?.startsWith('image/') && !looksLikeImage) continue;
       const source = await blobToDataUrl(blob);
       if (source) return { kind: 'image', source };
     } catch {
