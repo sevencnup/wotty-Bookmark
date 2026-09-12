@@ -15,7 +15,7 @@ export default defineConfig({
     name: 'WOTTY BOOKMARK Sidebar',
     short_name: 'Bookmarks',
     description: 'A private sidebar for your self-hosted bookmark library.',
-    version: '0.2.0',
+    version: '0.1.4',
     permissions: ['tabs', 'storage'],
     host_permissions: ['http://*/*', 'https://*/*'],
     action: {
