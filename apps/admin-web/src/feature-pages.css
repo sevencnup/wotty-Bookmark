@@ -497,8 +497,8 @@ html.reduce-motion *, html.reduce-motion *::before, html.reduce-motion *::after 
   }
 
   .library-virtual-row {
-    height: 68px;
-    min-height: 68px;
+    height: 69px;
+    min-height: 69px;
   }
 
   .library-site-icon {
