@@ -1,5 +1,13 @@
 # WOTTY BOOKMARK 开发记录
 
+## 2026-09-13：GitHub Container Registry 镜像发布
+
+- 增加 API 和管理后台/Caddy 的多阶段 Dockerfile。
+- 增加 GitHub Actions，在 `main` 或版本标签推送后运行测试并发布 GHCR 镜像。
+- 生产 Compose 改为直接拉取 GHCR 镜像，不再依赖宿主机预构建 `admin-web/dist`。
+- 明确数据库、书签数据、同步文件和历史版本仍保存在 Docker 数据卷中，镜像不包含运行时数据。
+- 更新 GHCR 部署文档和环境变量模板。
+
 ## 2026-09-13：补全服务器书签库管理与回收站
 
 - 管理后台支持编辑书签标题/网址、移动书签到文件夹或根目录。

@@ -1,0 +1,14 @@
+.git
+.github
+.ai
+.claude
+node_modules
+**/node_modules
+**/dist
+**/.output
+**/.wxt
+**/target
+data
+coverage
+*.log
+*.map.tmp

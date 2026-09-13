@@ -38,6 +38,26 @@ pnpm dev:sidebar
 
 SQLite 数据库默认保存在 `data/bookmark-vault.sqlite`，不需要单独安装或启动数据库服务。
 
+## Docker / GitHub 镜像部署
+
+仓库的 GitHub Actions 会在 `main` 分支或版本标签推送后自动测试并发布 GHCR 镜像：
+
+- `ghcr.io/sevencnup/wotty-bookmark-api:latest`
+- `ghcr.io/sevencnup/wotty-bookmark-web:latest`
+
+生产部署不需要在服务器安装 Rust、Node.js 或先构建前端。复制 `infra/.env.example` 为私有 `.env`，设置正式域名、CORS 和 `GHCR_NAMESPACE`，然后执行：
+
+```bash
+docker compose --env-file infra/.env \
+  -f infra/docker-compose.yml \
+  -f infra/docker-compose.production.yml pull
+docker compose --env-file infra/.env \
+  -f infra/docker-compose.yml \
+  -f infra/docker-compose.production.yml up -d
+```
+
+数据库、书签数据、Floccus 文件和历史版本仍保存在 `bookmark-data` Docker 卷中；Caddy 证书保存在 `caddy-data` / `caddy-config` 卷中。镜像只包含程序和管理后台，不包含你的运行时数据库数据。详细步骤见 [`infra/docs/deployment-recovery.md`](infra/docs/deployment-recovery.md)。
+
 若只启动管理后台，可使用 `pnpm dev:frontend` 或 `pnpm dev:admin`。
 
 ## 本地启动管理后台

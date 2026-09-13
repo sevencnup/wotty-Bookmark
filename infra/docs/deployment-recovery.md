@@ -8,21 +8,37 @@
 
 ## 部署文件
 
-- `docker-compose.yml`：开发和协议验收用基础编排，保留 `26626` 本地 API 端口。
-- `docker-compose.production.yml`：生产覆盖，移除 API 公网端口，增加 Caddy，并要求通过环境变量注入 CORS 和域名配置。
-- `Caddyfile`：将 `/api/*`、`/dav/*`、`/health/*` 代理到 API，并提供管理后台静态文件。
+- `docker-compose.yml`：开发和协议验收用基础编排，保留 `26626` 本地 API 端口；生产覆盖会清除其本地 build 配置并改用 GHCR 镜像。
+- `docker-compose.production.yml`：生产覆盖，使用 GitHub Container Registry 中的 API/Web 镜像，移除 API 公网端口，增加 Caddy，并要求通过环境变量注入 CORS 和域名配置。
+- `Caddyfile`：将 `/api/*`、`/dav/*`、`/health/*` 代理到 API，并提供管理后台静态文件；该配置已内置在 Web 镜像中。
 - `.env.example`：生产变量模板，不包含可用凭据；真实 `.env` 不得提交。
+
+## GitHub Container Registry 镜像
+
+推送到 `main` 分支或创建 `v*.*.*` 标签后，GitHub Actions 会先执行管理后台和 API 测试，再发布两个镜像：
+
+- `ghcr.io/<owner>/wotty-bookmark-api:<tag>`：Rust API，数据仍通过 `bookmark-data` 卷保存。
+- `ghcr.io/<owner>/wotty-bookmark-web:<tag>`：管理后台静态文件和 Caddy。
+
+首次使用前，在仓库的 **Settings → Actions → General** 确认允许 workflow 写入 packages；发布后如果镜像不是公开的，需要在 GHCR 包设置中将其设为公开，或在部署主机先执行 `docker login ghcr.io`。
+
+部署主机只需复制 `.env.example` 为私有 `.env`，确认 `GHCR_NAMESPACE` 使用 GitHub 用户名/组织名的小写形式，然后拉取并启动镜像：
+
+```bash
+docker compose --env-file infra/.env \
+  -f infra/docker-compose.yml \
+  -f infra/docker-compose.production.yml pull
+docker compose --env-file infra/.env \
+  -f infra/docker-compose.yml \
+  -f infra/docker-compose.production.yml up -d
+```
+
+如果要部署某个固定版本，将 `IMAGE_TAG` 改为 Actions 发布的 Git tag（例如 `v0.0.59`），不要依赖 `latest`。仓库当前所有者是 `sevencnup`；如果仓库转移到其他组织，需同步修改 `GHCR_NAMESPACE`。
 
 ## 生产部署
 
-1. 构建管理后台静态文件：
-
-   ```bash
-   pnpm --filter @bookmark-vault/admin-web build
-   ```
-
-2. 复制 `infra/.env.example` 为部署主机上的私有 `.env`，替换正式域名和 CORS 来源。
-3. 使用生产覆盖检查合并配置，并确认没有缺失必需变量：
+1. 复制 `infra/.env.example` 为部署主机上的私有 `.env`，替换正式域名、CORS 来源和镜像命名空间。
+2. 使用生产覆盖检查合并配置，并确认没有缺失必需变量：
 
    ```bash
    docker compose --env-file infra/.env \
@@ -30,15 +46,18 @@
      -f infra/docker-compose.production.yml config --quiet
    ```
 
-4. 启动或升级服务：
+3. 拉取并启动或升级服务：
 
    ```bash
    docker compose --env-file infra/.env \
      -f infra/docker-compose.yml \
-     -f infra/docker-compose.production.yml up -d --build
+     -f infra/docker-compose.production.yml pull
+   docker compose --env-file infra/.env \
+     -f infra/docker-compose.yml \
+     -f infra/docker-compose.production.yml up -d
    ```
 
-5. 验证 API 健康检查和 Caddy 路由：
+4. 验证 API 健康检查和 Caddy 路由：
 
    ```bash
    curl --fail https://bookmarks.example.com/health/live
