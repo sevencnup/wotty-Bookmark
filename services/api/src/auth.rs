@@ -110,6 +110,13 @@ pub struct SidebarPairingResponse {
     pub server_url: String,
     pub device_code: String,
     pub expires_at: String,
+    pub browser_name: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateSidebarPairingPayload {
+    pub browser_name: String,
 }
 
 #[derive(Deserialize)]
@@ -280,20 +287,33 @@ pub async fn me(State(state): State<AppState>, headers: HeaderMap) -> Response {
     .into_response()
 }
 
-pub async fn create_sidebar_pairing(State(state): State<AppState>, headers: HeaderMap) -> Response {
+pub async fn create_sidebar_pairing(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(payload): Json<CreateSidebarPairingPayload>,
+) -> Response {
     let Some(user) = authenticate_session(&state, &headers).await else {
         return error(StatusCode::UNAUTHORIZED, "unauthorized", "请先登录");
     };
+    let browser_name = payload.browser_name.trim();
+    if browser_name.is_empty() || browser_name.chars().count() > 80 {
+        return error(
+            StatusCode::BAD_REQUEST,
+            "invalid_browser_name",
+            "浏览器名称不能为空且不能超过 80 个字符",
+        );
+    }
     let raw_code = generate_secret();
     let pairing_id = Uuid::new_v4();
     let expires_at = chrono::Utc::now() + chrono::Duration::from_std(SIDEBAR_PAIRING_TTL).unwrap();
     let result = sqlx::query(
-        "INSERT INTO sidebar_pairings (id, user_id, code_hash, expires_at) VALUES ($1, $2, $3, $4)",
+        "INSERT INTO sidebar_pairings (id, user_id, code_hash, expires_at, browser_name) VALUES ($1, $2, $3, $4, $5)",
     )
     .bind(pairing_id)
     .bind(user.id)
     .bind(hash_token(&raw_code))
     .bind(expires_at)
+    .bind(browser_name)
     .execute(&state.db)
     .await;
     if result.is_err() {
@@ -316,6 +336,7 @@ pub async fn create_sidebar_pairing(State(state): State<AppState>, headers: Head
         server_url: server_url.to_string(),
         device_code: raw_code,
         expires_at: expires_at.to_rfc3339(),
+        browser_name: browser_name.to_string(),
     })
     .into_response()
 }
@@ -332,7 +353,7 @@ pub async fn exchange_sidebar_pairing(
         );
     };
     let row = sqlx::query(
-        "SELECT id, user_id FROM sidebar_pairings WHERE code_hash = $1 AND used_at IS NULL AND expires_at > CURRENT_TIMESTAMP",
+        "SELECT id, user_id, browser_name FROM sidebar_pairings WHERE code_hash = $1 AND used_at IS NULL AND expires_at > CURRENT_TIMESTAMP",
     )
     .bind(hash_token(&secret))
     .fetch_optional(&state.db)
@@ -356,6 +377,7 @@ pub async fn exchange_sidebar_pairing(
     };
     let pairing_id: Uuid = row.get("id");
     let user_id: Uuid = row.get("user_id");
+    let browser_name: String = row.get("browser_name");
     let mut transaction = match state.db.begin().await {
         Ok(value) => value,
         Err(error_value) => {
@@ -387,7 +409,7 @@ pub async fn exchange_sidebar_pairing(
             "侧边栏连接失败",
         );
     }
-    match create_session(&state, user_id).await {
+    match create_sidebar_session(&state, user_id, &browser_name).await {
         Ok(token) => {
             let login_identifier: String =
                 match sqlx::query_scalar("SELECT login_identifier FROM users WHERE id = $1")
@@ -784,6 +806,39 @@ async fn create_session(state: &AppState, user_id: Uuid) -> Result<String, sqlx:
         .bind(hash_token(&token))
         .execute(&state.db)
         .await?;
+    Ok(token)
+}
+
+async fn create_sidebar_session(
+    state: &AppState,
+    user_id: Uuid,
+    browser_name: &str,
+) -> Result<String, sqlx::Error> {
+    let token = generate_secret();
+    let client_id = format!("sidebar-{}", Uuid::new_v4());
+    let device_id = Uuid::new_v4();
+    let mut transaction = state.db.begin().await?;
+    sqlx::query(
+        "INSERT INTO devices (id, user_id, client_id, name, device_type, user_agent_summary)
+         VALUES ($1, $2, $3, $4, 'sidebar', 'WOTTY BOOKMARK 浏览器侧边栏')",
+    )
+    .bind(device_id)
+    .bind(user_id)
+    .bind(client_id)
+    .bind(browser_name)
+    .execute(&mut *transaction)
+    .await?;
+    sqlx::query(
+        "INSERT INTO sessions (id, user_id, token_hash, expires_at, device_id)
+         VALUES ($1, $2, $3, datetime(CURRENT_TIMESTAMP, '+30 days'), $4)",
+    )
+    .bind(Uuid::new_v4())
+    .bind(user_id)
+    .bind(hash_token(&token))
+    .bind(device_id)
+    .execute(&mut *transaction)
+    .await?;
+    transaction.commit().await?;
     Ok(token)
 }
 

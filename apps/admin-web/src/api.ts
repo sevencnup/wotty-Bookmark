@@ -59,6 +59,7 @@ export type SidebarPairing = {
   serverUrl: string
   deviceCode: string
   expiresAt: string
+  browserName: string
 }
 
 export type FileVersion = {
@@ -425,8 +426,11 @@ export function restoreBackup(token: string, backupName: string) {
   return request<{ restored: boolean; restartRequired: boolean; protectionBackup: string }>(`/api/v1/backups/${encodeURIComponent(backupName)}/restore`, { method: 'POST' }, token)
 }
 
-export function createSidebarPairing(token: string) {
-  return request<SidebarPairing>('/api/v1/sidebar/pairing-codes', { method: 'POST' }, token)
+export function createSidebarPairing(token: string, browserName: string) {
+  return request<SidebarPairing>('/api/v1/sidebar/pairing-codes', {
+    method: 'POST',
+    body: JSON.stringify({ browserName }),
+  }, token)
 }
 
 export function getBookmarks(token: string, query = '') {

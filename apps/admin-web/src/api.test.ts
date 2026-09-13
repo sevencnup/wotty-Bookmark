@@ -36,6 +36,7 @@ import {
   getLibrary,
   createLibraryBookmark,
   createLibraryFolder,
+  createSidebarPairing,
   moveLibraryNode,
   deleteLibraryNode,
   restoreLibraryNode,
@@ -108,6 +109,28 @@ describe('admin API contract', () => {
       expect.objectContaining({
         method: 'POST',
         body: JSON.stringify({ name: 'Floccus 书签同步' }),
+      }),
+    )
+    expect(new Headers(fetchMock.mock.calls[0][1].headers).get('authorization')).toBe('Bearer session-token')
+  })
+
+  it('creates a named sidebar pairing code', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(response({
+      code: 'bvpair.v1.envelope',
+      serverUrl: 'https://bookmarks.example.com',
+      deviceCode: 'bv_device-secret',
+      expiresAt: '2026-09-13T15:10:00Z',
+      browserName: 'Chrome 工作浏览器',
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await createSidebarPairing('session-token', 'Chrome 工作浏览器')
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/v1/sidebar/pairing-codes',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ browserName: 'Chrome 工作浏览器' }),
       }),
     )
     expect(new Headers(fetchMock.mock.calls[0][1].headers).get('authorization')).toBe('Bearer session-token')

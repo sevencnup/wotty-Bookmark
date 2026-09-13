@@ -30,6 +30,7 @@ import {
   CheckCircle2,
   Lock,
   LogOut,
+  Link2,
 } from 'lucide-react'
 import {
   TrashPage,
@@ -71,6 +72,7 @@ type NavIconName =
   | 'library'
   | 'trash'
   | 'passwords'
+  | 'sidebar'
   | 'backup'
   | 'devices'
   | 'account'
@@ -98,7 +100,7 @@ const navGroups: NavGroup[] = [
   {
     label: '安全管理',
     items: [
-      { id: 'app-passwords', label: '密码管理', icon: 'passwords' },
+      { id: 'app-passwords', label: '侧边栏连接', icon: 'sidebar' },
       // 保留 Floccus 兼容路由，暂不在主侧边栏显示。
       { id: 'floccus', label: 'Floccus 配置', icon: 'sync', hidden: true },
       { id: 'backup', label: '数据备份', icon: 'backup' },
@@ -140,6 +142,8 @@ function NavIcon({ name, size = 18 }: { name: NavIconName; size?: number }) {
       return <Trash2 size={size} strokeWidth={1.8} />
     case 'passwords':
       return <KeyRound size={size} strokeWidth={1.8} />
+    case 'sidebar':
+      return <Link2 size={size} strokeWidth={1.8} />
     case 'sync':
       return <RefreshCw size={size} strokeWidth={1.8} />
     case 'backup':
@@ -300,11 +304,11 @@ function App() {
           ) : (
             <>
                 {activeSection === 'overview' && <Overview token={session.token} />}
-                {activeSection === 'app-passwords' && <AppPasswords token={session.token} />}
+                {activeSection === 'app-passwords' && <SidebarConnectionPage token={session.token} />}
                 {activeSection === 'categories' && <CategoryManagementPage token={session.token} onOpenFloccus={() => navigate('floccus')} />}
                 {activeSection === 'library' && <LibraryManagementPage token={session.token} />}
                 {activeSection === 'floccus' && <FloccusGuide token={session.token} loginIdentifier={session.user.loginIdentifier} />}
-                {activeSection === 'account' && <AccountSettings loginIdentifier={session.user.loginIdentifier} onOpenAppPasswords={() => navigate('app-passwords')} />}
+                {activeSection === 'account' && <AccountSettings loginIdentifier={session.user.loginIdentifier} />}
                 {activeSection === 'security' && <Security />}
                 {activeSection === 'trash' && <TrashPage navigate={navigate} token={session.token} />}
                 {activeSection === 'devices' && <DevicesPage navigate={navigate} onSessionRevoked={() => handleSessionChange(null)} token={session.token} />}
@@ -350,13 +354,13 @@ function LoginCard({ onLogin }: { onLogin: (session: api.Session) => void }) {
         <div className="brand auth-brand"><span className="brand-mark"><BrandLogo size={18} /></span> 书签管理</div>
         <p className="eyebrow">SELF-HOSTED BOOKMARK SYNC</p>
         <h1>管理你的同步服务</h1>
-        <p className="muted">登录后台创建 WebDAV 应用密码，然后使用官方 Floccus 同步浏览器书签。</p>
+        <p className="muted">登录后台生成侧边栏连接码，直接管理服务器书签；Floccus 兼容配置仍保留在隐藏页面。</p>
         <label>邮箱或用户名<input value={loginIdentifier} onChange={(event) => setLoginIdentifier(event.target.value)} placeholder="you@example.com" type="text" /></label>
         <label>密码<input value={password} onChange={(event) => setPassword(event.target.value)} placeholder="至少 12 个字符" type="password" /></label>
         {error && <p className="form-error">{error}</p>}
         <button className="primary-button" disabled={loading || !loginIdentifier || !password} onClick={() => void submit()} type="button">{loading ? '处理中…' : mode === 'login' ? '登录' : '创建账户'}</button>
         <button className="switch-button" onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError('') }} type="button">{mode === 'login' ? '还没有账户？创建账户' : '已有账户？返回登录'}</button>
-        <p className="form-hint">账户密码只用于登录；Floccus 专用密码会单独生成，不要填写账户密码。</p>
+        <p className="form-hint">账户密码只用于登录；侧边栏连接使用一次性设备码，不要填写账户密码。</p>
       </section>
     </main>
   )
@@ -424,10 +428,8 @@ function StatCard({ icon, iconTone, label, value, suffix, detail, trend }: { ico
 
 function Overview({ token }: { token: string }) {
   const [storage, setStorage] = useState<api.StorageStatus | null>(null)
-  const [passwordCount, setPasswordCount] = useState<number | null>(null)
   useEffect(() => {
     api.getStorageStatus(token).then(setStorage).catch(() => setStorage(null))
-    api.getAppPasswords(token).then((items) => setPasswordCount(items.length)).catch(() => setPasswordCount(null))
   }, [token])
 
   return (
@@ -440,8 +442,8 @@ function Overview({ token }: { token: string }) {
               准备就绪
             </span>
           </div>
-          <h2>从 Floccus 开始同步你的书签</h2>
-          <p>服务器保存 Floccus 加密后的 XBEL 文件；需要后台整理时，可用同一个 passphrase 显式解锁并建立索引。</p>
+          <h2>从服务器书签库开始管理</h2>
+          <p>书签保存在你自己的服务器上；为每个浏览器生成一次性连接码后，就能在侧边栏直接收藏、整理和访问。</p>
         </div>
         <div className="hero-symbol-container">
           <div className="hero-symbol-halo" />
@@ -453,7 +455,6 @@ function Overview({ token }: { token: string }) {
       <div className="stats-grid">
         <StatCard icon={<RefreshCw size={20} strokeWidth={1.8} />} iconTone="blue" label="同步文件" value={storage ? String(storage.files) : '—'} suffix="个" detail={storage?.lastModifiedAt ? `最近同步 ${formatDate(storage.lastModifiedAt)}` : '尚未配置 Floccus'} />
         <StatCard icon={<HardDrive size={20} strokeWidth={1.8} />} iconTone="green" label="存储占用" value={storage ? formatBytes(storage.bytes) : '—'} suffix="" detail={storage ? `单文件上限 ${formatBytes(storage.maxFileBytes)}` : '读取中'} />
-        <StatCard icon={<KeyRound size={20} strokeWidth={1.8} />} iconTone="purple" label="应用密码" value={passwordCount === null ? '—' : String(passwordCount)} suffix="个" detail="建议为每台设备单独创建" />
       </div>
       <section className="panel">
         <div className="panel-heading">
@@ -466,22 +467,22 @@ function Overview({ token }: { token: string }) {
           <li>
             <span className="step-badge">1</span>
             <div>
-              <strong>创建应用密码</strong>
-              <p>为 Floccus 创建独立凭据，主账户密码不会用于 WebDAV。</p>
+              <strong>生成侧边栏连接码</strong>
+              <p>填写浏览器名称，生成一次性连接码并在侧边栏完成绑定。</p>
             </div>
           </li>
           <li>
             <span className="step-badge">2</span>
             <div>
-              <strong>安装官方 Floccus</strong>
-              <p>在 Chrome、Edge 或 Firefox 的插件市场安装扩展。</p>
+              <strong>连接服务器书签库</strong>
+              <p>在 WOTTY BOOKMARK 侧边栏输入 API 地址和一次性设备码。</p>
             </div>
           </li>
           <li>
             <span className="step-badge">3</span>
             <div>
-              <strong>打开加密同步</strong>
-              <p>配置 WebDAV 地址和 passphrase，保护你的书签内容。</p>
+              <strong>直接收藏和整理</strong>
+              <p>侧边栏的新增、移动和删除会直接保存到服务器书签库。</p>
             </div>
           </li>
         </ol>
@@ -780,33 +781,22 @@ function formatBytes(bytes: number) { if (bytes < 1024) return `${bytes} B`; if 
 function formatDate(value: string) { return new Date(value).toLocaleString() }
 function getWebDavUrl(loginIdentifier: string) { return `${window.location.origin}/dav/${encodeURIComponent(loginIdentifier)}/` }
 
-function AppPasswordList({ token }: { token: string }) {
-  const [items, setItems] = useState<api.AppPassword[]>([])
-  const [name, setName] = useState('')
-  const [newSecret, setNewSecret] = useState<string | null>(null)
-  const [error, setError] = useState('')
-  const [loadError, setLoadError] = useState('')
-  async function loadPasswords() { setLoadError(''); try { setItems(await api.getAppPasswords(token)) } catch (requestError) { setLoadError(requestError instanceof Error ? requestError.message : '读取失败') } }
-  useEffect(() => { void loadPasswords() }, [token])
-  async function create() { if (!name.trim()) return; try { const item = await api.createAppPassword(token, name.trim()); setItems((current) => [item, ...current]); setNewSecret(item.secret ?? null); setName(''); setError('') } catch (requestError) { setError(requestError instanceof Error ? requestError.message : '创建失败') } }
-  async function revoke(id: string) {
-    const item = items.find((candidate) => candidate.id === id)
-    if (!confirmDangerousAction(`撤销应用密码“${item?.name ?? '未命名连接'}”？撤销后使用它的 Floccus 将无法继续同步。`)) return
-    try { await api.revokeAppPassword(token, id); setItems((current) => current.filter((item) => item.id !== id)); setError('') } catch (requestError) { setError(requestError instanceof Error ? requestError.message : '撤销失败') }
-  }
-  return <section className="panel"><div className="panel-heading"><div><p className="eyebrow">ACCESS CONTROL</p><h3>应用密码</h3></div></div><p className="account-panel-intro">为 Floccus、浏览器侧边栏或其他客户端创建独立连接凭据。凭据只显示一次，撤销单个凭据不会影响账户登录。</p><div className="password-create"><input value={name} onChange={(event) => setName(event.target.value)} placeholder="例如：Chrome 工作浏览器" /><button className="primary-button compact" onClick={() => void create()} type="button">创建应用密码</button></div>{error && <p className="form-error">{error}</p>}{newSecret && <div className="secret-box"><strong>请立即保存这串应用密码</strong><code>{newSecret}</code><CopyButton className="ghost-button" value={newSecret} /><p>它只会在创建成功时显示一次。</p></div>}{loadError ? <div className="empty-state"><span>!</span><h4>无法读取应用密码</h4><p>{loadError}</p><button className="toolbar-button compact" onClick={() => void loadPasswords()} type="button"><RefreshCw size={14} /> 重新连接</button></div> : items.length === 0 ? <div className="empty-state"><span>◇</span><h4>还没有应用密码</h4><p>建议为每个浏览器或设备创建独立的应用密码，撤销时不会影响账户登录。</p></div> : <div className="password-list">{items.map((item) => <div className="password-row" key={item.id}><div><strong>{item.name}</strong><span>创建于 {new Date(item.createdAt).toLocaleString()}</span></div><button className="danger-button" onClick={() => void revoke(item.id)} type="button">撤销</button></div>)}</div>}</section>
-}
-
-function AppPasswords({ token }: { token: string }) {
+function SidebarConnectionPage({ token }: { token: string }) {
   const [sidebarPairing, setSidebarPairing] = useState<api.SidebarPairing | null>(null)
+  const [browserName, setBrowserName] = useState('')
   const [pairing, setPairing] = useState(false)
   const [pairingError, setPairingError] = useState('')
   async function handleSidebarPairing() {
+    const name = browserName.trim()
+    if (!name) {
+      setPairingError('请先填写浏览器名称')
+      return
+    }
     setPairing(true)
     setPairingError('')
-    try { setSidebarPairing(await api.createSidebarPairing(token)) } catch (requestError) { setPairingError(requestError instanceof Error ? requestError.message : '设备码创建失败') } finally { setPairing(false) }
+    try { setSidebarPairing(await api.createSidebarPairing(token, name)) } catch (requestError) { setPairingError(requestError instanceof Error ? requestError.message : '设备码创建失败') } finally { setPairing(false) }
   }
-  return <div className="feature-page"><AppPasswordList token={token} /><section className="panel sidebar-pairing-panel"><div className="panel-heading"><div><p className="eyebrow">SIDEBAR CONNECTION</p><h3>侧边栏连接码</h3></div></div><p className="account-panel-intro">生成一次性连接码，把服务器地址和设备码填入 WOTTY BOOKMARK 浏览器侧边栏。连接码 10 分钟内有效且只能使用一次。</p>{sidebarPairing ? <div className="secret-box"><strong>连接码已生成，请立即使用</strong><div className="config-fields"><ConfigField label="API 地址" value={sidebarPairing.serverUrl} /><ConfigField label="设备码" value={sidebarPairing.deviceCode} /></div><p>有效期至 {new Date(sidebarPairing.expiresAt).toLocaleString()}</p></div> : <><button className="primary-button compact" disabled={pairing} onClick={() => void handleSidebarPairing()} type="button">{pairing ? '生成中…' : '生成侧边栏连接码'}</button>{pairingError && <p className="form-error">{pairingError}</p>}</>}</section></div>
+  return <div className="feature-page"><section className="panel sidebar-pairing-panel"><div className="panel-heading"><div><p className="eyebrow">SIDEBAR CONNECTION</p><h3>侧边栏连接</h3></div></div><p className="account-panel-intro">为每个浏览器生成一次性连接码。连接后，侧边栏会直接管理服务器书签库，不需要应用密码或 WebDAV 配置。</p>{sidebarPairing ? <div className="secret-box"><strong>“{sidebarPairing.browserName || browserName || '浏览器'}”连接码已生成，请立即使用</strong><div className="config-fields"><ConfigField label="API 地址" value={sidebarPairing.serverUrl} /><ConfigField label="设备码" value={sidebarPairing.deviceCode} /></div><p>有效期至 {new Date(sidebarPairing.expiresAt).toLocaleString()}，且只能使用一次。</p></div> : <><label className="pairing-browser-field">浏览器名称<input autoFocus maxLength={80} onChange={(event) => { setBrowserName(event.target.value); setPairingError('') }} placeholder="例如：Chrome 工作浏览器" value={browserName} /></label><button className="primary-button compact" disabled={pairing || !browserName.trim()} onClick={() => void handleSidebarPairing()} type="button">{pairing ? '生成中…' : '生成侧边栏连接码'}</button>{pairingError && <p className="form-error">{pairingError}</p>}</>}</section></div>
 }
 
 function FloccusGuide({ token, loginIdentifier }: { token: string; loginIdentifier: string }) {
@@ -922,7 +912,7 @@ function FloccusGuide({ token, loginIdentifier }: { token: string; loginIdentifi
   )
 }
 
-function AccountSettings({ loginIdentifier, onOpenAppPasswords }: { loginIdentifier: string; onOpenAppPasswords: () => void }) {
+function AccountSettings({ loginIdentifier }: { loginIdentifier: string }) {
   const davUrl = getWebDavUrl(loginIdentifier)
 
   return (
@@ -949,7 +939,7 @@ function AccountSettings({ loginIdentifier, onOpenAppPasswords }: { loginIdentif
           <div className="panel-heading">
             <div><p className="eyebrow">WEBDAV CONNECTION</p><h3>同步连接信息</h3></div>
           </div>
-          <p className="account-panel-intro">在 Floccus 中使用下面的地址和用户名。密码请使用应用密码，不要填写登录密码。</p>
+          <p className="account-panel-intro">Floccus 兼容同步仍可使用下面的 WebDAV 地址和用户名；自有侧边栏连接不需要应用密码。</p>
           <div className="config-fields">
             <ConfigField label="WebDAV 地址" value={davUrl} />
             <ConfigField label="WebDAV 用户名" value={loginIdentifier} />
@@ -958,7 +948,7 @@ function AccountSettings({ loginIdentifier, onOpenAppPasswords }: { loginIdentif
             <span>i</span>
             <p>WebDAV 地址会随当前访问地址生成。部署到服务器后，这里会自动显示服务器域名。</p>
           </div>
-          <button className="primary-button" onClick={onOpenAppPasswords} type="button">去创建应用密码</button>
+          <div className="security-notice account-notice"><span>i</span><p>推荐使用“侧边栏连接”生成一次性设备码。应用密码接口仅为旧版 Floccus 配置保留，不在后台提供创建入口。</p></div>
         </section>
       </div>
     </div>
