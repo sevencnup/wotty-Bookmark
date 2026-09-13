@@ -1,5 +1,10 @@
 # WOTTY BOOKMARK 开发记录
 
+## 2026-09-13：修复 GHCR API 镜像构建版本
+
+- 根据 GitHub Actions 构建日志，将 API 多阶段 Dockerfile 的 Rust 构建环境从 1.85 升级到 1.88。
+- 保持运行时镜像和数据卷结构不变，重新触发 GHCR 镜像发布。
+
 ## 2026-09-13：GitHub Container Registry 镜像发布
 
 - 增加 API 和管理后台/Caddy 的多阶段 Dockerfile。

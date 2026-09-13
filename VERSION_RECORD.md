@@ -1,5 +1,9 @@
 # 版本记录
 
+## 0.0.60 · 2026-09-13
+
+- 修复 GHCR API 镜像构建使用过旧 Rust 版本导致 Actions 失败的问题。
+
 ## 0.0.59 · 2026-09-13
 
 - 增加 GitHub Actions 自动构建并发布 GHCR API/Web Docker 镜像，生产 Compose 支持直接拉取镜像部署。
