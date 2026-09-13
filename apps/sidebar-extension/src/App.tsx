@@ -11,6 +11,8 @@ import { loadSiteFavicon } from './lib/site-favicon';
 
 type Modal = { type: 'connect' } | { type: 'create'; kind: 'bookmark' | 'folder'; parentId?: string } | { type: 'edit' | 'move' | 'delete'; nodeId: string } | null;
 type Editor = { kind: 'bookmark' | 'folder'; title: string; url: string; parentId: string };
+type RefreshOptions = { silent?: boolean };
+const AUTO_REFRESH_INTERVAL_MS = 10_000;
 
 function toNodes(tree: LibraryTree): BookmarkNode[] {
   const build = (folder: LibraryFolder): BookmarkNode => ({ id: folder.id, title: folder.title, children: folder.children.map(build) });
@@ -49,6 +51,13 @@ function flattenLibraryFolders(folders: LibraryFolder[], depth = 0): Array<Libra
   return folders.flatMap((folder) => [{ ...folder, depth }, ...flattenLibraryFolders(folder.children, depth + 1)]);
 }
 
+function formatSyncTime(value: Date | null) {
+  if (!value) return '尚未同步';
+  const elapsed = Math.max(0, Date.now() - value.getTime());
+  if (elapsed < 60_000) return '刚刚同步';
+  return `同步于 ${value.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+}
+
 function App() {
   const [connection, setConnection] = useState<BackendConnection | null>(null);
   const [tree, setTree] = useState<LibraryTree | null>(null);
@@ -60,17 +69,48 @@ function App() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [activeTab, setActiveTab] = useState<{ title: string; url: string } | null>(null);
   const [quickSaveFolder, setQuickSaveFolder] = useState('');
+  const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
+  const refreshInFlightRef = useRef(false);
   const workspaceRef = useRef<HTMLElement>(null);
 
-  const refresh = useCallback(async (current = connection) => {
-    if (!current) { setTree(null); setLoading(false); return; }
-    setLoading(true); setError(null);
-    try { setTree(await getLibrary(current)); } catch (reason) { setError(reason instanceof Error ? reason.message : '无法读取服务器书签库'); } finally { setLoading(false); }
+  const refresh = useCallback(async (current = connection, { silent = false }: RefreshOptions = {}) => {
+    if (!current) { setTree(null); setLoading(false); setLastSyncedAt(null); return; }
+    if (refreshInFlightRef.current) return;
+    refreshInFlightRef.current = true;
+    if (!silent) setLoading(true);
+    setError(null);
+    try {
+      setTree(await getLibrary(current));
+      setLastSyncedAt(new Date());
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : '无法读取服务器书签库');
+    } finally {
+      refreshInFlightRef.current = false;
+      if (!silent) setLoading(false);
+    }
   }, [connection]);
 
   const refreshTab = useCallback(() => { void getActiveTab().then(setActiveTab).catch(() => setActiveTab(null)); }, []);
   useEffect(() => { void loadBackendConnection().then((value) => { setConnection(value); void refresh(value); }); }, []);
   useEffect(() => { refreshTab(); const tabs = getTabsApi(); tabs?.onActivated?.addListener(refreshTab); window.addEventListener('focus', refreshTab); return () => { tabs?.onActivated?.removeListener(refreshTab); window.removeEventListener('focus', refreshTab); }; }, [refreshTab]);
+  useEffect(() => {
+    if (!connection) return;
+    const syncIfVisible = () => {
+      if (document.visibilityState === 'hidden') return;
+      void refresh(connection, { silent: true });
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') syncIfVisible();
+    };
+    const interval = window.setInterval(syncIfVisible, AUTO_REFRESH_INTERVAL_MS);
+    window.addEventListener('focus', syncIfVisible);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('focus', syncIfVisible);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [connection, refresh]);
 
   const nodes = useMemo(() => tree ? toNodes(tree) : [], [tree]);
   const folders = useMemo(() => collectFolders(nodes), [nodes]);
@@ -108,11 +148,11 @@ function App() {
       <div className="search-shell"><Search size={16} /><input aria-label="搜索服务器书签" disabled={!connection} onChange={(event) => setQuery(event.target.value)} placeholder="搜索服务器书签或网址" type="search" value={query} />{query && <button className="icon-button" onClick={() => setQuery('')} type="button"><X size={14} /></button>}</div>
       <section className={`quick-save-card ${!activeTab || !connection ? 'is-disabled' : ''}`}><div className="quick-save-icon"><Globe size={17} /></div><div className="quick-save-copy"><span className="eyebrow">收藏当前页 · SERVER</span><strong>{activeTab?.title ?? '当前页面不可收藏'}</strong><span>{activeTab ? hostname(activeTab.url) : '请在普通网页中打开侧边栏'}</span></div><label className="quick-save-folder"><Folder size={13} /><span className="sr-only">保存到文件夹</span><select aria-label="收藏到文件夹" disabled={!activeTab || !connection || currentSaved || busy} onChange={(event) => setQuickSaveFolder(event.target.value)} value={quickSaveFolder}><option value="">根目录</option>{folderOptions.map((folder) => <option key={folder.id} value={folder.id}>{'　'.repeat(folder.depth)}{folder.title}</option>)}</select></label><button className={`save-current-button ${currentSaved ? 'is-saved' : ''}`} disabled={!activeTab || !connection || currentSaved || busy} onClick={() => activeTab && void perform((active) => createLibraryBookmark(active, { title: activeTab.title, url: activeTab.url, parentId: quickSaveFolder || null }))} type="button">{currentSaved ? <Check size={15} /> : <Plus size={15} />}{currentSaved ? '已收藏' : '收藏'}</button></section>
       <div className="section-heading"><div><span className="section-kicker">PRIVATE LIBRARY</span><h1>我的服务器书签</h1></div><div className="heading-actions"><button className="new-bookmark-button" disabled={!connection} onClick={() => setModal({ type: 'create', kind: 'folder' })} type="button"><Folder size={15} />文件夹</button><button className="new-bookmark-button primary" disabled={!connection} onClick={() => setModal({ type: 'create', kind: 'bookmark' })} type="button"><Plus size={15} />新增</button></div></div>
-      <div className="library-meta"><span>{countBookmarks(nodes)} 个书签</span><span className="meta-separator">·</span><span>{countFolders(nodes)} 个文件夹</span><span className="meta-spacer" /><button className="refresh-button" disabled={!connection || loading} onClick={() => void refresh()} type="button"><RefreshCw className={loading ? 'spin' : ''} size={13} />刷新</button></div>
+      <div className="library-meta"><span>{countBookmarks(nodes)} 个书签</span><span className="meta-separator">·</span><span>{countFolders(nodes)} 个文件夹</span><span className="sync-time" title="侧边栏每 10 秒自动同步一次，重新聚焦时会立即同步">{formatSyncTime(lastSyncedAt)}</span><span className="meta-spacer" /><button className="refresh-button" disabled={!connection || loading} onClick={() => void refresh()} type="button"><RefreshCw className={loading ? 'spin' : ''} size={13} />刷新</button></div>
       {!connection ? <Disconnected onConnect={() => setModal({ type: 'connect' })} /> : error && !tree ? <Failure message={error} onRetry={() => void refresh()} /> : loading ? <Loading /> : query.trim() ? <SearchList results={results} onEdit={(nodeId) => setModal({ type: 'edit', nodeId })} onMove={(nodeId) => setModal({ type: 'move', nodeId })} onDelete={(nodeId) => setModal({ type: 'delete', nodeId })} /> : visible.length ? <div className="bookmark-list">{visible.map((node) => <NodeRow key={node.id} node={node} expanded={expanded.has(node.id)} onDelete={() => setModal({ type: 'delete', nodeId: node.id })} onEdit={() => setModal({ type: 'edit', nodeId: node.id })} onMove={() => setModal({ type: 'move', nodeId: node.id })} onOpen={() => node.url && void openBookmark(node.url)} onToggle={() => setExpanded((current) => { const next = new Set(current); if (next.has(node.id)) next.delete(node.id); else next.add(node.id); return next; })} />)}</div> : <Empty onCreate={() => setModal({ type: 'create', kind: 'bookmark' })} />}{error && tree && <p className="inline-error">{error}</p>}
     </section>
     <button aria-label="回到顶部" className="back-to-top-button" onClick={() => scrollToTop(workspaceRef.current)} title="回到顶部" type="button"><ArrowUp size={16} /></button>
-    <footer className="app-footer"><span><span className="footer-dot" /> 服务器是唯一数据源</span><span className="footer-version">v0.1.13</span></footer>
+    <footer className="app-footer"><span><span className="footer-dot" /> 服务器是唯一数据源</span><span className="footer-version">v0.1.14</span></footer>
     {modal?.type === 'connect' && <ConnectionModal busy={busy} connection={connection} onClose={() => setModal(null)} onConnect={(serverUrl, code) => { setBusy(true); setError(null); void connectToBackend(serverUrl, code).then(async (next) => { setConnection(next); await refresh(next); setModal(null); }).catch((reason: unknown) => setError(reason instanceof Error ? reason.message : '连接失败')).finally(() => setBusy(false)); }} onDisconnect={() => { setBusy(true); void clearBackendConnection().then(() => { setConnection(null); setTree(null); setModal(null); }).finally(() => setBusy(false)); }} />}
     {modal?.type === 'create' && <EditorModal busy={busy} initial={{ kind: modal.kind, parentId: modal.parentId ?? '' }} nodes={nodes} onClose={() => setModal(null)} onSubmit={submitEditor} />}
     {modal?.type === 'edit' && <EditorModal busy={busy} node={findNode(nodes, modal.nodeId)} nodes={nodes} onClose={() => setModal(null)} onSubmit={submitEditor} />}

@@ -495,6 +495,16 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   color: var(--line);
 }
 
+.sync-time {
+  overflow: hidden;
+  max-width: 92px;
+  margin-left: 8px;
+  color: var(--soft-muted);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .meta-spacer { flex: 1; }
 
 .refresh-button {
