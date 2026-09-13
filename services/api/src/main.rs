@@ -144,6 +144,11 @@ fn app_router(state: AppState) -> Router {
             "/api/v1/library/trash/:id/restore",
             post(library::restore_node),
         )
+        .route("/api/v1/library/trash/empty", post(library::empty_trash))
+        .route(
+            "/api/v1/library/trash/:id",
+            delete(library::permanently_delete_trash),
+        )
         .route("/api/v1/library/import", post(library::import_xbel))
         .route(
             "/api/v1/library/import-from-sync",

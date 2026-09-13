@@ -377,6 +377,89 @@ pub async fn restore_node(
     }
 }
 
+pub async fn permanently_delete_trash(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Path(id): Path<Uuid>,
+) -> Response {
+    let user = match require_user(&state, &headers).await {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
+    match permanently_delete_trash_root(&state.db, user.id, id).await {
+        Ok(removed) if removed > 0 => {
+            Json(json!({ "deleted": true, "removed": removed })).into_response()
+        }
+        Ok(_) => not_found(),
+        Err(error) => database_error(error),
+    }
+}
+
+pub async fn empty_trash(State(state): State<AppState>, headers: HeaderMap) -> Response {
+    let user = match require_user(&state, &headers).await {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
+    match empty_trash_for_user(&state.db, user.id).await {
+        Ok(removed) => Json(json!({ "removed": removed })).into_response(),
+        Err(error) => database_error(error),
+    }
+}
+
+async fn permanently_delete_trash_root(
+    db: &SqlitePool,
+    user_id: Uuid,
+    id: Uuid,
+) -> Result<u64, sqlx::Error> {
+    // Only a deleted root may be addressed directly. Deleting a root removes
+    // its complete soft-deleted subtree, including nested folders/bookmarks.
+    let mut transaction = db.begin().await?;
+    let count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM library_nodes
+         WHERE user_id = $1
+           AND deleted_root_id = $2
+           AND deleted_at IS NOT NULL
+           AND EXISTS (
+             SELECT 1 FROM library_nodes root
+             WHERE root.id = $2
+               AND root.user_id = $1
+               AND root.deleted_root_id = root.id
+               AND root.deleted_at IS NOT NULL
+           )",
+    )
+    .bind(user_id)
+    .bind(id)
+    .fetch_one(&mut *transaction)
+    .await?;
+    if count == 0 {
+        transaction.rollback().await?;
+        return Ok(0);
+    }
+    sqlx::query(
+        "DELETE FROM library_nodes
+         WHERE user_id = $1
+           AND deleted_root_id = $2
+           AND deleted_at IS NOT NULL",
+    )
+    .bind(user_id)
+    .bind(id)
+    .execute(&mut *transaction)
+    .await?;
+    transaction.commit().await?;
+    Ok(count as u64)
+}
+
+async fn empty_trash_for_user(db: &SqlitePool, user_id: Uuid) -> Result<u64, sqlx::Error> {
+    let result = sqlx::query(
+        "DELETE FROM library_nodes
+         WHERE user_id = $1 AND deleted_at IS NOT NULL",
+    )
+    .bind(user_id)
+    .execute(db)
+    .await?;
+    Ok(result.rows_affected())
+}
+
 pub async fn import_xbel(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -707,7 +790,10 @@ fn database_error(error: sqlx::Error) -> Response {
 
 #[cfg(test)]
 mod tests {
-    use super::{folder_move_creates_cycle_db, import_document, load_tree, validate_url};
+    use super::{
+        empty_trash_for_user, folder_move_creates_cycle_db, import_document, load_tree,
+        permanently_delete_trash_root, validate_url,
+    };
     use crate::bookmarks::parse_xbel;
     use sqlx::sqlite::SqlitePoolOptions;
     use uuid::Uuid;
@@ -769,5 +855,116 @@ mod tests {
         assert!(folder_move_creates_cycle_db(&db, id, root, child)
             .await
             .unwrap());
+    }
+
+    #[tokio::test]
+    async fn permanently_deletes_only_a_trash_root_and_its_subtree() {
+        let db = test_db().await;
+        let first = user(&db).await;
+        let second = user(&db).await;
+        let root = Uuid::new_v4();
+        let child_folder = Uuid::new_v4();
+        let child_bookmark = Uuid::new_v4();
+        let other_root = Uuid::new_v4();
+        for (id, owner, parent, node_type, title, root_id) in [
+            (root, first, None, "folder", "Deleted root", Some(root)),
+            (
+                child_folder,
+                first,
+                Some(root),
+                "folder",
+                "Nested folder",
+                Some(root),
+            ),
+            (
+                child_bookmark,
+                first,
+                Some(child_folder),
+                "bookmark",
+                "Nested bookmark",
+                Some(root),
+            ),
+            (
+                other_root,
+                second,
+                None,
+                "folder",
+                "Other user",
+                Some(other_root),
+            ),
+        ] {
+            sqlx::query(
+                "INSERT INTO library_nodes
+                 (id, user_id, parent_id, node_type, title, url, position, deleted_at, deleted_root_id)
+                 VALUES ($1, $2, $3, $4, $5, $6, 0, CURRENT_TIMESTAMP, $7)",
+            )
+            .bind(id)
+            .bind(owner)
+            .bind(parent)
+            .bind(node_type)
+            .bind(title)
+            .bind(if node_type == "bookmark" { Some("https://example.com") } else { None })
+            .bind(root_id)
+            .execute(&db)
+            .await
+            .unwrap();
+        }
+
+        assert_eq!(
+            permanently_delete_trash_root(&db, first, child_folder)
+                .await
+                .unwrap(),
+            0
+        );
+        assert_eq!(
+            permanently_delete_trash_root(&db, first, root)
+                .await
+                .unwrap(),
+            3
+        );
+        assert_eq!(
+            sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM library_nodes WHERE user_id = $1",)
+                .bind(first)
+                .fetch_one(&db)
+                .await
+                .unwrap(),
+            0
+        );
+        assert_eq!(
+            sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM library_nodes WHERE user_id = $1",)
+                .bind(second)
+                .fetch_one(&db)
+                .await
+                .unwrap(),
+            1
+        );
+    }
+
+    #[tokio::test]
+    async fn empty_trash_is_isolated_per_user() {
+        let db = test_db().await;
+        let first = user(&db).await;
+        let second = user(&db).await;
+        for owner in [first, second, first] {
+            sqlx::query(
+                "INSERT INTO library_nodes
+                 (id, user_id, node_type, title, url, position, deleted_at, deleted_root_id)
+                 VALUES ($1, $2, 'bookmark', 'Deleted', 'https://example.com', 0, CURRENT_TIMESTAMP, $1)",
+            )
+            .bind(Uuid::new_v4())
+            .bind(owner)
+            .execute(&db)
+            .await
+            .unwrap();
+        }
+        assert_eq!(empty_trash_for_user(&db, first).await.unwrap(), 2);
+        assert_eq!(
+            sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM library_nodes WHERE user_id = $1",)
+                .bind(second)
+                .fetch_one(&db)
+                .await
+                .unwrap(),
+            1
+        );
     }
 }
