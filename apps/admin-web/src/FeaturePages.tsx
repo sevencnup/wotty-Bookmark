@@ -20,6 +20,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from 'react'
 import * as api from './api'
 import { confirmDangerousAction, savePreferences, shouldConfirmDangerousActions, type Preferences } from './preferences'
+import { browserBookmarksHtmlToXbel } from './browser-bookmarks'
 
 type Navigate = (section: string) => void
 
@@ -256,14 +257,40 @@ export function ImportExportPage({ token, navigate }: PageProps) {
   async function load() { try { const [nextStorage, nextVersions] = await Promise.all([api.getStorageStatus(token), api.getFileVersions(token)]); setStorage(nextStorage); setVersions(nextVersions) } catch (requestError) { setError(errorMessage(requestError, '导入导出状态读取失败')) } finally { setLoading(false) } }
   useEffect(() => { void load() }, [token])
   async function exportFile() { setBusy('export'); setError(''); try { const blob = await api.exportStorageFile(token); const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = 'bookmarks.xbel'; link.click(); URL.revokeObjectURL(url); setNotice('同步文件已开始下载。') } catch (requestError) { setError(errorMessage(requestError, '导出同步文件失败')) } finally { setBusy(null) } }
-  async function importFile() { if (!selectedFile) return; setBusy('import'); setError(''); try { const result = await api.importStorageFile(token, selectedFile); setNotice(result.encrypted ? '加密同步文件已导入；若已保存的 passphrase 匹配，索引会自动更新，否则请重新解锁。' : '明文 XBEL 已导入并建立索引。'); setSelectedFile(null); setConfirmImport(false); if (inputRef.current) inputRef.current.value = ''; await load() } catch (requestError) { setError(errorMessage(requestError, '导入同步文件失败')) } finally { setBusy(null) } }
+  async function importFile() {
+    if (!selectedFile) return
+    setBusy('import')
+    setError('')
+    try {
+      const source = await selectedFile.text()
+      const isHtml = /\.html?$/i.test(selectedFile.name) || selectedFile.type === 'text/html' || /NETSCAPE-Bookmark-file|<DT[^>]*>\s*<H3/i.test(source)
+      if (isHtml) {
+        const converted = browserBookmarksHtmlToXbel(source)
+        if (!converted.count) {
+          setError('没有找到可导入的 HTTP/HTTPS 书签，请确认这是浏览器导出的书签 HTML 文件。')
+          return
+        }
+        await api.importLibraryXbel(token, converted.xbel, false)
+        setNotice('已导入 ' + converted.count + ' 个浏览器书签到“我的书签库”，不会覆盖 Floccus 同步文件。')
+      } else {
+        const result = await api.importStorageFile(token, selectedFile)
+        setNotice(result.encrypted ? '加密同步文件已导入；若已保存的 passphrase 匹配，索引会自动更新，否则请重新解锁。' : '明文 XBEL 已导入并建立索引。')
+      }
+      setSelectedFile(null)
+      setConfirmImport(false)
+      if (inputRef.current) inputRef.current.value = ''
+      await load()
+    } catch (requestError) { setError(errorMessage(requestError, '导入文件失败')) } finally { setBusy(null) }
+  }
   async function cleanup() {
     if (!confirmDangerousAction('清理旧历史版本？被清理的版本将无法再恢复。')) return
     setBusy('cleanup')
     try { const result = await api.cleanupFileVersions(token); setNotice(`已清理 ${result.removed} 个旧版本。`); await load() } catch (requestError) { setError(errorMessage(requestError, '历史版本清理失败')) } finally { setBusy(null) }
   }
   function requestImport() {
-    if (shouldConfirmDangerousActions()) setConfirmImport(true)
+    const isHtml = selectedFile && (/\.html?$/i.test(selectedFile.name) || selectedFile.type === 'text/html')
+    if (isHtml) void importFile()
+    else if (shouldConfirmDangerousActions()) setConfirmImport(true)
     else void importFile()
   }
   function requestVersionRestore(version: api.FileVersion) {
@@ -274,7 +301,8 @@ export function ImportExportPage({ token, navigate }: PageProps) {
     setBusy(version.id)
     try { await api.restoreFileVersion(token, version.id); setConfirmVersionRestore(null); setNotice('历史版本已恢复。'); await load() } catch (requestError) { setError(errorMessage(requestError, '历史版本恢复失败')) } finally { setBusy(null) }
   }
-  return <div className="feature-page">{notice && <PageAlert tone="success"><strong>{notice}</strong></PageAlert>}{error && <PageAlert>{error}</PageAlert>}<div className="import-export-grid"><section className="panel transfer-card"><span className="transfer-icon blue"><CloudDownload size={24} /></span><h3>导出同步文件</h3><p>下载当前 `bookmarks.xbel` 原始文件，可用于备份或迁移到另一台服务。</p><dl className="transfer-details"><div><dt>文件大小</dt><dd>{storage ? formatBytes(storage.bytes) : '—'}</dd></div><div><dt>最近修改</dt><dd>{storage?.lastModifiedAt ? formatDate(storage.lastModifiedAt) : '暂无记录'}</dd></div></dl><button className="primary-button" disabled={busy !== null || !storage?.files} onClick={() => void exportFile()} type="button"><CloudDownload size={15} /> {busy === 'export' ? '准备下载…' : '导出 bookmarks.xbel'}</button>{!storage?.files && <small className="form-hint left">当前没有可导出的同步文件。</small>}</section><section className="panel transfer-card"><span className="transfer-icon green"><CloudUpload size={24} /></span><h3>导入同步文件</h3><p>导入前会自动创建当前文件的历史版本。支持明文 XBEL 和 Floccus 加密文件，单文件不超过 10 MB。</p><label className="file-picker"><Upload size={18} /><span>{selectedFile ? `${selectedFile.name} · ${formatBytes(selectedFile.size)}` : '选择 bookmarks.xbel 文件'}</span><input accept=".xbel,.json,application/octet-stream,application/xml,text/xml" ref={inputRef} onChange={(event) => setSelectedFile(event.target.files?.[0] ?? null)} type="file" /></label><button className="primary-button" disabled={busy !== null || !selectedFile} onClick={requestImport} type="button"><CloudUpload size={15} /> 导入并覆盖当前文件</button><small className="form-hint left">加密文件会尝试使用服务器已保存的受保护 passphrase 建立索引；不匹配时文件仍会保留并要求重新解锁。</small></section></div><section className="panel"><div className="panel-heading"><div><p className="eyebrow">RECOVERY</p><h3>历史版本</h3></div><div className="inline-actions"><button className="ghost-button compact" disabled={busy !== null || loading} onClick={() => void load()} type="button"><RefreshCw size={14} /> 刷新</button><button className="ghost-button compact" disabled={busy !== null || versions.length === 0} onClick={() => void cleanup()} type="button">清理旧版本</button></div></div>{versions.length === 0 ? <div className="feature-empty compact-empty"><FileArchive size={25} /><h3>还没有历史版本</h3><p>同步文件被覆盖后，系统会自动保留最近的版本。</p></div> : <div className="version-list">{versions.slice(0, 8).map((version) => <div className="version-row" key={version.id}><FileArchive size={17} /><div><strong>{formatBytes(version.byteSize)}</strong><span>{formatDate(version.createdAt)} · {version.filePath}</span></div><button className="ghost-button compact" disabled={busy !== null} onClick={() => requestVersionRestore(version)} type="button">恢复</button></div>)}</div>}</section><p className="workspace-note">导入会覆盖当前同步文件，但系统会先保存一个历史版本 · {versions.length} 个可用历史版本</p>{confirmImport && <ConfirmDialog confirmLabel="确认导入" description={`将使用 ${selectedFile?.name ?? '所选文件'} 覆盖当前同步文件，并先创建历史版本。`} loading={busy === 'import'} onCancel={() => setConfirmImport(false)} onConfirm={() => void importFile()} title="导入并覆盖？" />}{confirmVersionRestore && <ConfirmDialog danger confirmLabel="确认恢复" description={`恢复 ${confirmVersionRestore.filePath} 会覆盖当前同步文件，并先保留当前版本。`} loading={busy === confirmVersionRestore.id} onCancel={() => setConfirmVersionRestore(null)} onConfirm={() => void restoreVersion(confirmVersionRestore)} title="恢复历史版本？" />}</div>
+  const selectedIsHtml = Boolean(selectedFile && (/\.html?$/i.test(selectedFile.name) || selectedFile.type === 'text/html'))
+  return <div className="feature-page">{notice && <PageAlert tone="success"><strong>{notice}</strong></PageAlert>}{error && <PageAlert>{error}</PageAlert>}<div className="import-export-grid"><section className="panel transfer-card"><span className="transfer-icon blue"><CloudDownload size={24} /></span><h3>导出同步文件</h3><p>下载当前 `bookmarks.xbel` 原始文件，可用于备份或迁移到另一台服务。</p><dl className="transfer-details"><div><dt>文件大小</dt><dd>{storage ? formatBytes(storage.bytes) : '—'}</dd></div><div><dt>最近修改</dt><dd>{storage?.lastModifiedAt ? formatDate(storage.lastModifiedAt) : '暂无记录'}</dd></div></dl><button className="primary-button" disabled={busy !== null || !storage?.files} onClick={() => void exportFile()} type="button"><CloudDownload size={15} /> {busy === 'export' ? '准备下载…' : '导出 bookmarks.xbel'}</button>{!storage?.files && <small className="form-hint left">当前没有可导出的同步文件。</small>}</section><section className="panel transfer-card"><span className="transfer-icon green"><CloudUpload size={24} /></span><h3>导入文件</h3><p>浏览器导出的 HTML 会追加到“我的书签库”；XBEL/JSON 用于导入 Floccus 同步文件。单文件不超过 10 MB。</p><label className="file-picker"><Upload size={18} /><span>{selectedFile ? `${selectedFile.name} · ${formatBytes(selectedFile.size)}` : '选择 HTML、XBEL 或 JSON 文件'}</span><input accept=".html,.htm,.xbel,.json,text/html,application/octet-stream,application/xml,text/xml,application/json" ref={inputRef} onChange={(event) => setSelectedFile(event.target.files?.[0] ?? null)} type="file" /></label><button className="primary-button" disabled={busy !== null || !selectedFile} onClick={requestImport} type="button"><CloudUpload size={15} /> {selectedIsHtml ? '导入到我的书签库' : '导入并覆盖同步文件'}</button><small className="form-hint left">{selectedIsHtml ? 'HTML 导入会保留文件夹层级，不会修改 Floccus 同步文件。' : 'XBEL/JSON 导入会覆盖当前同步文件，并先创建历史版本；加密文件会尝试使用服务器已保存的 passphrase 建立索引。'}</small></section></div><section className="panel"><div className="panel-heading"><div><p className="eyebrow">RECOVERY</p><h3>历史版本</h3></div><div className="inline-actions"><button className="ghost-button compact" disabled={busy !== null || loading} onClick={() => void load()} type="button"><RefreshCw size={14} /> 刷新</button><button className="ghost-button compact" disabled={busy !== null || versions.length === 0} onClick={() => void cleanup()} type="button">清理旧版本</button></div></div>{versions.length === 0 ? <div className="feature-empty compact-empty"><FileArchive size={25} /><h3>还没有历史版本</h3><p>同步文件被覆盖后，系统会自动保留最近的版本。</p></div> : <div className="version-list">{versions.slice(0, 8).map((version) => <div className="version-row" key={version.id}><FileArchive size={17} /><div><strong>{formatBytes(version.byteSize)}</strong><span>{formatDate(version.createdAt)} · {version.filePath}</span></div><button className="ghost-button compact" disabled={busy !== null} onClick={() => requestVersionRestore(version)} type="button">恢复</button></div>)}</div>}</section><p className="workspace-note">XBEL/JSON 导入会覆盖当前同步文件并先保存历史版本 · {versions.length} 个可用历史版本</p>{confirmImport && <ConfirmDialog confirmLabel="确认导入" description={`将使用 ${selectedFile?.name ?? '所选文件'} 覆盖当前同步文件，并先创建历史版本。`} loading={busy === 'import'} onCancel={() => setConfirmImport(false)} onConfirm={() => void importFile()} title="导入并覆盖？" />}{confirmVersionRestore && <ConfirmDialog danger confirmLabel="确认恢复" description={`恢复 ${confirmVersionRestore.filePath} 会覆盖当前同步文件，并先保留当前版本。`} loading={busy === confirmVersionRestore.id} onCancel={() => setConfirmVersionRestore(null)} onConfirm={() => void restoreVersion(confirmVersionRestore)} title="恢复历史版本？" />}</div>
 }
 
 const helpArticles = [

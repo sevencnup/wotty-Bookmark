@@ -4,6 +4,7 @@ import * as api from './api'
 import { forgetLibraryFavicon, getCachedLibraryFavicon, getLibraryFaviconCandidates, rememberLibraryFavicon } from './library-favicon'
 import { confirmDangerousAction } from './preferences'
 import { getVirtualWindow } from './virtual-list'
+import { browserBookmarksHtmlToXbel } from './browser-bookmarks'
 
 type CreateKind = 'bookmark' | 'folder'
 type EditTarget = { id: string; nodeType: 'bookmark' | 'folder'; title: string; url?: string; parentId: string | null; folderPath?: string }
@@ -96,12 +97,24 @@ export function LibraryManagementPage({ token }: { token: string }) {
     }, kind === 'folder' ? '文件夹已保存到服务器书签库' : '书签已保存到服务器书签库')
   }
 
-  const uploadXbel = async (file: File) => {
-    const xbel = await file.text()
+  const uploadBookmarkFile = async (file: File) => {
+    const source = await file.text()
+    const isHtml = /\.html?$/i.test(file.name) || /NETSCAPE-Bookmark-file|<DT[^>]*>\s*<H3/i.test(source)
+    let xbel = source
+    let importedCount: number | null = null
+    if (isHtml) {
+      const converted = browserBookmarksHtmlToXbel(source)
+      if (!converted.count) {
+        setError('没有找到可导入的 HTTP/HTTPS 书签，请确认这是浏览器导出的书签 HTML 文件。')
+        return
+      }
+      xbel = converted.xbel
+      importedCount = converted.count
+    }
     const hasContent = library !== null && (library.bookmarks.length > 0 || library.folders.length > 0)
     const replace = hasContent && confirmDangerousAction('导入会替换当前服务器书签库。确定继续吗？')
     if (!replace && library && (library.bookmarks.length > 0 || library.folders.length > 0)) return
-    await run(async () => { const result = await api.importLibraryXbel(token, xbel, replace); setNotice(`已导入 ${result.count} 个节点到服务器书签库`) }, '导入完成')
+    await run(async () => { const result = await api.importLibraryXbel(token, xbel, replace); setNotice('已导入 ' + (importedCount ?? result.count) + ' 个书签节点到服务器书签库') }, '导入完成')
   }
 
   const openEdit = (target: EditTarget) => {
@@ -159,7 +172,7 @@ export function LibraryManagementPage({ token }: { token: string }) {
     </section>
     <section className="library-transfer-grid">
       <article className="panel library-transfer-card"><FolderInput size={22} /><div><h3>从 Floccus 同步库迁移</h3><p>复制当前 XBEL 同步索引到服务器书签库。它不会删除或改写 Floccus 数据。</p></div><button className="toolbar-button" disabled={busy} onClick={() => void run(async () => { const result = await api.importLibraryFromSync(token); setNotice(`已迁移 ${result.count} 个节点`) }, '迁移完成')} type="button">{busy ? '处理中…' : '复制现有同步书签'}</button></article>
-      <article className="panel library-transfer-card"><HardDriveUpload size={22} /><div><h3>导入 XBEL 备份</h3><p>适用于导出旧浏览器书签后开始自有库模式。当前支持 XBEL 文件。</p></div><input accept=".xbel,application/xml,text/xml" hidden onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadXbel(file); event.target.value = '' }} ref={fileInput} type="file" /><button className="toolbar-button" disabled={busy} onClick={() => fileInput.current?.click()} type="button">选择 XBEL 文件</button></article>
+      <article className="panel library-transfer-card"><HardDriveUpload size={22} /><div><h3>导入浏览器书签</h3><p>支持 Chrome、Edge、Firefox 导出的 HTML，也支持 XBEL 文件；会导入到独立服务器书签库。</p></div><input accept=".html,.htm,.xbel,text/html,application/xml,text/xml" hidden onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadBookmarkFile(file); event.target.value = '' }} ref={fileInput} type="file" /><button className="toolbar-button" disabled={busy} onClick={() => fileInput.current?.click()} type="button">选择浏览器书签文件</button></article>
     </section>
     <section className="panel library-list-panel">
       <div className="panel-heading library-list-heading"><div><p className="eyebrow">SERVER LIBRARY</p><h3>{library?.bookmarks.length ?? 0} 条书签 <span>·</span> {folders.length} 个文件夹</h3></div><div className="library-heading-actions"><span className="library-result-count">显示 {visibleBookmarks.length} 条</span><button className="toolbar-button" disabled={loading || busy} onClick={() => void load()} type="button"><RefreshCw className={loading ? 'spin' : ''} size={15} />刷新</button></div></div>
