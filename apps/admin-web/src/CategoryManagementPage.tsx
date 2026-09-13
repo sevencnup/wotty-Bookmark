@@ -3,6 +3,7 @@ import type { DragEvent, MouseEvent as ReactMouseEvent } from 'react'
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import * as api from './api'
 import { descendantFolderIds, findFolderParentId, flattenFolders as flattenBookmarkFolders, folderHasChildren, groupBookmarksByFolder, resolveDraggedBookmarkIds, type FlatBookmarkFolder } from './bookmark-tree'
+import { confirmDangerousAction } from './preferences'
 
 type Props = {
   token: string
@@ -117,7 +118,7 @@ export function CategoryManagementPage({ token, onOpenFloccus }: Props) {
 
   async function resetSyncBaseline() {
     if (resettingBaseline) return
-    const confirmed = window.confirm(
+    const confirmed = confirmDangerousAction(
       '仅当浏览器本地书签仍完整、但旧 Floccus 加密 Passphrase 已忘记时继续。请先取消当前同步。系统会把服务器旧密文保留到历史版本，移除远端基线和服务器保存的旧口令；不会删除浏览器本地书签。继续吗？',
     )
     if (!confirmed) return
@@ -329,7 +330,7 @@ export function CategoryManagementPage({ token, onOpenFloccus }: Props) {
     if (!tree || !ready || moving || selectedIds.size === 0) return
     const ids = [...selectedIds].filter((id) => tree.bookmarks.some((bookmark) => bookmark.id === id))
     if (!ids.length) return
-    const confirmed = window.confirm(
+    const confirmed = confirmDangerousAction(
       `确定将选中的 ${ids.length} 个书签移入回收站吗？\n\n后台会立即更新 WebDAV 同步文件；下次 Floccus 双向同步时，浏览器中的对应书签也可能被删除。`,
     )
     if (!confirmed) return

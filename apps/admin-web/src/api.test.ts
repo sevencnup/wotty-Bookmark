@@ -39,6 +39,8 @@ import {
   moveLibraryNode,
   deleteLibraryNode,
   restoreLibraryNode,
+  permanentlyDeleteLibraryTrashNode,
+  emptyLibraryTrash,
   importLibraryXbel,
   importLibraryFromSync,
   resolveLibraryFavicons,
@@ -164,6 +166,21 @@ describe('admin API contract', () => {
       ['/api/v1/library/import-from-sync', 'POST'],
     ])
     expect(JSON.parse(fetchMock.mock.calls[6][1].body)).toEqual({ xbel: '<xbel/>', replace: true })
+  })
+
+  it('cleans up self-hosted library trash through dedicated endpoints', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(response({ deleted: true, removed: 3 }))
+      .mockResolvedValueOnce(response({ removed: 2 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await permanentlyDeleteLibraryTrashNode('token', 'trash/root')
+    await emptyLibraryTrash('token')
+
+    expect(fetchMock.mock.calls.map(([path, init]) => [path, init?.method ?? 'GET'])).toEqual([
+      ['/api/v1/library/trash/trash%2Froot', 'DELETE'],
+      ['/api/v1/library/trash/empty', 'POST'],
+    ])
   })
 
   it('resolves server-cached favicons in one deduplicated batch', async () => {

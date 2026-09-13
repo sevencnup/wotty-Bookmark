@@ -53,6 +53,17 @@ export function savePreferences(preferences: Preferences, storage: Storage | nul
   }
 }
 
+/** Whether destructive operations should show a confirmation before running. */
+export function shouldConfirmDangerousActions(storage: Storage | null = typeof window === 'undefined' ? null : window.localStorage): boolean {
+  return loadPreferences(storage).confirmDangerousActions
+}
+
+/** Apply the user's dangerous-action preference to a browser confirmation. */
+export function confirmDangerousAction(message: string, storage: Storage | null = typeof window === 'undefined' ? null : window.localStorage): boolean {
+  if (!shouldConfirmDangerousActions(storage)) return true
+  return typeof window === 'undefined' ? true : window.confirm(message)
+}
+
 export function loadActiveSection(validSections: readonly string[], fallback: string, storage: Storage | null = typeof window === 'undefined' ? null : window.localStorage): string {
   const safeFallback = validSections.includes(fallback) ? fallback : validSections[0] ?? 'overview'
   if (!storage) return safeFallback

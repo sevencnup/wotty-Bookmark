@@ -44,7 +44,7 @@ import { CategoryManagementPage } from './CategoryManagementPage'
 import { LibraryManagementPage } from './LibraryManagementPage'
 import { copyText } from './clipboard'
 import * as api from './api'
-import { loadActiveSection, loadPreferences, saveActiveSection, savePreferences, type Preferences } from './preferences'
+import { confirmDangerousAction, loadActiveSection, loadPreferences, saveActiveSection, savePreferences, type Preferences } from './preferences'
 import { descendantFolderIds, flattenFolders, findFolder, folderHasChildren, resolveDraggedBookmarkIds, visibleFolders, type FlatBookmarkFolder } from './bookmark-tree'
 
 type AdminSection =
@@ -560,6 +560,7 @@ function BookmarkOrganizer({ token, onOpenFloccus, mode = 'organizer' }: { token
 
   async function forgetPassphrase() {
     if (unlocking) return
+    if (!confirmDangerousAction('移除服务器保存的 Floccus passphrase 和可搜索索引？加密同步文件不会删除，但后台将无法继续解锁它。')) return
     setUnlocking(true)
     setError('')
     try {
@@ -576,7 +577,7 @@ function BookmarkOrganizer({ token, onOpenFloccus, mode = 'organizer' }: { token
 
   async function resetEncryptedBaseline() {
     if (resettingBaseline) return
-    const confirmed = window.confirm('仅当浏览器本地书签仍完整、但旧 Floccus 加密 Passphrase 已忘记时继续。请先取消同步。旧密文会保留到历史版本，远端基线和服务器旧口令会被移除。继续吗？')
+    const confirmed = confirmDangerousAction('仅当浏览器本地书签仍完整、但旧 Floccus 加密 Passphrase 已忘记时继续。请先取消同步。旧密文会保留到历史版本，远端基线和服务器旧口令会被移除。继续吗？')
     if (!confirmed) return
     setResettingBaseline(true)
     setError('')
@@ -787,7 +788,11 @@ function AppPasswords({ token }: { token: string }) {
   async function loadPasswords() { setLoadError(''); try { setItems(await api.getAppPasswords(token)) } catch (requestError) { setLoadError(requestError instanceof Error ? requestError.message : '读取失败') } }
   useEffect(() => { void loadPasswords() }, [token])
   async function create() { if (!name.trim()) return; try { const item = await api.createAppPassword(token, name.trim()); setItems((current) => [item, ...current]); setNewSecret(item.secret ?? null); setName(''); setError('') } catch (requestError) { setError(requestError instanceof Error ? requestError.message : '创建失败') } }
-  async function revoke(id: string) { try { await api.revokeAppPassword(token, id); setItems((current) => current.filter((item) => item.id !== id)); setError('') } catch (requestError) { setError(requestError instanceof Error ? requestError.message : '撤销失败') } }
+  async function revoke(id: string) {
+    const item = items.find((candidate) => candidate.id === id)
+    if (!confirmDangerousAction(`撤销应用密码“${item?.name ?? '未命名连接'}”？撤销后使用它的 Floccus 将无法继续同步。`)) return
+    try { await api.revokeAppPassword(token, id); setItems((current) => current.filter((item) => item.id !== id)); setError('') } catch (requestError) { setError(requestError instanceof Error ? requestError.message : '撤销失败') }
+  }
   return <section className="panel"><div className="panel-heading"><div><p className="eyebrow">ACCESS CONTROL</p><h3>应用密码</h3></div></div><div className="password-create"><input value={name} onChange={(event) => setName(event.target.value)} placeholder="例如：Chrome 工作浏览器" /><button className="primary-button compact" onClick={() => void create()} type="button">创建应用密码</button></div>{error && <p className="form-error">{error}</p>}{newSecret && <div className="secret-box"><strong>请立即保存这串应用密码</strong><code>{newSecret}</code><CopyButton className="ghost-button" value={newSecret} /><p>它只会在创建成功时显示一次。</p></div>}{loadError ? <div className="empty-state"><span>!</span><h4>无法读取应用密码</h4><p>{loadError}</p><button className="toolbar-button compact" onClick={() => void loadPasswords()} type="button"><RefreshCw size={14} /> 重新连接</button></div> : items.length === 0 ? <div className="empty-state"><span>◇</span><h4>还没有应用密码</h4><p>建议为每个浏览器或设备创建独立的应用密码，撤销时不会影响账户登录。</p></div> : <div className="password-list">{items.map((item) => <div className="password-row" key={item.id}><div><strong>{item.name}</strong><span>创建于 {new Date(item.createdAt).toLocaleString()}</span></div><button className="danger-button" onClick={() => void revoke(item.id)} type="button">撤销</button></div>)}</div>}</section>
 }
 

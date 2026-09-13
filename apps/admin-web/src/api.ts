@@ -466,6 +466,14 @@ export function restoreLibraryNode(token: string, id: string) {
   return request(`/api/v1/library/trash/${encodeURIComponent(id)}/restore`, { method: 'POST' }, token)
 }
 
+export function permanentlyDeleteLibraryTrashNode(token: string, id: string) {
+  return request<{ deleted: boolean; removed: number }>(`/api/v1/library/trash/${encodeURIComponent(id)}`, { method: 'DELETE' }, token)
+}
+
+export function emptyLibraryTrash(token: string) {
+  return request<{ removed: number }>('/api/v1/library/trash/empty', { method: 'POST' }, token)
+}
+
 export function importLibraryXbel(token: string, xbel: string, replace = false) {
   return request<{ imported: boolean; count: number }>('/api/v1/library/import', { method: 'POST', body: JSON.stringify({ xbel, replace }) }, token)
 }
