@@ -94,7 +94,11 @@ fn app_router(state: AppState) -> Router {
         .route("/api/v1/me", get(auth::me))
         .route(
             "/api/v1/sidebar/pairing-codes",
-            post(auth::create_sidebar_pairing),
+            get(auth::list_sidebar_pairings).post(auth::create_sidebar_pairing),
+        )
+        .route(
+            "/api/v1/sidebar/pairing-codes/:id/revoke",
+            post(auth::revoke_sidebar_pairing),
         )
         .route(
             "/api/v1/sidebar/exchange",

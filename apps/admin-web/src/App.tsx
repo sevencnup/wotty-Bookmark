@@ -783,9 +783,17 @@ function getWebDavUrl(loginIdentifier: string) { return `${window.location.origi
 
 function SidebarConnectionPage({ token }: { token: string }) {
   const [sidebarPairing, setSidebarPairing] = useState<api.SidebarPairing | null>(null)
+  const [pairings, setPairings] = useState<api.SidebarPairingRecord[]>([])
   const [browserName, setBrowserName] = useState('')
   const [pairing, setPairing] = useState(false)
+  const [loadingPairings, setLoadingPairings] = useState(true)
+  const [revokingId, setRevokingId] = useState<string | null>(null)
   const [pairingError, setPairingError] = useState('')
+  async function loadPairings() {
+    setLoadingPairings(true)
+    try { setPairings(await api.getSidebarPairings(token)) } catch (requestError) { setPairingError(requestError instanceof Error ? requestError.message : '连接码列表读取失败') } finally { setLoadingPairings(false) }
+  }
+  useEffect(() => { void loadPairings() }, [token])
   async function handleSidebarPairing() {
     const name = browserName.trim()
     if (!name) {
@@ -794,9 +802,20 @@ function SidebarConnectionPage({ token }: { token: string }) {
     }
     setPairing(true)
     setPairingError('')
-    try { setSidebarPairing(await api.createSidebarPairing(token, name)) } catch (requestError) { setPairingError(requestError instanceof Error ? requestError.message : '设备码创建失败') } finally { setPairing(false) }
+    try { setSidebarPairing(await api.createSidebarPairing(token, name)); setBrowserName(''); await loadPairings() } catch (requestError) { setPairingError(requestError instanceof Error ? requestError.message : '设备码创建失败') } finally { setPairing(false) }
   }
-  return <div className="feature-page"><section className="panel sidebar-pairing-panel"><div className="panel-heading"><div><p className="eyebrow">SIDEBAR CONNECTION</p><h3>侧边栏连接</h3></div></div><p className="account-panel-intro">为每个浏览器生成一次性连接码。连接后，侧边栏会直接管理服务器书签库，不需要应用密码或 WebDAV 配置。</p>{sidebarPairing ? <div className="secret-box"><strong>“{sidebarPairing.browserName || browserName || '浏览器'}”连接码已生成，请立即使用</strong><div className="config-fields"><ConfigField label="API 地址" value={sidebarPairing.serverUrl} /><ConfigField label="设备码" value={sidebarPairing.deviceCode} /></div><p>有效期至 {new Date(sidebarPairing.expiresAt).toLocaleString()}，且只能使用一次。</p></div> : <><label className="pairing-browser-field">浏览器名称<input autoFocus maxLength={80} onChange={(event) => { setBrowserName(event.target.value); setPairingError('') }} placeholder="例如：Chrome 工作浏览器" value={browserName} /></label><button className="primary-button compact" disabled={pairing || !browserName.trim()} onClick={() => void handleSidebarPairing()} type="button">{pairing ? '生成中…' : '生成侧边栏连接码'}</button>{pairingError && <p className="form-error">{pairingError}</p>}</>}</section></div>
+  async function revokePairing(id: string) {
+    if (!confirmDangerousAction('撤销这个侧边栏连接码？已连接的该浏览器会立即失去访问权限。')) return
+    setRevokingId(id); setPairingError('')
+    try { await api.revokeSidebarPairing(token, id); if (sidebarPairing?.id === id) setSidebarPairing(null); await loadPairings() } catch (requestError) { setPairingError(requestError instanceof Error ? requestError.message : '连接码撤销失败') } finally { setRevokingId(null) }
+  }
+  function pairingStatus(item: api.SidebarPairingRecord) {
+    if (item.revokedAt) return '已撤销'
+    if (item.usedAt) return '已连接'
+    if (new Date(item.expiresAt).getTime() <= Date.now()) return '已过期'
+    return '待连接'
+  }
+  return <div className="feature-page"><section className="panel sidebar-pairing-panel"><div className="panel-heading"><div><p className="eyebrow">SIDEBAR CONNECTION</p><h3>侧边栏连接</h3></div></div><p className="account-panel-intro">为每个浏览器生成一次性连接码。连接后，侧边栏会直接管理服务器书签库，不需要应用密码或 WebDAV 配置。</p>{sidebarPairing ? <div className="secret-box"><strong>“{sidebarPairing.browserName || browserName || '浏览器'}”连接码已生成，请立即使用</strong><div className="config-fields"><ConfigField label="API 地址" value={sidebarPairing.serverUrl} /><ConfigField label="设备码" value={sidebarPairing.deviceCode} /></div><p>有效期至 {new Date(sidebarPairing.expiresAt).toLocaleString()}，且只能使用一次。</p><button className="toolbar-button compact" onClick={() => setSidebarPairing(null)} type="button">生成另一个连接码</button></div> : <><label className="pairing-browser-field">浏览器名称<input autoFocus maxLength={80} onChange={(event) => { setBrowserName(event.target.value); setPairingError('') }} placeholder="例如：Chrome 工作浏览器" value={browserName} /></label><button className="primary-button compact" disabled={pairing || !browserName.trim()} onClick={() => void handleSidebarPairing()} type="button">{pairing ? '生成中…' : '生成侧边栏连接码'}</button>{pairingError && <p className="form-error">{pairingError}</p>}</>}</section><section className="panel pairing-history-panel"><div className="panel-heading"><div><p className="eyebrow">PAIRING HISTORY</p><h3>已创建的连接码</h3></div><button className="toolbar-button compact" disabled={loadingPairings} onClick={() => void loadPairings()} type="button"><RefreshCw size={14} /> 刷新</button></div>{loadingPairings ? <div className="empty-state"><span>…</span><h4>正在读取连接码</h4></div> : pairings.length === 0 ? <div className="empty-state"><span>◇</span><h4>还没有创建连接码</h4><p>为不同浏览器生成的连接码会显示在这里。</p></div> : <div className="pairing-list">{pairings.map((item) => <div className="pairing-row" key={item.id}><div><strong>{item.browserName}</strong><span>创建于 {new Date(item.createdAt).toLocaleString()} · {item.usedAt ? '已完成连接' : `有效期至 ${new Date(item.expiresAt).toLocaleString()}`}</span></div><div className="pairing-row-actions"><span className={`pairing-status ${item.revokedAt ? 'revoked' : item.usedAt ? 'used' : 'pending'}`}>{pairingStatus(item)}</span>{!item.revokedAt && <button className="danger-button compact" disabled={revokingId !== null} onClick={() => void revokePairing(item.id)} type="button">{revokingId === item.id ? '撤销中…' : '撤销授权'}</button>}</div></div>)}</div>}{pairingError && <p className="form-error">{pairingError}</p>}</section></div>
 }
 
 function FloccusGuide({ token, loginIdentifier }: { token: string; loginIdentifier: string }) {

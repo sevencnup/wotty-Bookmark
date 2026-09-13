@@ -55,11 +55,24 @@ export type MoveBookmarksResponse = {
 }
 
 export type SidebarPairing = {
+  id: string
   code: string
   serverUrl: string
   deviceCode: string
   expiresAt: string
   browserName: string
+  createdAt: string
+  usedAt: string | null
+  revokedAt: string | null
+}
+
+export type SidebarPairingRecord = {
+  id: string
+  browserName: string
+  expiresAt: string
+  createdAt: string
+  usedAt: string | null
+  revokedAt: string | null
 }
 
 export type FileVersion = {
@@ -431,6 +444,14 @@ export function createSidebarPairing(token: string, browserName: string) {
     method: 'POST',
     body: JSON.stringify({ browserName }),
   }, token)
+}
+
+export function getSidebarPairings(token: string) {
+  return request<SidebarPairingRecord[]>('/api/v1/sidebar/pairing-codes', {}, token)
+}
+
+export function revokeSidebarPairing(token: string, id: string) {
+  return request<void>('/api/v1/sidebar/pairing-codes/' + encodeURIComponent(id) + '/revoke', { method: 'POST' }, token)
 }
 
 export function getBookmarks(token: string, query = '') {

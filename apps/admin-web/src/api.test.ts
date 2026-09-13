@@ -37,6 +37,8 @@ import {
   createLibraryBookmark,
   createLibraryFolder,
   createSidebarPairing,
+  getSidebarPairings,
+  revokeSidebarPairing,
   moveLibraryNode,
   deleteLibraryNode,
   restoreLibraryNode,
@@ -134,6 +136,21 @@ describe('admin API contract', () => {
       }),
     )
     expect(new Headers(fetchMock.mock.calls[0][1].headers).get('authorization')).toBe('Bearer session-token')
+  })
+
+  it('lists and revokes sidebar pairing codes', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(response([{ id: 'pairing-1', browserName: 'Edge 家用浏览器', expiresAt: '2026-09-13T15:10:00Z', createdAt: '2026-09-13T15:00:00Z', usedAt: null, revokedAt: null }]))
+      .mockResolvedValueOnce(response(undefined, 204))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await getSidebarPairings('session-token')
+    await revokeSidebarPairing('session-token', 'pairing-1')
+
+    expect(fetchMock.mock.calls.map(([path, init]) => [path, init?.method ?? 'GET'])).toEqual([
+      ['/api/v1/sidebar/pairing-codes', 'GET'],
+      ['/api/v1/sidebar/pairing-codes/pairing-1/revoke', 'POST'],
+    ])
   })
 
   it('calls bookmark tree and move endpoints with encoded data', async () => {

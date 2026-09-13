@@ -106,11 +106,26 @@ impl From<sqlx::Error> for CreateFloccusCredentialError {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SidebarPairingResponse {
+    pub id: Uuid,
     pub code: String,
     pub server_url: String,
     pub device_code: String,
     pub expires_at: String,
     pub browser_name: String,
+    pub created_at: String,
+    pub used_at: Option<String>,
+    pub revoked_at: Option<String>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SidebarPairingRecordResponse {
+    pub id: Uuid,
+    pub browser_name: String,
+    pub expires_at: String,
+    pub created_at: String,
+    pub used_at: Option<String>,
+    pub revoked_at: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -306,14 +321,16 @@ pub async fn create_sidebar_pairing(
     let raw_code = generate_secret();
     let pairing_id = Uuid::new_v4();
     let expires_at = chrono::Utc::now() + chrono::Duration::from_std(SIDEBAR_PAIRING_TTL).unwrap();
+    let created_at = chrono::Utc::now().to_rfc3339();
     let result = sqlx::query(
-        "INSERT INTO sidebar_pairings (id, user_id, code_hash, expires_at, browser_name) VALUES ($1, $2, $3, $4, $5)",
+        "INSERT INTO sidebar_pairings (id, user_id, code_hash, expires_at, browser_name, created_at) VALUES ($1, $2, $3, $4, $5, $6)",
     )
     .bind(pairing_id)
     .bind(user.id)
     .bind(hash_token(&raw_code))
     .bind(expires_at)
     .bind(browser_name)
+    .bind(&created_at)
     .execute(&state.db)
     .await;
     if result.is_err() {
@@ -332,13 +349,85 @@ pub async fn create_sidebar_pairing(
     let payload = json!({ "serverUrl": server_url, "secret": raw_code });
     let encoded = URL_SAFE_NO_PAD.encode(payload.to_string());
     Json(SidebarPairingResponse {
+        id: pairing_id,
         code: format!("{SIDEBAR_PAIRING_PREFIX}{encoded}"),
         server_url: server_url.to_string(),
         device_code: raw_code,
         expires_at: expires_at.to_rfc3339(),
         browser_name: browser_name.to_string(),
+        created_at,
+        used_at: None,
+        revoked_at: None,
     })
     .into_response()
+}
+
+pub async fn list_sidebar_pairings(State(state): State<AppState>, headers: HeaderMap) -> Response {
+    let Some(user) = authenticate_session(&state, &headers).await else {
+        return error(StatusCode::UNAUTHORIZED, "unauthorized", "请先登录");
+    };
+    let rows = sqlx::query(
+        "SELECT id, browser_name, expires_at, created_at, used_at, revoked_at
+         FROM sidebar_pairings WHERE user_id = $1 ORDER BY created_at DESC, id DESC",
+    )
+    .bind(user.id)
+    .fetch_all(&state.db)
+    .await;
+    match rows {
+        Ok(rows) => Json(rows.into_iter().map(sidebar_pairing_from_row).collect::<Vec<_>>()).into_response(),
+        Err(error_value) => {
+            tracing::error!(?error_value, "list sidebar pairings failed");
+            error(StatusCode::INTERNAL_SERVER_ERROR, "pairing_list_failed", "连接码列表读取失败")
+        }
+    }
+}
+
+pub async fn revoke_sidebar_pairing(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Path(id): Path<Uuid>,
+) -> Response {
+    let Some(user) = authenticate_session(&state, &headers).await else {
+        return error(StatusCode::UNAUTHORIZED, "unauthorized", "请先登录");
+    };
+    let result = sqlx::query(
+        "UPDATE sidebar_pairings SET revoked_at = CURRENT_TIMESTAMP
+         WHERE id = $1 AND user_id = $2 AND revoked_at IS NULL",
+    )
+    .bind(id)
+    .bind(user.id)
+    .execute(&state.db)
+    .await;
+    match result {
+        Ok(result) if result.rows_affected() == 1 => {
+            if let Some(device_id) = sqlx::query_scalar::<_, Uuid>(
+                "SELECT device_id FROM sidebar_pairings WHERE id = $1 AND user_id = $2",
+            )
+            .bind(id)
+            .bind(user.id)
+            .fetch_optional(&state.db)
+            .await
+            .ok()
+            .flatten()
+            {
+                let _ = sqlx::query("UPDATE devices SET revoked_at = CURRENT_TIMESTAMP WHERE id = $1 AND user_id = $2")
+                    .bind(device_id)
+                    .bind(user.id)
+                    .execute(&state.db)
+                    .await;
+                let _ = sqlx::query("UPDATE sessions SET revoked_at = CURRENT_TIMESTAMP WHERE device_id = $1")
+                    .bind(device_id)
+                    .execute(&state.db)
+                    .await;
+            }
+            StatusCode::NO_CONTENT.into_response()
+        }
+        Ok(_) => error(StatusCode::NOT_FOUND, "pairing_not_found", "连接码不存在或已经撤销"),
+        Err(error_value) => {
+            tracing::error!(?error_value, "revoke sidebar pairing failed");
+            error(StatusCode::INTERNAL_SERVER_ERROR, "pairing_revoke_failed", "连接码撤销失败")
+        }
+    }
 }
 
 pub async fn exchange_sidebar_pairing(
@@ -353,7 +442,7 @@ pub async fn exchange_sidebar_pairing(
         );
     };
     let row = sqlx::query(
-        "SELECT id, user_id, browser_name FROM sidebar_pairings WHERE code_hash = $1 AND used_at IS NULL AND expires_at > CURRENT_TIMESTAMP",
+        "SELECT id, user_id, browser_name FROM sidebar_pairings WHERE code_hash = $1 AND used_at IS NULL AND revoked_at IS NULL AND expires_at > CURRENT_TIMESTAMP",
     )
     .bind(hash_token(&secret))
     .fetch_optional(&state.db)
@@ -410,7 +499,16 @@ pub async fn exchange_sidebar_pairing(
         );
     }
     match create_sidebar_session(&state, user_id, &browser_name).await {
-        Ok(token) => {
+        Ok((token, device_id)) => {
+            if sqlx::query("UPDATE sidebar_pairings SET device_id = $1 WHERE id = $2")
+                .bind(device_id)
+                .bind(pairing_id)
+                .execute(&state.db)
+                .await
+                .is_err()
+            {
+                tracing::warn!(%pairing_id, %device_id, "bind sidebar pairing device failed");
+            }
             let login_identifier: String =
                 match sqlx::query_scalar("SELECT login_identifier FROM users WHERE id = $1")
                     .bind(user_id)
@@ -813,7 +911,7 @@ async fn create_sidebar_session(
     state: &AppState,
     user_id: Uuid,
     browser_name: &str,
-) -> Result<String, sqlx::Error> {
+) -> Result<(String, Uuid), sqlx::Error> {
     let token = generate_secret();
     let client_id = format!("sidebar-{}", Uuid::new_v4());
     let device_id = Uuid::new_v4();
@@ -839,7 +937,18 @@ async fn create_sidebar_session(
     .execute(&mut *transaction)
     .await?;
     transaction.commit().await?;
-    Ok(token)
+    Ok((token, device_id))
+}
+
+fn sidebar_pairing_from_row(row: sqlx::sqlite::SqliteRow) -> SidebarPairingRecordResponse {
+    SidebarPairingRecordResponse {
+        id: row.get("id"),
+        browser_name: row.get("browser_name"),
+        expires_at: row.get("expires_at"),
+        created_at: row.get("created_at"),
+        used_at: row.try_get("used_at").ok(),
+        revoked_at: row.try_get("revoked_at").ok(),
+    }
 }
 
 fn generate_secret() -> String {
