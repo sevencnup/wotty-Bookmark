@@ -81,7 +81,7 @@ type NavIconName =
   | 'sync'
 
 
-type NavItem = { id: AdminSection; label: string; icon: NavIconName }
+type NavItem = { id: AdminSection; label: string; icon: NavIconName; hidden?: boolean }
 type NavGroup = { label?: string; items: NavItem[] }
 
 const navGroups: NavGroup[] = [
@@ -99,7 +99,8 @@ const navGroups: NavGroup[] = [
     label: '安全管理',
     items: [
       { id: 'app-passwords', label: '密码管理', icon: 'passwords' },
-      { id: 'floccus', label: 'Floccus 配置', icon: 'sync' },
+      // 保留 Floccus 兼容路由，暂不在主侧边栏显示。
+      { id: 'floccus', label: 'Floccus 配置', icon: 'sync', hidden: true },
       { id: 'backup', label: '数据备份', icon: 'backup' },
       { id: 'devices', label: '设备管理', icon: 'devices' },
     ],
@@ -251,7 +252,7 @@ function App() {
           {navGroups.map((group, index) => (
             <div className="nav-group" key={group.label ?? `group-${index}`}>
               {group.label && <p className="nav-group-label">{group.label}</p>}
-              {group.items.map((item) => (
+              {group.items.filter((item) => !item.hidden).map((item) => (
                 <button
                   className={`nav-item ${activeSection === item.id ? 'active' : ''}`}
                   key={item.id}
@@ -779,7 +780,7 @@ function formatBytes(bytes: number) { if (bytes < 1024) return `${bytes} B`; if 
 function formatDate(value: string) { return new Date(value).toLocaleString() }
 function getWebDavUrl(loginIdentifier: string) { return `${window.location.origin}/dav/${encodeURIComponent(loginIdentifier)}/` }
 
-function AppPasswords({ token }: { token: string }) {
+function AppPasswordList({ token }: { token: string }) {
   const [items, setItems] = useState<api.AppPassword[]>([])
   const [name, setName] = useState('')
   const [newSecret, setNewSecret] = useState<string | null>(null)
@@ -793,7 +794,19 @@ function AppPasswords({ token }: { token: string }) {
     if (!confirmDangerousAction(`撤销应用密码“${item?.name ?? '未命名连接'}”？撤销后使用它的 Floccus 将无法继续同步。`)) return
     try { await api.revokeAppPassword(token, id); setItems((current) => current.filter((item) => item.id !== id)); setError('') } catch (requestError) { setError(requestError instanceof Error ? requestError.message : '撤销失败') }
   }
-  return <section className="panel"><div className="panel-heading"><div><p className="eyebrow">ACCESS CONTROL</p><h3>应用密码</h3></div></div><div className="password-create"><input value={name} onChange={(event) => setName(event.target.value)} placeholder="例如：Chrome 工作浏览器" /><button className="primary-button compact" onClick={() => void create()} type="button">创建应用密码</button></div>{error && <p className="form-error">{error}</p>}{newSecret && <div className="secret-box"><strong>请立即保存这串应用密码</strong><code>{newSecret}</code><CopyButton className="ghost-button" value={newSecret} /><p>它只会在创建成功时显示一次。</p></div>}{loadError ? <div className="empty-state"><span>!</span><h4>无法读取应用密码</h4><p>{loadError}</p><button className="toolbar-button compact" onClick={() => void loadPasswords()} type="button"><RefreshCw size={14} /> 重新连接</button></div> : items.length === 0 ? <div className="empty-state"><span>◇</span><h4>还没有应用密码</h4><p>建议为每个浏览器或设备创建独立的应用密码，撤销时不会影响账户登录。</p></div> : <div className="password-list">{items.map((item) => <div className="password-row" key={item.id}><div><strong>{item.name}</strong><span>创建于 {new Date(item.createdAt).toLocaleString()}</span></div><button className="danger-button" onClick={() => void revoke(item.id)} type="button">撤销</button></div>)}</div>}</section>
+  return <section className="panel"><div className="panel-heading"><div><p className="eyebrow">ACCESS CONTROL</p><h3>应用密码</h3></div></div><p className="account-panel-intro">为 Floccus、浏览器侧边栏或其他客户端创建独立连接凭据。凭据只显示一次，撤销单个凭据不会影响账户登录。</p><div className="password-create"><input value={name} onChange={(event) => setName(event.target.value)} placeholder="例如：Chrome 工作浏览器" /><button className="primary-button compact" onClick={() => void create()} type="button">创建应用密码</button></div>{error && <p className="form-error">{error}</p>}{newSecret && <div className="secret-box"><strong>请立即保存这串应用密码</strong><code>{newSecret}</code><CopyButton className="ghost-button" value={newSecret} /><p>它只会在创建成功时显示一次。</p></div>}{loadError ? <div className="empty-state"><span>!</span><h4>无法读取应用密码</h4><p>{loadError}</p><button className="toolbar-button compact" onClick={() => void loadPasswords()} type="button"><RefreshCw size={14} /> 重新连接</button></div> : items.length === 0 ? <div className="empty-state"><span>◇</span><h4>还没有应用密码</h4><p>建议为每个浏览器或设备创建独立的应用密码，撤销时不会影响账户登录。</p></div> : <div className="password-list">{items.map((item) => <div className="password-row" key={item.id}><div><strong>{item.name}</strong><span>创建于 {new Date(item.createdAt).toLocaleString()}</span></div><button className="danger-button" onClick={() => void revoke(item.id)} type="button">撤销</button></div>)}</div>}</section>
+}
+
+function AppPasswords({ token }: { token: string }) {
+  const [sidebarPairing, setSidebarPairing] = useState<api.SidebarPairing | null>(null)
+  const [pairing, setPairing] = useState(false)
+  const [pairingError, setPairingError] = useState('')
+  async function handleSidebarPairing() {
+    setPairing(true)
+    setPairingError('')
+    try { setSidebarPairing(await api.createSidebarPairing(token)) } catch (requestError) { setPairingError(requestError instanceof Error ? requestError.message : '设备码创建失败') } finally { setPairing(false) }
+  }
+  return <div className="feature-page"><AppPasswordList token={token} /><section className="panel sidebar-pairing-panel"><div className="panel-heading"><div><p className="eyebrow">SIDEBAR CONNECTION</p><h3>侧边栏连接码</h3></div></div><p className="account-panel-intro">生成一次性连接码，把服务器地址和设备码填入 WOTTY BOOKMARK 浏览器侧边栏。连接码 10 分钟内有效且只能使用一次。</p>{sidebarPairing ? <div className="secret-box"><strong>连接码已生成，请立即使用</strong><div className="config-fields"><ConfigField label="API 地址" value={sidebarPairing.serverUrl} /><ConfigField label="设备码" value={sidebarPairing.deviceCode} /></div><p>有效期至 {new Date(sidebarPairing.expiresAt).toLocaleString()}</p></div> : <><button className="primary-button compact" disabled={pairing} onClick={() => void handleSidebarPairing()} type="button">{pairing ? '生成中…' : '生成侧边栏连接码'}</button>{pairingError && <p className="form-error">{pairingError}</p>}</>}</section></div>
 }
 
 function FloccusGuide({ token, loginIdentifier }: { token: string; loginIdentifier: string }) {
@@ -801,8 +814,6 @@ function FloccusGuide({ token, loginIdentifier }: { token: string; loginIdentifi
   const [createdSecret, setCreatedSecret] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState('')
-  const [sidebarPairing, setSidebarPairing] = useState<api.SidebarPairing | null>(null)
-  const [pairing, setPairing] = useState(false)
 
   async function handleCreate() {
     setCreating(true)
@@ -819,18 +830,6 @@ function FloccusGuide({ token, loginIdentifier }: { token: string; loginIdentifi
     }
   }
 
-  async function handleSidebarPairing() {
-    setPairing(true)
-    setError('')
-    try {
-      const result = await api.createSidebarPairing(token)
-      setSidebarPairing(result)
-    } catch (pairingError) {
-      setError(pairingError instanceof Error ? pairingError.message : '设备码创建失败')
-    } finally {
-      setPairing(false)
-    }
-  }
 
   return (
     <section className="panel">
@@ -919,26 +918,6 @@ function FloccusGuide({ token, loginIdentifier }: { token: string; loginIdentifi
         </div>
       </div>
 
-      <div className="guide-step-card sidebar-pairing-guide">
-        <div className="guide-step-num">↗</div>
-        <div className="guide-step-body">
-          <h4>连接 WOTTY BOOKMARK 侧边栏</h4>
-          <p>生成连接信息后，将 API 地址和设备码分别填入侧边栏，即可读取当前后台书签索引。</p>
-          {sidebarPairing ? (
-            <div className="secret-box">
-              <strong>设备码有效期 10 分钟，只能使用一次</strong>
-              <div className="config-fields">
-                <ConfigField label="API 地址" value={sidebarPairing.serverUrl} />
-                <ConfigField label="设备码" value={sidebarPairing.deviceCode} />
-              </div>
-            </div>
-          ) : (
-            <button className="primary-button compact" disabled={pairing} onClick={() => { void handleSidebarPairing() }} type="button">
-              {pairing ? '生成中…' : '生成侧边栏设备码'}
-            </button>
-          )}
-        </div>
-      </div>
     </section>
   )
 }
