@@ -608,6 +608,13 @@ html.reduce-motion *, html.reduce-motion *::before, html.reduce-motion *::after 
 .import-export-grid,
 .about-grid {
   gap: 14px;
+  align-items: stretch;
+}
+
+.about-grid > .panel {
+  height: 100%;
+  margin-bottom: 0;
+  box-sizing: border-box;
 }
 
 .transfer-card h3 {
@@ -683,5 +690,9 @@ html.reduce-motion *, html.reduce-motion *::before, html.reduce-motion *::after 
 
   .help-search-panel {
     padding: 16px;
+  }
+
+  .about-grid > .panel {
+    height: auto;
   }
 }
