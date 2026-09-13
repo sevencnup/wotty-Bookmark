@@ -2,17 +2,22 @@
   # Keep API/WebDAV/health routes ahead of the SPA fallback. Caddy sorts
   # top-level directives, so an explicit route block is required here.
   route {
-    @api path /api/*
-    reverse_proxy @api api:26626
+    handle /api/* {
+      reverse_proxy api:26626
+    }
 
-    @dav path /dav/*
-    reverse_proxy @dav api:26626
+    handle /dav/* {
+      reverse_proxy api:26626
+    }
 
-    @health path /health/*
-    reverse_proxy @health api:26626
+    handle /health/* {
+      reverse_proxy api:26626
+    }
 
-    root * /srv/admin-web
-    try_files {path} /index.html
-    file_server
+    handle {
+      root * /srv/admin-web
+      try_files {path} /index.html
+      file_server
+    }
   }
 }
