@@ -121,22 +121,21 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 
 .sidebar-brand {
   display: flex;
-  width: fit-content;
+  width: 100%;
+  max-width: 194px;
   align-items: center;
   align-self: center;
   justify-content: center;
-  min-height: 104px;
+  min-height: 74px;
   margin: 0;
-  padding: 4px 0 16px;
+  padding: 2px 0 10px;
 }
 
 .sidebar-brand .brand-mark {
-  width: 92px;
-  height: 92px;
-}
-
-.sidebar-brand .brand-logo-img {
-  transform: scale(1.22);
+  display: block;
+  width: min(100%, 194px);
+  height: auto;
+  aspect-ratio: 2 / 1;
 }
 
 .brand-mark {
@@ -3882,13 +3881,13 @@ a:focus-visible {
 }
 
 .sidebar-brand {
-  min-height: 92px;
+  min-height: 74px;
   padding: 0 0 8px;
 }
 
 .sidebar-brand .brand-mark {
-  width: 82px;
-  height: 82px;
+  width: min(100%, 194px);
+  height: auto;
 }
 
 .nav-list {
@@ -4421,14 +4420,14 @@ a:focus-visible {
   }
 
   .sidebar-brand {
-    min-height: 54px;
+    min-height: 48px;
     align-self: flex-start;
     padding: 0;
   }
 
   .sidebar-brand .brand-mark {
-    width: 52px;
-    height: 52px;
+    width: min(100%, 168px);
+    height: auto;
   }
 
   .nav-list {
