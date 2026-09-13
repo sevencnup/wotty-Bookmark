@@ -1339,21 +1339,29 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 
 .config-fields {
   display: grid;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
   gap: 10px;
 }
 
 .config-field {
   display: flex;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
   align-items: center;
   gap: 12px;
   padding: 10px 14px;
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
   background: var(--paper);
+  overflow: hidden;
 }
 
 .config-field-label {
   flex: 0 0 180px;
+  min-width: 0;
   color: var(--muted);
   font-size: 12px;
   font-weight: 600;
@@ -1362,6 +1370,8 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 
 .config-field-value {
   flex: 1;
+  min-width: 0;
+  max-width: 100%;
   overflow: hidden;
   color: var(--ink);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
@@ -3016,10 +3026,78 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   .main-content, .main-content.category-main-content { min-height: auto; padding: 20px 16px; overflow: visible; overscroll-behavior: auto; }
   .hero-card { padding: 20px; flex-direction: column; text-align: center; }
   .hero-symbol { display: none; }
-  .config-field { flex-direction: column; align-items: flex-start; gap: 6px; }
-  .config-field-label { flex: none; }
-  .config-field-value { width: 100%; }
+  .config-field { display: grid; grid-template-columns: 1fr auto; align-items: start; gap: 6px 8px; }
+  .config-field-label { grid-column: 1 / -1; flex: none; white-space: normal; overflow-wrap: anywhere; }
+  .config-field-value { width: 100%; white-space: normal; overflow-wrap: anywhere; line-height: 1.45; }
+  .copy-btn { align-self: start; }
   .auth-card { padding: 24px; }
+}
+
+/* Floccus 配置向导：在中等宽度下也允许字段真实收缩，避免复制按钮把页面撑出横向滚动 */
+@media (max-width: 900px) {
+  .guide-step-card {
+    gap: 14px;
+    padding: 18px;
+  }
+
+  .config-field {
+    display: grid;
+    grid-template-columns: minmax(0, 120px) minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .config-field-label {
+    min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .config-field-value {
+    min-width: 0;
+    width: 100%;
+  }
+}
+
+@media (max-width: 560px) {
+  .guide-step-card {
+    gap: 11px;
+    padding: 14px;
+  }
+
+  .guide-step-num {
+    width: 28px;
+    height: 28px;
+    font-size: 13px;
+  }
+
+  .config-field {
+    grid-template-columns: 1fr auto;
+    align-items: start;
+  }
+
+  .config-field-label {
+    grid-column: 1 / -1;
+  }
+
+  .config-field-value {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    line-height: 1.45;
+  }
+
+  .copy-btn {
+    align-self: start;
+  }
+
+  .browser-links {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .browser-link-btn {
+    justify-content: center;
+  }
 }
 
 /* ── 分类管理最终稳定双栏（文件末尾优先级） ─────────────── */
