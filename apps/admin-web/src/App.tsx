@@ -45,6 +45,7 @@ import { CategoryManagementPage } from './CategoryManagementPage'
 import { LibraryManagementPage } from './LibraryManagementPage'
 import { copyText } from './clipboard'
 import * as api from './api'
+import { translate, type Locale } from './i18n'
 import { confirmDangerousAction, loadActiveSection, loadPreferences, saveActiveSection, savePreferences, type Preferences } from './preferences'
 import { descendantFolderIds, flattenFolders, findFolder, folderHasChildren, resolveDraggedBookmarkIds, visibleFolders, type FlatBookmarkFolder } from './bookmark-tree'
 
@@ -86,46 +87,49 @@ type NavIconName =
 type NavItem = { id: AdminSection; label: string; icon: NavIconName; hidden?: boolean }
 type NavGroup = { label?: string; items: NavItem[] }
 
-const navGroups: NavGroup[] = [
-  { items: [{ id: 'overview', label: '概览', icon: 'overview' }] },
+function getNavGroups(locale: Locale): NavGroup[] {
+  const t = (key: Parameters<typeof translate>[1]) => translate(locale, key)
+  return [
+  { items: [{ id: 'overview', label: t('navOverview'), icon: 'overview' }] },
   {
-    label: '数据管理',
+    label: t('navDataManagement'),
     items: [
-      { id: 'storage', label: '存储文件', icon: 'storage' },
-      { id: 'library', label: '我的书签库', icon: 'library' },
-      { id: 'categories', label: '分类管理', icon: 'categories' },
-      { id: 'trash', label: '回收站', icon: 'trash' },
+      { id: 'storage', label: t('navStorage'), icon: 'storage' },
+      { id: 'library', label: t('navLibrary'), icon: 'library' },
+      { id: 'categories', label: t('navCategories'), icon: 'categories' },
+      { id: 'trash', label: t('navTrash'), icon: 'trash' },
     ],
   },
   {
-    label: '安全管理',
+    label: t('navSecurityManagement'),
     items: [
-      { id: 'app-passwords', label: '侧边栏连接', icon: 'sidebar' },
+      { id: 'app-passwords', label: t('navSidebarConnection'), icon: 'sidebar' },
       // 保留 Floccus 兼容路由，暂不在主侧边栏显示。
       { id: 'floccus', label: 'Floccus 配置', icon: 'sync', hidden: true },
-      { id: 'backup', label: '数据备份', icon: 'backup' },
-      { id: 'devices', label: '设备管理', icon: 'devices' },
+      { id: 'backup', label: t('navBackup'), icon: 'backup' },
+      { id: 'devices', label: t('navDevices'), icon: 'devices' },
     ],
   },
   {
-    label: '系统设置',
+    label: t('navSystemSettings'),
     items: [
-      { id: 'account', label: '账号设置', icon: 'account' },
-      { id: 'preferences', label: '偏好设置', icon: 'preferences' },
-      { id: 'import-export', label: '导入/导出', icon: 'import-export' },
+      { id: 'account', label: t('navAccount'), icon: 'account' },
+      { id: 'preferences', label: t('navPreferences'), icon: 'preferences' },
+      { id: 'import-export', label: t('navImportExport'), icon: 'import-export' },
     ],
   },
   {
-    label: '帮助与支持',
+    label: t('navHelpSupport'),
     items: [
-      { id: 'help', label: '帮助中心', icon: 'help' },
-      { id: 'about', label: '关于项目', icon: 'about' },
+      { id: 'help', label: t('navHelp'), icon: 'help' },
+      { id: 'about', label: t('navAbout'), icon: 'about' },
     ],
   },
-]
+  ]
+}
 
-function allNavItems() {
-  return navGroups.flatMap((group) => group.items)
+function allNavItems(groups: NavGroup[]) {
+  return groups.flatMap((group) => group.items)
 }
 
 function NavIcon({ name, size = 18 }: { name: NavIconName; size?: number }) {
@@ -202,13 +206,15 @@ function persistSession(session: api.Session | null) {
 }
 
 function App() {
-  const validSections = allNavItems().map((item) => item.id)
+  const validSections = allNavItems(getNavGroups('zh-CN')).map((item) => item.id)
   const [activeSection, setActiveSection] = useState<AdminSection>(() => {
     const preferences = loadPreferences()
     return loadActiveSection(validSections, preferences.defaultSection, localStorage) as AdminSection
   })
   const [preferences, setPreferences] = useState<Preferences>(() => loadPreferences())
   const [session, setSession] = useState<api.Session | null>(() => loadStoredSession())
+  const navGroups = getNavGroups(preferences.language)
+  const t = (key: Parameters<typeof translate>[1]) => translate(preferences.language, key)
 
   function handleSessionChange(nextSession: api.Session | null) {
     setSession(nextSession)
@@ -231,6 +237,7 @@ function App() {
   useEffect(() => {
     document.documentElement.dataset.density = preferences.density
     document.documentElement.classList.toggle('reduce-motion', preferences.reduceMotion)
+    document.documentElement.lang = preferences.language
   }, [preferences])
 
   async function handleLogout() {
@@ -239,10 +246,10 @@ function App() {
   }
 
   if (!session) {
-    return <LoginCard onLogin={handleSessionChange} />
+    return <LoginCard locale={preferences.language} onLogin={handleSessionChange} />
   }
 
-  const activeLabel = allNavItems().find((item) => item.id === activeSection)?.label ?? '管理后台'
+  const activeLabel = allNavItems(navGroups).find((item) => item.id === activeSection)?.label ?? t('adminConsole')
   const isStorageWorkspace = activeSection === 'storage'
   const isCategoryWorkspace = activeSection === 'categories'
 
@@ -252,7 +259,7 @@ function App() {
         <div className="sidebar-brand">
           <span className="brand-mark"><BrandLogo size={80} /></span>
         </div>
-        <nav className="nav-list" aria-label="管理后台导航">
+        <nav className="nav-list" aria-label={t('adminConsole')}>
           {navGroups.map((group, index) => (
             <div className="nav-group" key={group.label ?? `group-${index}`}>
               {group.label && <p className="nav-group-label">{group.label}</p>}
@@ -274,27 +281,27 @@ function App() {
           <div className="sidebar-user" title={session.user.loginIdentifier}>
             <span className="sidebar-user-avatar">{session.user.loginIdentifier.charAt(0).toUpperCase()}</span>
             <div>
-              <strong>管理员</strong>
+              <strong>{t('administrator')}</strong>
               <small>{session.user.loginIdentifier}</small>
             </div>
           </div>
           <button className="sidebar-logout" onClick={() => void handleLogout()} type="button">
             <LogOut size={16} strokeWidth={1.8} />
-            <span>退出登录</span>
+            <span>{t('signOut')}</span>
           </button>
         </div>
       </aside>
       <main className={`main-content ${isCategoryWorkspace ? 'category-main-content' : ''}`}>
         <header className="workspace-header">
           <div>
-            <p>ADMIN CONSOLE</p>
+            <p>{t('adminConsole')}</p>
             <h1>{activeLabel}</h1>
           </div>
           <div className="workspace-service-status">
             <span />
             <div>
-              <strong>服务正常</strong>
-              <small>管理控制台</small>
+              <strong>{t('serviceOnline')}</strong>
+              <small>{t('adminWorkspace')}</small>
             </div>
           </div>
         </header>
@@ -326,12 +333,13 @@ function App() {
   )
 }
 
-function LoginCard({ onLogin }: { onLogin: (session: api.Session) => void }) {
+function LoginCard({ locale, onLogin }: { locale: Locale; onLogin: (session: api.Session) => void }) {
   const [mode, setMode] = useState<'login' | 'register'>('login')
   const [loginIdentifier, setLoginIdentifier] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const t = (key: Parameters<typeof translate>[1]) => translate(locale, key)
 
   async function submit() {
     setLoading(true)
@@ -342,7 +350,7 @@ function LoginCard({ onLogin }: { onLogin: (session: api.Session) => void }) {
         : await api.register(loginIdentifier, password)
       onLogin(session)
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : '请求失败')
+      setError(submitError instanceof Error ? submitError.message : t('requestFailed'))
     } finally {
       setLoading(false)
     }
@@ -351,16 +359,16 @@ function LoginCard({ onLogin }: { onLogin: (session: api.Session) => void }) {
   return (
     <main className="auth-page">
       <section className="auth-card">
-        <div className="brand auth-brand"><span className="brand-mark"><BrandLogo size={18} /></span> 书签管理</div>
+        <div className="brand auth-brand"><span className="brand-mark"><BrandLogo size={18} /></span> {t('appName')}</div>
         <p className="eyebrow">SELF-HOSTED BOOKMARK SYNC</p>
-        <h1>管理你的同步服务</h1>
-        <p className="muted">登录后台生成侧边栏连接码，直接管理服务器书签；Floccus 兼容配置仍保留在隐藏页面。</p>
-        <label>邮箱或用户名<input value={loginIdentifier} onChange={(event) => setLoginIdentifier(event.target.value)} placeholder="you@example.com" type="text" /></label>
-        <label>密码<input value={password} onChange={(event) => setPassword(event.target.value)} placeholder="至少 12 个字符" type="password" /></label>
+        <h1>{t('loginTitle')}</h1>
+        <p className="muted">{t('loginDescription')}</p>
+        <label>{t('emailOrUsername')}<input value={loginIdentifier} onChange={(event) => setLoginIdentifier(event.target.value)} placeholder="you@example.com" type="text" /></label>
+        <label>{t('password')}<input value={password} onChange={(event) => setPassword(event.target.value)} placeholder={locale === 'en' ? 'At least 12 characters' : '至少 12 个字符'} type="password" /></label>
         {error && <p className="form-error">{error}</p>}
-        <button className="primary-button" disabled={loading || !loginIdentifier || !password} onClick={() => void submit()} type="button">{loading ? '处理中…' : mode === 'login' ? '登录' : '创建账户'}</button>
-        <button className="switch-button" onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError('') }} type="button">{mode === 'login' ? '还没有账户？创建账户' : '已有账户？返回登录'}</button>
-        <p className="form-hint">账户密码只用于登录；侧边栏连接使用一次性设备码，不要填写账户密码。</p>
+        <button className="primary-button" disabled={loading || !loginIdentifier || !password} onClick={() => void submit()} type="button">{loading ? t('processing') : mode === 'login' ? t('login') : t('createAccount')}</button>
+        <button className="switch-button" onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError('') }} type="button">{mode === 'login' ? t('noAccountCreate') : t('hasAccountLogin')}</button>
+        <p className="form-hint">{t('loginHint')}</p>
       </section>
     </main>
   )

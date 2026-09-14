@@ -17,12 +17,18 @@ describe('admin preferences', () => {
   })
 
   it('normalizes known values and persists a versioned payload', () => {
-    const target = storage(JSON.stringify({ version: 1, density: 'wrong', reduceMotion: true }))
+    const target = storage(JSON.stringify({ version: 1, language: 'en', density: 'wrong', reduceMotion: true }))
     const preferences = loadPreferences(target)
-    expect(preferences).toEqual({ ...defaultPreferences, reduceMotion: true })
+    expect(preferences).toEqual({ ...defaultPreferences, language: 'en', reduceMotion: true })
 
-    savePreferences({ ...preferences, density: 'compact' }, target)
+    savePreferences({ ...preferences, language: 'zh-CN', density: 'compact' }, target)
     expect(loadPreferences(target).density).toBe('compact')
+    expect(loadPreferences(target).language).toBe('zh-CN')
+  })
+
+  it('falls back to Simplified Chinese for unknown language values and old preferences', () => {
+    expect(loadPreferences(storage(JSON.stringify({ version: 1, language: 'fr' }))).language).toBe('zh-CN')
+    expect(loadPreferences(storage(JSON.stringify({ version: 1, density: 'compact' }))).language).toBe('zh-CN')
   })
 
   it('falls back when a removed section is stored as the default', () => {

@@ -20,6 +20,7 @@ import {
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import * as api from './api'
+import { translate, type Locale } from './i18n'
 import { confirmDangerousAction, savePreferences, shouldConfirmDangerousActions, type Preferences } from './preferences'
 import { browserBookmarksHtmlToXbel } from './browser-bookmarks'
 
@@ -130,8 +131,9 @@ export function DevicesPage({ token, navigate, onSessionRevoked }: PageProps & {
 }
 
 export function PreferencesPage({ preferences, onChange }: { preferences: Preferences; onChange: (next: Preferences) => void }) {
+  const t = (key: Parameters<typeof translate>[1]) => translate(preferences.language, key)
   function update(patch: Partial<Preferences>) { const next = { ...preferences, ...patch }; onChange(next); savePreferences(next) }
-  return <div className="feature-page"><section className="panel settings-panel"><PreferenceSelect label="界面密度" description="调整面板和列表的留白。" value={preferences.density} onChange={(value) => update({ density: value as Preferences['density'] })} options={[['comfortable', '舒适'], ['compact', '紧凑']]} /><PreferenceSelect label="默认打开页面" description="下次打开后台时优先进入的页面。" value={preferences.defaultSection} onChange={(value) => update({ defaultSection: value })} options={[['overview', '概览'], ['storage', '存储文件'], ['categories', '分类管理'], ['devices', '设备管理'], ['import-export', '导入/导出'], ['help', '帮助中心']]} /><PreferenceToggle label="减少界面动效" description="关闭页面过渡和悬停位移动效。" checked={preferences.reduceMotion} onChange={(checked) => update({ reduceMotion: checked })} /><PreferenceToggle label="危险操作始终确认" description="永久删除、清空和撤销操作前显示确认弹窗。" checked={preferences.confirmDangerousActions} onChange={(checked) => update({ confirmDangerousActions: checked })} /></section><section className="panel security-notice"><span><ShieldCheck size={14} /></span><p>不会在偏好设置中保存登录密码、应用密码、Floccus passphrase、书签明文或导入文件。</p></section></div>
+  return <div className="feature-page"><section className="panel settings-panel"><PreferenceSelect label={t('language')} description={t('languageDescription')} value={preferences.language} onChange={(value) => update({ language: value as Locale })} options={[['zh-CN', t('languageChinese')], ['en', t('languageEnglish')]]} /><PreferenceSelect label={t('interfaceDensity')} description={t('interfaceDensityDescription')} value={preferences.density} onChange={(value) => update({ density: value as Preferences['density'] })} options={[['comfortable', t('densityComfortable')], ['compact', t('densityCompact')]]} /><PreferenceSelect label={t('defaultPage')} description={t('defaultPageDescription')} value={preferences.defaultSection} onChange={(value) => update({ defaultSection: value })} options={[['overview', t('navOverview')], ['storage', t('navStorage')], ['categories', t('navCategories')], ['devices', t('navDevices')], ['import-export', t('navImportExport')], ['help', t('navHelp')]]} /><PreferenceToggle label={t('reduceMotion')} description={t('reduceMotionDescription')} checked={preferences.reduceMotion} onChange={(checked) => update({ reduceMotion: checked })} /><PreferenceToggle label={t('confirmDangerousActions')} description={t('confirmDangerousActionsDescription')} checked={preferences.confirmDangerousActions} onChange={(checked) => update({ confirmDangerousActions: checked })} /></section><section className="panel security-notice"><span><ShieldCheck size={14} /></span><p>{t('preferencesSecurityNote')}</p></section></div>
 }
 
 export function BackupPage({ token }: { token: string }) {

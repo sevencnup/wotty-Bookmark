@@ -1,9 +1,12 @@
+import type { Locale } from './i18n'
+
 export const PREFERENCES_STORAGE_KEY = 'bookmark-vault.preferences.v1'
 export const ACTIVE_SECTION_STORAGE_KEY = 'bookmark-vault.active-section.v1'
 
 export type Density = 'comfortable' | 'compact'
 
 export type Preferences = {
+  language: Locale
   density: Density
   defaultSection: string
   reduceMotion: boolean
@@ -11,6 +14,7 @@ export type Preferences = {
 }
 
 export const defaultPreferences: Preferences = {
+  language: 'zh-CN',
   density: 'comfortable',
   defaultSection: 'overview',
   reduceMotion: false,
@@ -28,6 +32,7 @@ export function loadPreferences(storage: Storage | null = typeof window === 'und
       ? value.defaultSection
       : defaultPreferences.defaultSection
     return {
+      language: value.language === 'en' ? 'en' : 'zh-CN',
       density: value.density === 'compact' ? 'compact' : 'comfortable',
       defaultSection: storedDefaultSection === 'bookmark-organizer'
         ? 'categories'
