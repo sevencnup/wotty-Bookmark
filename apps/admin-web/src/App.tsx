@@ -305,7 +305,7 @@ function App() {
             <>
                 {activeSection === 'overview' && <Overview token={session.token} />}
                 {activeSection === 'app-passwords' && <SidebarConnectionPage token={session.token} />}
-                {activeSection === 'categories' && <CategoryManagementPage token={session.token} onOpenFloccus={() => navigate('floccus')} />}
+                {activeSection === 'categories' && <CategoryManagementPage token={session.token} />}
                 {activeSection === 'library' && <LibraryManagementPage token={session.token} />}
                 {activeSection === 'floccus' && <FloccusGuide token={session.token} loginIdentifier={session.user.loginIdentifier} />}
                 {activeSection === 'account' && <AccountSettings loginIdentifier={session.user.loginIdentifier} />}

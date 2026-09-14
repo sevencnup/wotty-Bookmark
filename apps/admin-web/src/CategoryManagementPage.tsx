@@ -1,13 +1,13 @@
-import { ChevronDown, ChevronRight, Folder, FolderOpen, Folders, GripVertical, Home, Link2, LoaderCircle, RefreshCw, Search, Sparkles, Trash2 } from 'lucide-react'
+import { ChevronDown, ChevronRight, Folder, FolderOpen, Folders, GripVertical, Home, Link2, LoaderCircle, RefreshCw, Search, Trash2 } from 'lucide-react'
 import type { DragEvent, MouseEvent as ReactMouseEvent } from 'react'
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import * as api from './api'
 import { descendantFolderIds, findFolderParentId, flattenFolders as flattenBookmarkFolders, folderHasChildren, groupBookmarksByFolder, resolveDraggedBookmarkIds, type FlatBookmarkFolder } from './bookmark-tree'
+import { toCategoryTree } from './category-library'
 import { confirmDangerousAction } from './preferences'
 
 type Props = {
   token: string
-  onOpenFloccus: () => void
 }
 
 type DragState = {
@@ -44,12 +44,11 @@ const EMPTY_FOLDERS: api.BookmarkFolder[] = []
 const EMPTY_BOOKMARK_IDS: string[] = []
 const ROOT_FOLDER_DROP_ID = '__tree_root__'
 
-export function CategoryManagementPage({ token, onOpenFloccus }: Props) {
+export function CategoryManagementPage({ token }: Props) {
   const [tree, setTree] = useState<api.BookmarkTree | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [moving, setMoving] = useState(false)
-  const [resettingBaseline, setResettingBaseline] = useState(false)
   const [query, setQuery] = useState('')
   const [selectedFolderId, setSelectedFolderId] = useState('all')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -61,9 +60,6 @@ export function CategoryManagementPage({ token, onOpenFloccus }: Props) {
   const [treeConnectionLayer, setTreeConnectionLayer] = useState<TreeConnectionLayerState>({ width: 0, height: 0, connections: [] })
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
-  const [passphrase, setPassphrase] = useState('')
-  const [unlocking, setUnlocking] = useState(false)
-  const [encryption, setEncryption] = useState<api.EncryptionStatus | null>(null)
   const treeCanvasRef = useRef<HTMLDivElement>(null)
   const treeContentRef = useRef<HTMLDivElement>(null)
   const folderExpandTimerRef = useRef<number | null>(null)
@@ -75,7 +71,8 @@ export function CategoryManagementPage({ token, onOpenFloccus }: Props) {
     if (showRefreshing) setRefreshing(true)
     setError('')
     try {
-      const nextTree = await api.getBookmarks(token)
+      const library = await api.getLibrary(token)
+      const nextTree = toCategoryTree(library)
       setTree(nextTree)
       setSelectedIds((current) => new Set([...current].filter((id) => nextTree.bookmarks.some((bookmark) => bookmark.id === id))))
       if (!expandedInitializedRef.current && nextTree.folders.length > 0) {
@@ -83,7 +80,7 @@ export function CategoryManagementPage({ token, onOpenFloccus }: Props) {
         expandedInitializedRef.current = true
       }
     } catch (requestError) {
-      setError(readableError(requestError, '书签分类读取失败'))
+      setError(readableError(requestError, '服务器书签库读取失败'))
     } finally {
       setLoading(false)
       setRefreshing(false)
@@ -93,52 +90,18 @@ export function CategoryManagementPage({ token, onOpenFloccus }: Props) {
   useEffect(() => { void load() }, [load])
 
   useEffect(() => {
-    if (tree?.status === 'encrypted' || tree?.status === 'ready') {
-      api.getEncryptionStatus(token).then(setEncryption).catch(() => setEncryption(null))
+    const refreshSilently = () => {
+      if (document.visibilityState === 'visible') void load()
     }
-  }, [token, tree?.status])
-
-  async function unlockEncryptedBookmarks() {
-    if (!passphrase || unlocking) return
-    setUnlocking(true)
-    setError('')
-    setNotice('')
-    try {
-      await api.unlockFloccusEncryption(token, passphrase)
-      setPassphrase('')
-      setNotice('加密书签已解锁，可以在分类树中整理并写回 Floccus')
-      setEncryption(await api.getEncryptionStatus(token))
-      await load()
-    } catch (requestError) {
-      setError(readableError(requestError, '加密书签解锁失败'))
-    } finally {
-      setUnlocking(false)
+    window.addEventListener('focus', refreshSilently)
+    document.addEventListener('visibilitychange', refreshSilently)
+    const interval = window.setInterval(refreshSilently, 10_000)
+    return () => {
+      window.removeEventListener('focus', refreshSilently)
+      document.removeEventListener('visibilitychange', refreshSilently)
+      window.clearInterval(interval)
     }
-  }
-
-  async function resetSyncBaseline() {
-    if (resettingBaseline) return
-    const confirmed = confirmDangerousAction(
-      '仅当浏览器本地书签仍完整、但旧 Floccus 加密 Passphrase 已忘记时继续。请先取消当前同步。系统会把服务器旧密文保留到历史版本，移除远端基线和服务器保存的旧口令；不会删除浏览器本地书签。继续吗？',
-    )
-    if (!confirmed) return
-    setResettingBaseline(true)
-    setError('')
-    setNotice('')
-    try {
-      const result = await api.resetSyncBaseline(token)
-      setNotice(result.backupCreated
-        ? '旧密文已保存到历史版本，旧服务器口令已移除。现在请在 Floccus 设置新的 Passphrase，再执行一次“向上推一次”。'
-        : '服务器同步基线和旧口令已清空。现在请在 Floccus 设置 Passphrase，再执行一次“向上推一次”。')
-      await load()
-    } catch (requestError) {
-      setError(requestError instanceof api.ApiRequestError && requestError.status === 423
-        ? 'Floccus 仍在同步，请先取消并等待停止后再试。'
-        : readableError(requestError, '同步基线重建失败，请稍后重试'))
-    } finally {
-      setResettingBaseline(false)
-    }
-  }
+  }, [load])
 
   useEffect(() => {
     const stopSelectionPaint = () => {
@@ -174,7 +137,7 @@ export function CategoryManagementPage({ token, onOpenFloccus }: Props) {
   const flatFolders = useMemo(() => flattenBookmarkFolders(allFolders), [allFolders])
   const bookmarkGroups = useMemo(() => groupBookmarksByFolder(visibleBookmarks, allFolders), [allFolders, visibleBookmarks])
   const draggedIds = drag?.kind === 'bookmarks' ? drag.ids : EMPTY_BOOKMARK_IDS
-  const ready = tree?.status === 'ready'
+  const ready = Boolean(tree)
 
   const drawTreeConnections = useCallback(() => {
     const canvas = treeContentRef.current
@@ -311,8 +274,7 @@ export function CategoryManagementPage({ token, onOpenFloccus }: Props) {
     setError('')
     setNotice('')
     try {
-      if (ids.length === 1) await api.moveBookmark(token, ids[0], parentId, tree.etag)
-      else await api.moveBookmarks(token, ids, parentId, tree.etag)
+      await Promise.all(ids.map((id) => api.moveLibraryNode(token, id, parentId)))
       setNotice(`已将 ${ids.length} 个书签归入目标文件夹`)
       setSelectedIds(new Set())
       await load()
@@ -331,16 +293,16 @@ export function CategoryManagementPage({ token, onOpenFloccus }: Props) {
     const ids = [...selectedIds].filter((id) => tree.bookmarks.some((bookmark) => bookmark.id === id))
     if (!ids.length) return
     const confirmed = confirmDangerousAction(
-      `确定将选中的 ${ids.length} 个书签移入回收站吗？\n\n后台会立即更新 WebDAV 同步文件；下次 Floccus 双向同步时，浏览器中的对应书签也可能被删除。`,
+      `确定将选中的 ${ids.length} 个书签移入服务器书签库回收站吗？`,
     )
     if (!confirmed) return
     setMoving(true)
     setError('')
     setNotice('')
     try {
-      const response = await api.trashBookmarks(token, ids, tree.etag)
+      await Promise.all(ids.map((id) => api.deleteLibraryNode(token, id)))
       setSelectedIds(new Set())
-      setNotice(`已将 ${response.count} 个书签移入回收站，并更新同步文件`)
+      setNotice(`已将 ${ids.length} 个书签移入服务器书签库回收站`)
       await load()
     } catch (requestError) {
       await load()
@@ -356,8 +318,8 @@ export function CategoryManagementPage({ token, onOpenFloccus }: Props) {
     setError('')
     setNotice('')
     try {
-      const response = await api.moveFolder(token, folderId, parentId, tree.etag)
-      setNotice(response.unchanged ? '文件夹已经在目标位置' : parentId ? '文件夹及其全部内容已移动' : '文件夹已移动到顶级目录')
+      await api.moveLibraryNode(token, folderId, parentId)
+      setNotice(parentId ? '文件夹及其全部内容已移动' : '文件夹已移动到顶级目录')
       if (parentId) setExpandedIds((current) => new Set(current).add(parentId))
       await load()
     } catch (requestError) {
@@ -477,12 +439,12 @@ export function CategoryManagementPage({ token, onOpenFloccus }: Props) {
   }
 
   const rootDropDisabled = drag?.kind === 'folder' && drag.sourceParentId === null
-  const organizationPanel = useMemo(() => <aside className="panel category-tree-panel category-layout-tree"><div className="category-panel-title"><div><p className="eyebrow">ORGANIZATION TREE</p><h3>书签组织架构</h3></div><div className="category-tree-actions"><button className="tree-action-button" onClick={collapseAll} type="button">收起</button><button className="tree-action-button" onClick={expandAll} type="button">展开</button><button aria-label="重置组织树视图" className="tree-control-button" onClick={resetTreeView} type="button">⌖</button><button aria-label="刷新分类树" className="icon-button" disabled={refreshing || moving} onClick={() => void load(true)} type="button"><RefreshCw className={refreshing ? 'spin' : ''} size={16} /></button></div></div><p className="category-tree-description">书签可拖入文件夹；文件夹也可以拖动重组整棵分支</p><div className="organization-tree category-layout-tree-canvas" ref={treeCanvasRef}><div className="organization-tree-canvas" ref={treeContentRef} style={{ transform: `scale(${treeZoom})`, transformOrigin: 'top left' }}><TreeConnectionLayer state={treeConnectionLayer} /><div className="organization-root-node"><button aria-current={selectedFolderId === 'all' ? 'page' : undefined} className={`organization-root-card ${selectedFolderId === 'all' ? 'active' : ''} ${dropFolderId === ROOT_FOLDER_DROP_ID ? 'folder-drop-target' : ''} ${rootDropDisabled ? 'folder-drop-disabled' : ''}`} data-tree-node-id="root" onClick={() => selectFolder('all')} onDragLeave={(event) => leaveDropTarget(event, null)} onDragOver={(event) => allowDrop(event, null)} onDrop={(event) => dropOnFolder(event, null)} type="button"><span className="organization-root-symbol"><Home size={18} /></span><span><strong>全部书签</strong><small>{tree?.bookmarks.length ?? 0} 个书签 · 总目录</small></span>{dropFolderId === ROOT_FOLDER_DROP_ID && drag?.kind === 'folder' && <span className="root-folder-drop-label">移动为顶级文件夹</span>}</button>{allFolders.length > 0 && <div className="organization-root-rail">{allFolders.map((folder) => <FolderTreeNode drag={drag} dropFolderId={dropFolderId} expandedIds={expandedIds} folder={folder} key={folder.id} moving={moving} onDragEnd={endDrag} onDragLeave={leaveDropTarget} onDragOver={allowDrop} onDrop={dropOnFolder} onFolderDragStart={beginFolderDrag} onSelect={selectFolder} onToggle={toggleFolder} parentId="root" selectedFolderId={selectedFolderId} />)}</div>}</div></div></div><div className="organization-tree-controls"><button aria-label="缩小组织树" disabled={treeZoom <= 0.65} onClick={() => zoomTree(-0.1)} type="button">−</button><span>{Math.round(treeZoom * 100)}%</span><button aria-label="放大组织树" disabled={treeZoom >= 1.2} onClick={() => zoomTree(0.1)} type="button">＋</button></div><div className="tree-drop-guide"><Link2 size={15} /><span>左侧书签拖入文件夹；右侧文件夹可互相嵌套，拖到“全部书签”可移回顶级</span></div></aside>, [allFolders, beginFolderDrag, drag, dropFolderId, endDrag, expandedIds, moving, refreshing, rootDropDisabled, selectedFolderId, tree, treeConnectionLayer, treeZoom])
+  const organizationPanel = useMemo(() => <aside className="panel category-tree-panel category-layout-tree"><div className="category-panel-title"><div><p className="eyebrow">SERVER LIBRARY TREE</p><h3>服务器书签组织架构</h3></div><div className="category-tree-actions"><button className="tree-action-button" onClick={collapseAll} type="button">收起</button><button className="tree-action-button" onClick={expandAll} type="button">展开</button><button aria-label="重置组织树视图" className="tree-control-button" onClick={resetTreeView} type="button">⌖</button><button aria-label="刷新分类树" className="icon-button" disabled={refreshing || moving} onClick={() => void load(true)} type="button"><RefreshCw className={refreshing ? 'spin' : ''} size={16} /></button></div></div><p className="category-tree-description">和“我的书签库”共享同一份服务器数据；书签和文件夹都可以拖动重组。</p><div className="organization-tree category-layout-tree-canvas" ref={treeCanvasRef}><div className="organization-tree-canvas" ref={treeContentRef} style={{ transform: `scale(${treeZoom})`, transformOrigin: 'top left' }}><TreeConnectionLayer state={treeConnectionLayer} /><div className="organization-root-node"><button aria-current={selectedFolderId === 'all' ? 'page' : undefined} className={`organization-root-card ${selectedFolderId === 'all' ? 'active' : ''} ${dropFolderId === ROOT_FOLDER_DROP_ID ? 'folder-drop-target' : ''} ${rootDropDisabled ? 'folder-drop-disabled' : ''}`} data-tree-node-id="root" onClick={() => selectFolder('all')} onDragLeave={(event) => leaveDropTarget(event, null)} onDragOver={(event) => allowDrop(event, null)} onDrop={(event) => dropOnFolder(event, null)} type="button"><span className="organization-root-symbol"><Home size={18} /></span><span><strong>全部书签</strong><small>{tree?.bookmarks.length ?? 0} 个书签 · 总目录</small></span>{dropFolderId === ROOT_FOLDER_DROP_ID && drag?.kind === 'folder' && <span className="root-folder-drop-label">移动为顶级文件夹</span>}</button>{allFolders.length > 0 && <div className="organization-root-rail">{allFolders.map((folder) => <FolderTreeNode drag={drag} dropFolderId={dropFolderId} expandedIds={expandedIds} folder={folder} key={folder.id} moving={moving} onDragEnd={endDrag} onDragLeave={leaveDropTarget} onDragOver={allowDrop} onDrop={dropOnFolder} onFolderDragStart={beginFolderDrag} onSelect={selectFolder} onToggle={toggleFolder} parentId="root" selectedFolderId={selectedFolderId} />)}</div>}</div></div></div><div className="organization-tree-controls"><button aria-label="缩小组织树" disabled={treeZoom <= 0.65} onClick={() => zoomTree(-0.1)} type="button">−</button><span>{Math.round(treeZoom * 100)}%</span><button aria-label="放大组织树" disabled={treeZoom >= 1.2} onClick={() => zoomTree(0.1)} type="button">＋</button></div><div className="tree-drop-guide"><Link2 size={15} /><span>左侧书签拖入文件夹；右侧文件夹可互相嵌套，拖到“全部书签”可移回顶级</span></div></aside>, [allFolders, beginFolderDrag, drag, dropFolderId, endDrag, expandedIds, moving, refreshing, rootDropDisabled, selectedFolderId, tree, treeConnectionLayer, treeZoom])
 
   return <div className="category-management-page">
     {error && tree && <div aria-live="polite" className="bookmark-alert error"><strong>操作失败</strong><span>{error}</span></div>}
     {notice && <div aria-live="polite" className="bookmark-alert success"><strong>已完成</strong><span>{notice}</span></div>}
-    {loading ? <section className="panel category-state"><LoaderCircle className="spin" size={30} /><strong>正在加载书签组织结构…</strong><p>正在读取最新的文件夹和书签索引。</p></section> : error && !tree ? <section className="panel category-state"><RefreshCw size={30} /><strong>书签服务暂时无法连接</strong><p>{error}</p><button className="primary-button" onClick={() => void load(true)} type="button"><RefreshCw size={15} /> 重新连接</button></section> : tree?.status === 'encrypted' ? <section className="panel category-state"><Sparkles size={30} /><strong>{encryption?.passphraseStored ? '保存的 Floccus 加密口令无法解密当前文件' : '输入 Floccus 加密口令建立分类树'}</strong><p>请输入 Floccus 配置中“加密 / Passphrase”字段的口令。它不是后台生成的 WebDAV 应用密码；应用密码只负责连接服务器，不能解密书签。</p><div className="bookmark-encryption-warning">验证成功后不再是零知识模式：服务器管理员可使用主密钥解密书签。Floccus 加密口令只以加密信封保存。</div><div className="bookmark-unlock-form"><input aria-label="Floccus 加密 Passphrase（不是 WebDAV 应用密码）" autoComplete="current-password" onChange={(event) => setPassphrase(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') void unlockEncryptedBookmarks() }} placeholder="Floccus 加密 Passphrase（不是应用密码）" type="password" value={passphrase} /><button className="primary-button compact" disabled={!passphrase || unlocking} onClick={() => void unlockEncryptedBookmarks()} type="button">{unlocking ? '验证中…' : '验证并解锁'}</button></div><div className="bookmark-encrypted-actions bookmark-recovery-actions"><button className="toolbar-button" onClick={onOpenFloccus} type="button">查看 Floccus 配置</button><button className="toolbar-button" disabled={refreshing || resettingBaseline} onClick={() => void load(true)} type="button">{refreshing ? '正在检查…' : '刷新状态'}</button><button className="danger-button" disabled={unlocking || resettingBaseline} onClick={() => void resetSyncBaseline()} type="button">{resettingBaseline ? '正在保存旧密文…' : '忘记旧口令，备份后重建'}</button></div><small className="bookmark-recovery-hint">只有确认浏览器本地书签仍完整、旧 Passphrase 确实找不回时才使用重建。</small></section> : tree?.status === 'migrationRequired' ? <section className="panel category-state"><FolderOpen size={30} /><strong>需要由浏览器重新建立同步身份</strong><p>当前 XBEL 缺少 Floccus 节点 ID，直接推送会先对旧树执行耗时的完整比较。请先取消当前同步，再让后台备份并移除旧基线；浏览器本地书签不会被删除。</p><div className="bookmark-encrypted-actions bookmark-recovery-actions"><button className="danger-button" disabled={resettingBaseline} onClick={() => void resetSyncBaseline()} type="button">{resettingBaseline ? '正在安全备份…' : '备份并快速重建同步文件'}</button><button className="toolbar-button" disabled={resettingBaseline || refreshing} onClick={() => void load(true)} type="button">{refreshing ? '正在检查…' : '我已推送，重新检查'}</button></div><small className="bookmark-recovery-hint">重建完成后，只需在 Floccus 执行一次“向上推一次”，无需删除配置。</small></section> : tree?.status !== 'ready' ? <section className="panel category-state"><FolderOpen size={30} /><strong>还没有可用的书签索引</strong><p>完成一次 Floccus XBEL 同步后，这里会显示从总目录衍生的文件夹组织树。</p><button className="primary-button" onClick={onOpenFloccus} type="button">前往同步配置</button></section> : <div className="category-workspace">
+    {loading ? <section className="panel category-state"><LoaderCircle className="spin" size={30} /><strong>正在加载服务器书签库…</strong><p>正在读取与“我的书签库”一致的文件夹和书签。</p></section> : error && !tree ? <section className="panel category-state"><RefreshCw size={30} /><strong>服务器书签库暂时无法连接</strong><p>{error}</p><button className="primary-button" onClick={() => void load(true)} type="button"><RefreshCw size={15} /> 重新连接</button></section> : tree ? <div className="category-workspace">
       <section className="panel category-bookmarks-panel category-layout-bookmarks">
         <div className="category-panel-title">
           <div><p className="eyebrow">BOOKMARKS TO ORGANIZE</p><h3>{selectedFolder ? selectedFolder.title : '全部书签'}</h3></div>
@@ -497,7 +459,7 @@ export function CategoryManagementPage({ token, onOpenFloccus }: Props) {
         <p className="category-keyboard-hint">按住书签行并上下滑动可连续多选；拖动右侧手柄，可将选中的书签放入组织树文件夹。</p>
       </section>
       {organizationPanel}
-    </div>}
+    </div> : null}
   </div>
 }
 
