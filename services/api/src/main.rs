@@ -93,6 +93,10 @@ fn app_router(state: AppState) -> Router {
         .route("/api/v1/auth/logout", post(auth::logout))
         .route("/api/v1/me", get(auth::me))
         .route(
+            "/api/v1/preferences",
+            get(auth::get_account_preferences).put(auth::update_account_preferences),
+        )
+        .route(
             "/api/v1/sidebar/pairing-codes",
             get(auth::list_sidebar_pairings).post(auth::create_sidebar_pairing),
         )
@@ -234,6 +238,7 @@ fn cors_layer_for_origins(configured_origins: &str) -> CorsLayer {
             Method::HEAD,
             Method::POST,
             Method::PATCH,
+            Method::PUT,
             Method::DELETE,
             Method::OPTIONS,
             Method::from_bytes(b"PROPFIND").expect("valid WebDAV method"),

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   cleanupFileVersions,
+  getAccountPreferences,
   createFloccusCredential,
   emptyTrash,
   exportStorageFile,
@@ -29,6 +30,7 @@ import {
   unlockFloccusEncryption,
   getBackupSettings,
   updateBackupSettings,
+  updateAccountPreferences,
   getBackupRuns,
   runBackupNow,
   downloadBackup,
@@ -136,6 +138,23 @@ describe('admin API contract', () => {
       }),
     )
     expect(new Headers(fetchMock.mock.calls[0][1].headers).get('authorization')).toBe('Bearer session-token')
+  })
+
+  it('reads and updates the account-wide interface language with the session token', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(response({ language: 'en' }))
+      .mockResolvedValueOnce(response({ language: 'zh-CN' }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(getAccountPreferences('session-token')).resolves.toEqual({ language: 'en' })
+    await expect(updateAccountPreferences('session-token', { language: 'zh-CN' })).resolves.toEqual({ language: 'zh-CN' })
+
+    expect(fetchMock.mock.calls.map(([path, init]) => [path, init?.method ?? 'GET'])).toEqual([
+      ['/api/v1/preferences', 'GET'],
+      ['/api/v1/preferences', 'PUT'],
+    ])
+    expect(new Headers(fetchMock.mock.calls[0][1].headers).get('authorization')).toBe('Bearer session-token')
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({ language: 'zh-CN' })
   })
 
   it('lists and revokes sidebar pairing codes', async () => {

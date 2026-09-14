@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   LayoutDashboard,
   Bookmark,
@@ -213,6 +213,8 @@ function App() {
   })
   const [preferences, setPreferences] = useState<Preferences>(() => loadPreferences())
   const [session, setSession] = useState<api.Session | null>(() => loadStoredSession())
+  const languageVersionRef = useRef(0)
+  const languageSaveQueueRef = useRef<Promise<void>>(Promise.resolve())
   const navGroups = getNavGroups(preferences.language)
   const t = (key: Parameters<typeof translate>[1]) => translate(preferences.language, key)
 
@@ -228,11 +230,48 @@ function App() {
   }
 
   function handlePreferencesChange(next: Preferences) {
+    const languageChanged = next.language !== preferences.language
     setPreferences(next)
     savePreferences(next)
     document.documentElement.dataset.density = next.density
     document.documentElement.classList.toggle('reduce-motion', next.reduceMotion)
+    if (languageChanged) {
+      languageVersionRef.current += 1
+      if (session) {
+        const token = session.token
+        const language = next.language
+        // Serialize writes: a quick en → zh-CN change must not let a slower
+        // earlier request overwrite the later language on the server.
+        languageSaveQueueRef.current = languageSaveQueueRef.current
+          .catch(() => undefined)
+          .then(() => api.updateAccountPreferences(token, { language }))
+          .then(() => undefined)
+          // A local change is deliberately kept when the service is offline.
+          // The next explicit language change will retry with the latest session.
+          .catch(() => undefined)
+      }
+    }
   }
+
+  useEffect(() => {
+    if (!session) return
+    const versionAtRequest = languageVersionRef.current
+    let cancelled = false
+    void api.getAccountPreferences(session.token)
+      .then((remote) => {
+        if (cancelled || languageVersionRef.current !== versionAtRequest) return
+        setPreferences((current) => {
+          if (current.language === remote.language) return current
+          const next = { ...current, language: remote.language }
+          savePreferences(next)
+          return next
+        })
+      })
+      // Retain the local preference while an older API image or a temporary
+      // network outage cannot serve account preferences.
+      .catch(() => undefined)
+    return () => { cancelled = true }
+  }, [session?.token])
 
   useEffect(() => {
     document.documentElement.dataset.density = preferences.density

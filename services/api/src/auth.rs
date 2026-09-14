@@ -75,6 +75,16 @@ pub struct TokenResponse {
 }
 
 #[derive(Serialize)]
+pub struct AccountPreferencesResponse {
+    pub language: String,
+}
+
+#[derive(Deserialize)]
+pub struct UpdateAccountPreferencesPayload {
+    pub language: String,
+}
+
+#[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AppPasswordResponse {
     pub id: Uuid,
@@ -300,6 +310,76 @@ pub async fn me(State(state): State<AppState>, headers: HeaderMap) -> Response {
         login_identifier: user.login_identifier,
     })
     .into_response()
+}
+
+/// Return the small set of preferences shared by every authenticated client
+/// belonging to this account. Existing accounts get Chinese until they choose
+/// another language, so the migration remains backward compatible.
+pub async fn get_account_preferences(State(state): State<AppState>, headers: HeaderMap) -> Response {
+    let Some(user) = authenticate_session(&state, &headers).await else {
+        return error(StatusCode::UNAUTHORIZED, "unauthorized", "请先登录");
+    };
+    match sqlx::query_scalar::<_, String>(
+        "SELECT language FROM account_preferences WHERE user_id = $1",
+    )
+    .bind(user.id)
+    .fetch_optional(&state.db)
+    .await
+    {
+        Ok(language) => Json(AccountPreferencesResponse {
+            language: language.unwrap_or_else(|| "zh-CN".to_owned()),
+        })
+        .into_response(),
+        Err(db_error) => {
+            tracing::error!(?db_error, user_id = %user.id, "read account preferences failed");
+            error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "preferences_read_failed",
+                "偏好设置读取失败",
+            )
+        }
+    }
+}
+
+/// The admin console is the sole writer of account preferences. Sidebar
+/// sessions use the same authenticated read endpoint to follow the choice.
+pub async fn update_account_preferences(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(payload): Json<UpdateAccountPreferencesPayload>,
+) -> Response {
+    // A sidebar session has a device_id. It may read this shared preference,
+    // but only the regular admin sign-in session can change it.
+    let Some(user) = authenticate_admin_session(&state, &headers).await else {
+        return error(StatusCode::UNAUTHORIZED, "unauthorized", "请先登录");
+    };
+    if !matches!(payload.language.as_str(), "zh-CN" | "en") {
+        return error(
+            StatusCode::BAD_REQUEST,
+            "invalid_language",
+            "仅支持 zh-CN 或 en 界面语言",
+        );
+    }
+    let language = payload.language;
+    let result = sqlx::query(
+        "INSERT INTO account_preferences (user_id, language) VALUES ($1, $2)
+         ON CONFLICT(user_id) DO UPDATE SET language = excluded.language, updated_at = CURRENT_TIMESTAMP",
+    )
+    .bind(user.id)
+    .bind(&language)
+    .execute(&state.db)
+    .await;
+    match result {
+        Ok(_) => Json(AccountPreferencesResponse { language }).into_response(),
+        Err(db_error) => {
+            tracing::error!(?db_error, user_id = %user.id, "update account preferences failed");
+            error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "preferences_update_failed",
+                "偏好设置保存失败",
+            )
+        }
+    }
 }
 
 pub async fn create_sidebar_pairing(
@@ -844,6 +924,27 @@ pub async fn authenticate_session(
         })
 }
 
+async fn authenticate_admin_session(
+    state: &AppState,
+    headers: &HeaderMap,
+) -> Option<AuthenticatedUser> {
+    let token = bearer_token(headers)?;
+    sqlx::query(
+        "SELECT u.id, u.login_identifier FROM sessions s JOIN users u ON u.id = s.user_id
+         WHERE s.token_hash = $1 AND s.device_id IS NULL AND s.revoked_at IS NULL
+           AND s.expires_at > CURRENT_TIMESTAMP AND u.status = 'active'",
+    )
+    .bind(hash_token(&token))
+    .fetch_optional(&state.db)
+    .await
+    .ok()?
+    .map(|row| AuthenticatedUser {
+        id: row.get("id"),
+        login_identifier: row.get("login_identifier"),
+        app_password_id: None,
+    })
+}
+
 pub async fn authenticate_webdav(
     state: &AppState,
     headers: &HeaderMap,
@@ -1043,11 +1144,17 @@ pub fn rate_limited(retry_after: Duration) -> Response {
 #[cfg(test)]
 mod tests {
     use super::{
-        basic_credentials, bearer_token, create_floccus_credential_record, hash_token,
-        sidebar_pairing_secret, SIDEBAR_PAIRING_PREFIX,
+        basic_credentials, bearer_token, create_floccus_credential_record, get_account_preferences,
+        hash_token, sidebar_pairing_secret, update_account_preferences,
+        UpdateAccountPreferencesPayload, SIDEBAR_PAIRING_PREFIX,
     };
     use crate::state::{AppState, AuthRateLimiter};
-    use axum::http::{header, HeaderMap, HeaderValue};
+    use axum::{
+        body::to_bytes,
+        extract::State,
+        http::{header, HeaderMap, HeaderValue, StatusCode},
+        Json,
+    };
     use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
     use sqlx::{sqlite::SqlitePoolOptions, Row};
     use std::{path::PathBuf, sync::Arc};
@@ -1070,6 +1177,41 @@ mod tests {
             auth_rate_limiter: Arc::new(AuthRateLimiter::default()),
             master_key: Arc::new(crate::floccus_crypto::MasterKey::for_tests()),
         }
+    }
+
+    async fn response_json(response: axum::response::Response) -> serde_json::Value {
+        let bytes = to_bytes(response.into_body(), 1024)
+            .await
+            .expect("response body");
+        serde_json::from_slice(&bytes).expect("JSON response")
+    }
+
+    async fn insert_session(
+        state: &AppState,
+        user_id: Uuid,
+        token: &str,
+        device_id: Option<Uuid>,
+    ) {
+        sqlx::query(
+            "INSERT INTO sessions (id, user_id, token_hash, expires_at, device_id)
+             VALUES ($1, $2, $3, datetime(CURRENT_TIMESTAMP, '+1 day'), $4)",
+        )
+        .bind(Uuid::new_v4())
+        .bind(user_id)
+        .bind(hash_token(token))
+        .bind(device_id)
+        .execute(&state.db)
+        .await
+        .expect("test session");
+    }
+
+    fn bearer_headers(token: &str) -> HeaderMap {
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            header::AUTHORIZATION,
+            HeaderValue::from_str(&format!("Bearer {token}")).expect("authorization header"),
+        );
+        headers
     }
 
     #[test]
@@ -1119,6 +1261,71 @@ mod tests {
             Some("bv_legacy-secret".to_owned())
         );
         assert_eq!(sidebar_pairing_secret("invalid"), None);
+    }
+
+    #[tokio::test]
+    async fn account_preferences_are_isolated_and_sidebar_sessions_are_read_only() {
+        let state = test_state().await;
+        let admin_user_id = Uuid::new_v4();
+        let other_user_id = Uuid::new_v4();
+        for (id, identifier) in [(admin_user_id, "alice"), (other_user_id, "bob")] {
+            sqlx::query(
+                "INSERT INTO users (id, login_identifier, password_hash) VALUES ($1, $2, 'hash')",
+            )
+            .bind(id)
+            .bind(identifier)
+            .execute(&state.db)
+            .await
+            .expect("test user");
+        }
+        insert_session(&state, admin_user_id, "admin-token", None).await;
+        insert_session(&state, other_user_id, "other-token", None).await;
+
+        let admin_headers = bearer_headers("admin-token");
+        let default_response = get_account_preferences(State(state.clone()), admin_headers.clone()).await;
+        assert_eq!(default_response.status(), StatusCode::OK);
+        assert_eq!(response_json(default_response).await["language"], "zh-CN");
+
+        let invalid_response = update_account_preferences(
+            State(state.clone()),
+            admin_headers.clone(),
+            Json(UpdateAccountPreferencesPayload { language: "fr".to_owned() }),
+        )
+        .await;
+        assert_eq!(invalid_response.status(), StatusCode::BAD_REQUEST);
+
+        let update_response = update_account_preferences(
+            State(state.clone()),
+            admin_headers.clone(),
+            Json(UpdateAccountPreferencesPayload { language: "en".to_owned() }),
+        )
+        .await;
+        assert_eq!(update_response.status(), StatusCode::OK);
+        assert_eq!(response_json(update_response).await["language"], "en");
+
+        let other_response = get_account_preferences(State(state.clone()), bearer_headers("other-token")).await;
+        assert_eq!(response_json(other_response).await["language"], "zh-CN");
+
+        let device_id = Uuid::new_v4();
+        sqlx::query(
+            "INSERT INTO devices (id, user_id, client_id, name) VALUES ($1, $2, 'sidebar-test', 'Sidebar')",
+        )
+        .bind(device_id)
+        .bind(admin_user_id)
+        .execute(&state.db)
+        .await
+        .expect("sidebar device");
+        insert_session(&state, admin_user_id, "sidebar-token", Some(device_id)).await;
+        let sidebar_headers = bearer_headers("sidebar-token");
+        let sidebar_read = get_account_preferences(State(state.clone()), sidebar_headers.clone()).await;
+        assert_eq!(response_json(sidebar_read).await["language"], "en");
+        let sidebar_write = update_account_preferences(
+            State(state),
+            sidebar_headers,
+            Json(UpdateAccountPreferencesPayload { language: "zh-CN".to_owned() }),
+        )
+        .await;
+        assert_eq!(sidebar_write.status(), StatusCode::UNAUTHORIZED);
     }
 
     #[tokio::test]

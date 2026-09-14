@@ -66,6 +66,10 @@ export type SidebarPairing = {
   revokedAt: string | null
 }
 
+export type AccountPreferences = {
+  language: 'zh-CN' | 'en'
+}
+
 export type SidebarPairingRecord = {
   id: string
   browserName: string
@@ -283,6 +287,17 @@ export function createAppPassword(token: string, name: string) {
   return request<AppPassword>('/api/v1/app-passwords', {
     method: 'POST',
     body: JSON.stringify({ name }),
+  }, token)
+}
+
+export function getAccountPreferences(token: string) {
+  return request<AccountPreferences>('/api/v1/preferences', {}, token)
+}
+
+export function updateAccountPreferences(token: string, preferences: AccountPreferences) {
+  return request<AccountPreferences>('/api/v1/preferences', {
+    method: 'PUT',
+    body: JSON.stringify(preferences),
   }, token)
 }
 
