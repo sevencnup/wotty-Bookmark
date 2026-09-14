@@ -1,4 +1,4 @@
-import type { Locale } from './i18n'
+import { translateInterfaceText, type Locale } from './i18n'
 
 export const PREFERENCES_STORAGE_KEY = 'bookmark-vault.preferences.v1'
 export const ACTIVE_SECTION_STORAGE_KEY = 'bookmark-vault.active-section.v1'
@@ -66,7 +66,7 @@ export function shouldConfirmDangerousActions(storage: Storage | null = typeof w
 /** Apply the user's dangerous-action preference to a browser confirmation. */
 export function confirmDangerousAction(message: string, storage: Storage | null = typeof window === 'undefined' ? null : window.localStorage): boolean {
   if (!shouldConfirmDangerousActions(storage)) return true
-  return typeof window === 'undefined' ? true : window.confirm(message)
+  return typeof window === 'undefined' ? true : window.confirm(translateInterfaceText(message, loadPreferences(storage).language))
 }
 
 export function loadActiveSection(validSections: readonly string[], fallback: string, storage: Storage | null = typeof window === 'undefined' ? null : window.localStorage): string {

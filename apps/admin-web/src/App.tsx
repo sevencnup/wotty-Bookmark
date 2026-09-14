@@ -45,7 +45,7 @@ import { CategoryManagementPage } from './CategoryManagementPage'
 import { LibraryManagementPage } from './LibraryManagementPage'
 import { copyText } from './clipboard'
 import * as api from './api'
-import { translate, type Locale } from './i18n'
+import { GlobalUiLocalization, translate, type Locale } from './i18n'
 import { confirmDangerousAction, loadActiveSection, loadPreferences, saveActiveSection, savePreferences, type Preferences } from './preferences'
 import { descendantFolderIds, flattenFolders, findFolder, folderHasChildren, resolveDraggedBookmarkIds, visibleFolders, type FlatBookmarkFolder } from './bookmark-tree'
 
@@ -246,14 +246,14 @@ function App() {
   }
 
   if (!session) {
-    return <LoginCard locale={preferences.language} onLogin={handleSessionChange} />
+    return <GlobalUiLocalization locale={preferences.language}><LoginCard locale={preferences.language} onLogin={handleSessionChange} /></GlobalUiLocalization>
   }
 
   const activeLabel = allNavItems(navGroups).find((item) => item.id === activeSection)?.label ?? t('adminConsole')
   const isStorageWorkspace = activeSection === 'storage'
   const isCategoryWorkspace = activeSection === 'categories'
 
-  return (
+  return <GlobalUiLocalization locale={preferences.language}>(
     <div className="app-shell">
       <aside className="sidebar">
         <div className="sidebar-brand">
@@ -330,7 +330,7 @@ function App() {
         </div>
       </main>
     </div>
-  )
+  )</GlobalUiLocalization>
 }
 
 function LoginCard({ locale, onLogin }: { locale: Locale; onLogin: (session: api.Session) => void }) {
