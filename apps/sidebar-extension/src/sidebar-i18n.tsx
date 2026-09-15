@@ -97,13 +97,13 @@ const originalAttributes = new WeakMap<Element, Map<string, string>>();
 const attributes = ['aria-label', 'title', 'placeholder'];
 
 function skipsText(element: Element | null): boolean {
-  return Boolean(element?.closest('[data-i18n-skip], textarea, code, option:not([data-i18n-force]), .bookmark-title, .bookmark-url, .result-copy, .quick-save-copy strong, .connection-status-card span, .delete-content strong'));
+  return Boolean(element?.closest('[data-i18n-skip], textarea, code, img, svg, .site-favicon, .site-favicon-svg, option:not([data-i18n-force]), .bookmark-title, .bookmark-url, .result-copy, .quick-save-copy strong, .connection-status-card span, .delete-content strong'));
 }
 
 function skipsAttribute(element: Element): boolean {
   // Inputs carry user data in their value, not in the localizable attributes
   // below. Keep placeholders and accessible names translatable.
-  return Boolean(element.closest('[data-i18n-skip], code, .bookmark-title, .bookmark-url, .result-copy, .quick-save-copy strong, .connection-status-card span, .delete-content strong'));
+  return Boolean(element.closest('[data-i18n-skip], code, img, svg, .site-favicon, .site-favicon-svg, .bookmark-title, .bookmark-url, .result-copy, .quick-save-copy strong, .connection-status-card span, .delete-content strong'));
 }
 
 function localizeText(node: Text, locale: SidebarLocale) {
@@ -152,11 +152,24 @@ export function SidebarUiLocalization({ children, locale }: { children: ReactNod
   useLayoutEffect(() => {
     const element = root.current;
     if (!element) return;
-    const apply = () => applyLocalization(element, locale);
+    let scheduled: number | null = null;
+    const apply = () => {
+      if (locale === 'zh-CN' && originalText.size === 0 && originalAttributes.size === 0) return;
+      applyLocalization(element, locale);
+    };
     apply();
-    const observer = new MutationObserver(apply);
+    const observer = new MutationObserver(() => {
+      if (scheduled !== null) return;
+      scheduled = requestAnimationFrame(() => {
+        scheduled = null;
+        apply();
+      });
+    });
     observer.observe(element, { attributes: true, attributeFilter: attributes, characterData: true, childList: true, subtree: true });
-    return () => observer.disconnect();
+    return () => {
+      if (scheduled !== null) cancelAnimationFrame(scheduled);
+      observer.disconnect();
+    };
   }, [locale]);
   return createElement('div', { 'data-i18n-root': '', ref: root, style: { display: 'contents' } }, children);
 }

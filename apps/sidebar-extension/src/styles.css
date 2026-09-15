@@ -180,6 +180,7 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   min-height: 0;
   padding: 14px;
   overflow-y: auto;
+  overscroll-behavior-y: contain;
 }
 
 .back-to-top-button {
@@ -195,9 +196,8 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   border: 1px solid var(--brand-primary-border);
   border-radius: var(--radius-full);
   color: var(--brand-primary);
-  background: rgba(255, 255, 255, 0.94);
+  background: #ffffff;
   box-shadow: var(--shadow-md);
-  backdrop-filter: blur(8px);
   transition: transform var(--duration) var(--ease), background var(--duration) var(--ease), box-shadow var(--duration) var(--ease);
 }
 
@@ -557,14 +557,16 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   background: var(--paper);
   box-shadow: var(--shadow-xs);
   overflow: hidden;
-  padding: 2px 0;
+  padding: 0;
+  contain: layout style paint;
 }
 
 .bookmark-row {
   position: relative;
+  height: 38px;
+  box-sizing: border-box;
   border-bottom: 1px solid var(--soft-line);
   background: var(--paper);
-  transition: background var(--duration) var(--ease), opacity var(--duration) var(--ease);
 }
 
 .bookmark-row:last-of-type { border-bottom: 0; }
@@ -806,6 +808,18 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   background: var(--paper);
   box-shadow: var(--shadow-xs);
   overflow: hidden;
+  contain: layout style paint;
+}
+
+.search-result {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 50px;
+  box-sizing: border-box;
+  padding: 0 8px 0 10px;
+  border-bottom: 1px solid var(--soft-line);
+  background: var(--paper);
 }
 
 .results-count {
