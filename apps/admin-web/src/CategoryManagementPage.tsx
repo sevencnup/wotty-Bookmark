@@ -1,6 +1,6 @@
 import { ChevronDown, ChevronRight, Folder, FolderOpen, Folders, GripVertical, Home, Link2, LoaderCircle, RefreshCw, Search, Trash2 } from 'lucide-react'
 import type { DragEvent, MouseEvent as ReactMouseEvent } from 'react'
-import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as api from './api'
 import { descendantFolderIds, findFolderParentId, flattenFolders as flattenBookmarkFolders, folderHasChildren, groupBookmarksByFolder, resolveDraggedBookmarkIds, type FlatBookmarkFolder } from './bookmark-tree'
 import { toCategoryTree } from './category-library'

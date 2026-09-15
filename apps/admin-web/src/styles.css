@@ -2664,27 +2664,29 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   box-sizing: border-box;
 }
 
+/* 根节点引出到一级列表的水平主干线 */
+.category-management-page .organization-root-card::after {
+  position: absolute;
+  top: 32px;
+  right: -28px;
+  z-index: 1;
+  width: 28px;
+  height: 2px;
+  min-width: 0;
+  background: #94a3b8;
+  content: '';
+}
+
 .category-management-page .organization-root-rail {
   position: relative;
+  z-index: 2;
   display: flex;
   min-width: max-content;
   flex-direction: column;
   align-items: flex-start;
   gap: 16px;
-  margin: 0 0 0 36px;
+  margin: 0 0 0 52px;
   padding: 0;
-}
-
-/* 根节点卡片到顶级分支轨道的水平引线 */
-.category-management-page .organization-root-rail::before {
-  position: absolute;
-  top: 32px;
-  left: -36px;
-  width: 36px;
-  height: 2px;
-  min-width: 0;
-  background: #94a3b8;
-  content: '';
 }
 
 .category-management-page .organization-root-rail > .organization-node,
@@ -2695,68 +2697,42 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   align-items: flex-start;
 }
 
-/* 垂直主干导轨：平滑连接上下兄弟节点 */
+/* 每个文件夹节点的平滑圆弧分支引线 (Smooth Curved Branch Line) */
 .category-management-page .organization-root-rail > .organization-node::before,
 .category-management-page .organization-children > .organization-node::before {
   position: absolute;
   top: 0;
+  left: -26px;
+  z-index: 1;
+  width: 26px;
+  height: 26px;
+  border-bottom: 2px solid #94a3b8;
+  border-left: 2px solid #94a3b8;
+  border-bottom-left-radius: 14px;
+  content: '';
+  box-sizing: border-box;
+}
+
+/* 非末尾节点：垂直导轨向下贯穿延伸到下一个兄弟节点 */
+.category-management-page .organization-root-rail > .organization-node:not(:last-child)::after,
+.category-management-page .organization-children > .organization-node:not(:last-child)::after {
+  position: absolute;
+  top: 26px;
   bottom: -16px;
-  left: 0;
+  left: -26px;
+  z-index: 1;
   width: 2px;
   background: #94a3b8;
   content: '';
-  box-sizing: border-box;
-}
-
-/* 平滑圆润弧线分支：从垂直导轨优雅弯曲射入文件夹卡片几何中心 */
-.category-management-page .organization-root-rail > .organization-node::after,
-.category-management-page .organization-children > .organization-node::after {
-  position: absolute;
-  top: 10px;
-  left: 0;
-  width: 32px;
-  height: 16px;
-  border-bottom: 2px solid #94a3b8;
-  border-left: 2px solid #94a3b8;
-  border-bottom-left-radius: 16px;
-  content: '';
-  box-sizing: border-box;
-}
-
-/* 第一个子节点：垂直主干从弯曲弧线起点自然向下延伸 */
-.category-management-page .organization-root-rail > .organization-node:first-child::before,
-.category-management-page .organization-children > .organization-node:first-child::before {
-  top: 10px;
-}
-
-/* 最后一个子节点：垂直主干在弧线起点终止，由 ::after 圆弧自然弯曲转折进入卡片 */
-.category-management-page .organization-root-rail > .organization-node:last-child::before,
-.category-management-page .organization-children > .organization-node:last-child::before {
-  bottom: auto;
-  height: 10px;
-}
-
-/* 唯一子节点：无上下多余导轨，直接由平滑水平线连入 */
-.category-management-page .organization-root-rail > .organization-node:only-child::before,
-.category-management-page .organization-children > .organization-node:only-child::before {
-  display: none;
-}
-
-.category-management-page .organization-root-rail > .organization-node:only-child::after,
-.category-management-page .organization-children > .organization-node:only-child::after {
-  top: 26px;
-  height: 0;
-  border-left: 0;
-  border-radius: 0;
 }
 
 .category-management-page .organization-folder-row {
   position: relative;
-  z-index: 2;
+  z-index: 3;
   flex: 0 0 220px;
   width: 220px;
   min-height: 52px;
-  margin-left: 32px;
+  margin-left: 0;
   padding: 6px 10px;
   border-color: #dbe5f2;
   background: rgba(255, 255, 255, 0.98);
@@ -2776,24 +2752,25 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   box-shadow: 0 0 0 4px var(--primary-glow), 0 10px 24px rgba(37, 99, 235, 0.16);
 }
 
-/* 子文件夹容器 */
+/* 子文件夹容器与父节点水平连线 */
 .category-management-page .organization-children {
   position: relative;
+  z-index: 2;
   display: flex;
   min-width: max-content;
   flex-direction: column;
   align-items: flex-start;
   gap: 16px;
-  margin: 0 0 0 32px;
+  margin: 0 0 0 48px;
   padding: 0;
 }
 
-/* 父卡片到子级列表的水平引线 */
 .category-management-page .organization-children::before {
   position: absolute;
-  top: 26px;
-  left: -32px;
-  width: 32px;
+  top: 25px;
+  left: -48px;
+  z-index: 1;
+  width: 24px;
   height: 2px;
   background: #94a3b8;
   content: '';
