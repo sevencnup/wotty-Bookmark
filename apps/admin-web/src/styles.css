@@ -2643,24 +2643,23 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   line-height: 1.5;
 }
 
-/* ── 分类管理：现代无连线层级岛屿卡片布局（Lineless Hierarchy Panels） ── */
+/* ── 分类管理：优雅思维导图式树状架构（Mindmap Tree Hierarchy） ── */
 .category-management-page .organization-root-node {
   position: relative;
   z-index: 1;
   display: flex;
   min-width: max-content;
   align-items: flex-start;
-  gap: 24px;
-  padding: 16px 20px 36px;
+  padding: 24px 32px 48px;
 }
 
 .category-management-page .organization-root-card {
   position: sticky;
-  top: 16px;
+  top: 24px;
   z-index: 10;
   flex: 0 0 220px;
   width: 220px;
-  min-height: 62px;
+  min-height: 60px;
   margin: 0;
   padding: 8px 12px;
   border-radius: 12px;
@@ -2669,6 +2668,19 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   box-shadow: 0 4px 14px rgba(37, 99, 235, 0.08);
   box-sizing: border-box;
   cursor: pointer;
+}
+
+/* 根节点右侧引出到一级树干的水平主干线 */
+.category-management-page .organization-root-card::after {
+  position: absolute;
+  top: 50%;
+  right: -32px;
+  z-index: 1;
+  width: 32px;
+  height: 2px;
+  background: #cbd5e1;
+  transform: translateY(-50%);
+  content: '';
 }
 
 .category-management-page .organization-root-card:hover,
@@ -2685,8 +2697,8 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   min-width: max-content;
   flex-direction: column;
   align-items: flex-start;
-  gap: 10px;
-  margin: 0;
+  gap: 12px;
+  margin: 0 0 0 48px;
   padding: 0;
 }
 
@@ -2696,7 +2708,35 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   display: flex;
   min-width: max-content;
   align-items: flex-start;
-  gap: 12px;
+}
+
+/* 节点左侧分支线：圆角平滑过渡 (Mindmap Smooth Branch Arc) */
+.category-management-page .organization-root-rail > .organization-node::before,
+.category-management-page .organization-children > .organization-node::before {
+  position: absolute;
+  top: 0;
+  left: -24px;
+  z-index: 1;
+  width: 24px;
+  height: 25px;
+  border-bottom: 2px solid #cbd5e1;
+  border-left: 2px solid #cbd5e1;
+  border-bottom-left-radius: 12px;
+  box-sizing: border-box;
+  content: '';
+}
+
+/* 垂直主干导轨：贯穿至最后一个同级节点 */
+.category-management-page .organization-root-rail > .organization-node:not(:last-child)::after,
+.category-management-page .organization-children > .organization-node:not(:last-child)::after {
+  position: absolute;
+  top: 25px;
+  bottom: -12px;
+  left: -24px;
+  z-index: 1;
+  width: 2px;
+  background: #cbd5e1;
+  content: '';
 }
 
 .category-management-page .organization-folder-row {
@@ -2709,39 +2749,20 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   padding: 6px 10px;
   border-radius: 10px;
   border: 1px solid #e2e8f0;
-  border-left: 4px solid #3b82f6;
   background: #ffffff;
   box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
   box-sizing: border-box;
-}
-
-.category-management-page .organization-folder-row[style*="--folder-depth: 1"] {
-  border-left-color: #0ea5e9;
-}
-
-.category-management-page .organization-folder-row[style*="--folder-depth: 2"] {
-  border-left-color: #8b5cf6;
-}
-
-.category-management-page .organization-folder-row[style*="--folder-depth: 3"] {
-  border-left-color: #ec4899;
-}
-
-.category-management-page .organization-folder-row[style*="--folder-depth: 4"] {
-  border-left-color: #f59e0b;
+  transition: border-color var(--duration) var(--ease), background var(--duration) var(--ease), box-shadow var(--duration) var(--ease);
 }
 
 .category-management-page .organization-folder-row:hover {
   border-color: #93c5fd;
-  border-left-color: #2563eb;
   background: #f8faff;
   box-shadow: 0 6px 16px rgba(37, 99, 235, 0.08);
-  transform: translateY(-1px);
 }
 
 .category-management-page .organization-folder-row.active {
   border-color: #3b82f6;
-  border-left-color: #2563eb;
   background: #eff6ff;
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15), 0 4px 12px rgba(37, 99, 235, 0.08);
 }
@@ -2752,7 +2773,7 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   box-shadow: 0 0 0 4px var(--primary-glow), 0 10px 24px rgba(37, 99, 235, 0.16);
 }
 
-/* 子文件夹容器：现代层级岛屿包裹层 */
+/* 子文件夹容器与父节点水平连线 */
 .category-management-page .organization-children {
   position: relative;
   z-index: 2;
@@ -2760,12 +2781,20 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   min-width: max-content;
   flex-direction: column;
   align-items: flex-start;
-  gap: 10px;
-  margin: 0;
-  padding: 10px 12px;
-  border: 1px solid rgba(203, 213, 225, 0.7);
-  border-radius: 12px;
-  background: rgba(241, 245, 249, 0.75);
+  gap: 12px;
+  margin: 0 0 0 48px;
+  padding: 0;
+}
+
+.category-management-page .organization-children::before {
+  position: absolute;
+  top: 24px;
+  left: -48px;
+  z-index: 1;
+  width: 24px;
+  height: 2px;
+  background: #cbd5e1;
+  content: '';
 }
 
 .category-management-page .organization-folder-button small {
