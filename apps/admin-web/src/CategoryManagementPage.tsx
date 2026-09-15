@@ -412,6 +412,7 @@ export function CategoryManagementPage({ token }: Props) {
               <div className="organization-root-rail">
                 {allFolders.map((folder) => (
                   <FolderTreeNode
+                    depth={0}
                     drag={drag}
                     dropFolderId={dropFolderId}
                     expandedIds={expandedIds}
