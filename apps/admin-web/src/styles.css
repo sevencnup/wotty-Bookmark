@@ -2673,41 +2673,22 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   line-height: 1.5;
 }
 
-.category-management-page .organization-tree-connections {
-  position: absolute;
-  z-index: 0;
-  top: 0;
-  left: 0;
-  overflow: visible;
-  pointer-events: none;
-}
-
-.category-management-page .organization-tree-connection {
-  fill: none;
-  stroke: #b8c9e8;
-  stroke-linecap: round;
-  stroke-width: 2;
-  vector-effect: non-scaling-stroke;
-}
-
-.category-management-page .organization-tree-connection[data-tree-parent-id='root'] {
-  opacity: 0.42;
-  stroke: #c5d2e8;
-  stroke-width: 1.5;
-}
-
 .category-management-page .organization-root-node {
   position: relative;
   z-index: 1;
   display: flex;
   min-width: max-content;
-  align-items: center;
+  align-items: flex-start;
+  padding: 12px 16px 40px;
 }
 
 .category-management-page .organization-root-card {
+  position: sticky;
+  top: 12px;
+  z-index: 5;
   flex: 0 0 220px;
   width: 220px;
-  min-height: 76px;
+  min-height: 72px;
   margin: 0;
 }
 
@@ -2716,34 +2697,33 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   display: flex;
   min-width: max-content;
   flex-direction: column;
-  align-items: stretch;
-  gap: 18px;
-  margin: 0 0 0 58px;
+  align-items: flex-start;
+  gap: 16px;
+  margin: 0 0 0 48px;
   padding: 0;
 }
 
-.category-management-page .organization-root-rail-line {
-  position: absolute;
-  top: 26px;
-  bottom: 26px;
-  left: 0;
-  width: 2px;
-  height: auto;
-  background: #b9c8e4;
-  transform: none;
-}
-
+/* 根节点卡片到右侧垂直主导轨的水平引线 */
 .category-management-page .organization-root-rail::before {
   position: absolute;
-  top: 50%;
-  right: auto;
-  left: -58px;
-  width: 58px;
+  top: 36px;
+  left: -48px;
+  width: 48px;
   height: 2px;
   min-width: 0;
   background: #b9c8e4;
   content: '';
-  transform: translateY(-50%);
+}
+
+/* 垂直主总线导轨 */
+.category-management-page .organization-root-rail::after {
+  position: absolute;
+  top: 29px;
+  bottom: 29px;
+  left: 0;
+  width: 2px;
+  background: #b9c8e4;
+  content: '';
 }
 
 .category-management-page .organization-root-rail > .organization-node,
@@ -2751,23 +2731,22 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   position: relative;
   display: flex;
   min-width: max-content;
-  align-items: center;
+  align-items: flex-start;
 }
 
 .category-management-page .organization-root-rail > .organization-node {
   padding: 0;
 }
 
-.category-management-page .organization-root-rail > .organization-node::before,
-.category-management-page .organization-children > .organization-node::before {
+/* 垂直主导轨到顶级文件夹节点的水平分支线 */
+.category-management-page .organization-root-rail > .organization-node::before {
   position: absolute;
-  top: 50%;
-  left: -38px;
-  width: 38px;
+  top: 29px;
+  left: 0;
+  width: 24px;
   height: 2px;
   background: #b9c8e4;
   content: '';
-  transform: translateY(-50%);
 }
 
 .category-management-page .organization-folder-row {
@@ -2776,13 +2755,12 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   flex: 0 0 214px;
   width: 214px;
   min-height: 58px;
+  margin-left: 24px;
   padding: 7px 10px;
   border-color: #dbe5f2;
   background: rgba(255, 255, 255, 0.96);
   box-shadow: 0 4px 12px rgba(30, 64, 175, 0.06);
-  width: calc(214px - (var(--folder-depth, 0) * 14px));
-  min-width: 150px;
-  margin-left: calc(var(--folder-depth, 0) * 14px);
+  box-sizing: border-box;
 }
 
 .category-management-page .organization-folder-row:hover {
@@ -2802,24 +2780,43 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   display: flex;
   min-width: max-content;
   flex-direction: column;
-  align-items: stretch;
+  align-items: flex-start;
   gap: 14px;
-  margin: 0 0 0 58px;
+  margin: 0 0 0 44px;
   padding: 0;
 }
 
+/* 父文件夹到子级垂直导轨的水平引线 */
+.category-management-page .organization-children::after {
+  position: absolute;
+  top: 29px;
+  left: -44px;
+  width: 44px;
+  height: 2px;
+  background: #d1dced;
+  content: '';
+}
+
+/* 子级垂直导轨 */
 .category-management-page .organization-children::before {
   position: absolute;
-  top: 26px;
-  bottom: 26px;
+  top: 29px;
+  bottom: 29px;
   left: 0;
   width: 2px;
   background: #d1dced;
   content: '';
 }
 
+/* 子级垂直导轨到子文件夹节点的水平分支线 */
 .category-management-page .organization-children > .organization-node::before {
-  left: -38px;
+  position: absolute;
+  top: 29px;
+  left: 0;
+  width: 24px;
+  height: 2px;
+  background: #d1dced;
+  content: '';
 }
 
 .category-management-page .folder-drop-label {

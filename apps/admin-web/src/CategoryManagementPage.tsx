@@ -29,19 +29,6 @@ type SelectionPaintState = {
   visitedIds: Set<string>
 } | null
 
-type TreeConnection = {
-  id: string
-  parentId: string
-  childId: string
-  path: string
-}
-
-type TreeConnectionLayerState = {
-  width: number
-  height: number
-  connections: TreeConnection[]
-}
-
 const EMPTY_FOLDERS: api.BookmarkFolder[] = []
 const EMPTY_BOOKMARK_IDS: string[] = []
 const ROOT_FOLDER_DROP_ID = '__tree_root__'
@@ -59,7 +46,6 @@ export function CategoryManagementPage({ token }: Props) {
   const [drag, setDrag] = useState<DragState>(null)
   const [dropFolderId, setDropFolderId] = useState<string | null>(null)
   const [treeZoom, setTreeZoom] = useState(1)
-  const [treeConnectionLayer, setTreeConnectionLayer] = useState<TreeConnectionLayerState>({ width: 0, height: 0, connections: [] })
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const treeCanvasRef = useRef<HTMLDivElement>(null)
@@ -140,62 +126,6 @@ export function CategoryManagementPage({ token }: Props) {
   const bookmarkGroups = useMemo(() => groupBookmarksByFolder(visibleBookmarks, allFolders), [allFolders, visibleBookmarks])
   const draggedIds = drag?.kind === 'bookmarks' ? drag.ids : EMPTY_BOOKMARK_IDS
   const ready = Boolean(tree)
-
-  const drawTreeConnections = useCallback(() => {
-    const canvas = treeContentRef.current
-    if (!canvas) return
-    const canvasRect = canvas.getBoundingClientRect()
-    const scaleX = canvas.offsetWidth > 0 ? canvasRect.width / canvas.offsetWidth : 1
-    const scaleY = canvas.offsetHeight > 0 ? canvasRect.height / canvas.offsetHeight : scaleX
-    if (!Number.isFinite(scaleX) || !Number.isFinite(scaleY) || scaleX <= 0 || scaleY <= 0) return
-
-    const nodes = new Map<string, HTMLElement>()
-    canvas.querySelectorAll<HTMLElement>('[data-tree-node-id]').forEach((node) => {
-      const id = node.dataset.treeNodeId
-      if (id) nodes.set(id, node)
-    })
-
-    const connections: TreeConnection[] = []
-    canvas.querySelectorAll<HTMLElement>('[data-tree-parent-id]').forEach((child) => {
-      const childId = child.dataset.treeNodeId
-      const parentId = child.dataset.treeParentId
-      const parent = parentId ? nodes.get(parentId) : undefined
-      if (!childId || !parentId || !parent) return
-      const parentRect = parent.getBoundingClientRect()
-      const childRect = child.getBoundingClientRect()
-      const startX = (parentRect.right - canvasRect.left - 2) / scaleX
-      const startY = (parentRect.top + parentRect.height / 2 - canvasRect.top) / scaleY
-      const endX = (childRect.left - canvasRect.left + 2) / scaleX
-      const endY = (childRect.top + childRect.height / 2 - canvasRect.top) / scaleY
-      const horizontalDistance = Math.max(0, endX - startX)
-      const curve = Math.max(28, Math.min(96, horizontalDistance * 0.48))
-      connections.push({ id: `${parentId}-${childId}`, parentId, childId, path: `M ${startX} ${startY} C ${startX + curve} ${startY}, ${endX - curve} ${endY}, ${endX} ${endY}` })
-    })
-
-    setTreeConnectionLayer({
-      width: Math.max(canvas.scrollWidth, canvas.offsetWidth),
-      height: Math.max(canvas.scrollHeight, canvas.offsetHeight),
-      connections,
-    })
-  }, [])
-
-  useLayoutEffect(() => {
-    const canvas = treeContentRef.current
-    if (!canvas) return
-    let frame = requestAnimationFrame(drawTreeConnections)
-    const redraw = () => {
-      cancelAnimationFrame(frame)
-      frame = requestAnimationFrame(drawTreeConnections)
-    }
-    const resizeObserver = new ResizeObserver(redraw)
-    resizeObserver.observe(canvas)
-    window.addEventListener('resize', redraw)
-    return () => {
-      cancelAnimationFrame(frame)
-      resizeObserver.disconnect()
-      window.removeEventListener('resize', redraw)
-    }
-  }, [allFolders, drawTreeConnections, expandedIds, treeZoom])
 
   const toggleSelected = useCallback((id: string) => {
     setSelectedIds((current) => {
@@ -441,7 +371,80 @@ export function CategoryManagementPage({ token }: Props) {
   }
 
   const rootDropDisabled = drag?.kind === 'folder' && drag.sourceParentId === null
-  const organizationPanel = useMemo(() => <aside className="panel category-tree-panel category-layout-tree"><div className="category-panel-title"><div><p className="eyebrow">SERVER LIBRARY TREE</p><h3>服务器书签组织架构</h3></div><div className="category-tree-actions"><button className="tree-action-button" onClick={collapseAll} type="button">收起</button><button className="tree-action-button" onClick={expandAll} type="button">展开</button><button aria-label="重置组织树视图" className="tree-control-button" onClick={resetTreeView} type="button">⌖</button><button aria-label="刷新分类树" className="icon-button" disabled={refreshing || moving} onClick={() => void load(true)} type="button"><RefreshCw className={refreshing ? 'spin' : ''} size={16} /></button></div></div><p className="category-tree-description">和“我的书签库”共享同一份服务器数据；书签和文件夹都可以拖动重组。</p><div className="organization-tree category-layout-tree-canvas" ref={treeCanvasRef}><div className="organization-tree-canvas" ref={treeContentRef} style={{ transform: `scale(${treeZoom})`, transformOrigin: 'top left' }}><TreeConnectionLayer state={treeConnectionLayer} /><div className="organization-root-node"><button aria-current={selectedFolderId === 'all' ? 'page' : undefined} className={`organization-root-card ${selectedFolderId === 'all' ? 'active' : ''} ${dropFolderId === ROOT_FOLDER_DROP_ID ? 'folder-drop-target' : ''} ${rootDropDisabled ? 'folder-drop-disabled' : ''}`} data-tree-node-id="root" onClick={() => selectFolder('all')} onDragLeave={(event) => leaveDropTarget(event, null)} onDragOver={(event) => allowDrop(event, null)} onDrop={(event) => dropOnFolder(event, null)} type="button"><span className="organization-root-symbol"><Home size={18} /></span><span><strong>全部书签</strong><small>{tree?.bookmarks.length ?? 0} 个书签 · 总目录</small></span>{dropFolderId === ROOT_FOLDER_DROP_ID && drag?.kind === 'folder' && <span className="root-folder-drop-label">移动为顶级文件夹</span>}</button>{allFolders.length > 0 && <div className="organization-root-rail">{allFolders.map((folder) => <FolderTreeNode drag={drag} dropFolderId={dropFolderId} expandedIds={expandedIds} folder={folder} key={folder.id} moving={moving} onDragEnd={endDrag} onDragLeave={leaveDropTarget} onDragOver={allowDrop} onDrop={dropOnFolder} onFolderDragStart={beginFolderDrag} onSelect={selectFolder} onToggle={toggleFolder} parentId="root" selectedFolderId={selectedFolderId} />)}</div>}</div></div></div><div className="organization-tree-controls"><button aria-label="缩小组织树" disabled={treeZoom <= 0.65} onClick={() => zoomTree(-0.1)} type="button">−</button><span>{Math.round(treeZoom * 100)}%</span><button aria-label="放大组织树" disabled={treeZoom >= 1.2} onClick={() => zoomTree(0.1)} type="button">＋</button></div><div className="tree-drop-guide"><Link2 size={15} /><span>左侧书签拖入文件夹；右侧文件夹可互相嵌套，拖到“全部书签”可移回顶级</span></div></aside>, [allFolders, beginFolderDrag, drag, dropFolderId, endDrag, expandedIds, moving, refreshing, rootDropDisabled, selectedFolderId, tree, treeConnectionLayer, treeZoom])
+  const organizationPanel = useMemo(() => (
+    <aside className="panel category-tree-panel category-layout-tree">
+      <div className="category-panel-title">
+        <div>
+          <p className="eyebrow">SERVER LIBRARY TREE</p>
+          <h3>服务器书签组织架构</h3>
+        </div>
+        <div className="category-tree-actions">
+          <button className="tree-action-button" onClick={collapseAll} type="button">收起</button>
+          <button className="tree-action-button" onClick={expandAll} type="button">展开</button>
+          <button aria-label="重置组织树视图" className="tree-control-button" onClick={resetTreeView} type="button">⌖</button>
+          <button aria-label="刷新分类树" className="icon-button" disabled={refreshing || moving} onClick={() => void load(true)} type="button">
+            <RefreshCw className={refreshing ? 'spin' : ''} size={16} />
+          </button>
+        </div>
+      </div>
+      <p className="category-tree-description">和“我的书签库”共享同一份服务器数据；书签和文件夹都可以拖动重组。</p>
+      <div className="organization-tree category-layout-tree-canvas" ref={treeCanvasRef}>
+        <div className="organization-tree-canvas" ref={treeContentRef} style={{ transform: `scale(${treeZoom})`, transformOrigin: 'top left' }}>
+          <div className="organization-root-node">
+            <button
+              aria-current={selectedFolderId === 'all' ? 'page' : undefined}
+              className={`organization-root-card ${selectedFolderId === 'all' ? 'active' : ''} ${dropFolderId === ROOT_FOLDER_DROP_ID ? 'folder-drop-target' : ''} ${rootDropDisabled ? 'folder-drop-disabled' : ''}`}
+              data-tree-node-id="root"
+              onClick={() => selectFolder('all')}
+              onDragLeave={(event) => leaveDropTarget(event, null)}
+              onDragOver={(event) => allowDrop(event, null)}
+              onDrop={(event) => dropOnFolder(event, null)}
+              type="button"
+            >
+              <span className="organization-root-symbol"><Home size={18} /></span>
+              <span>
+                <strong>全部书签</strong>
+                <small>{tree?.bookmarks.length ?? 0} 个书签 · 总目录</small>
+              </span>
+              {dropFolderId === ROOT_FOLDER_DROP_ID && drag?.kind === 'folder' && <span className="root-folder-drop-label">移动为顶级文件夹</span>}
+            </button>
+            {allFolders.length > 0 && (
+              <div className="organization-root-rail">
+                {allFolders.map((folder) => (
+                  <FolderTreeNode
+                    drag={drag}
+                    dropFolderId={dropFolderId}
+                    expandedIds={expandedIds}
+                    folder={folder}
+                    key={folder.id}
+                    moving={moving}
+                    onDragEnd={endDrag}
+                    onDragLeave={leaveDropTarget}
+                    onDragOver={allowDrop}
+                    onDrop={dropOnFolder}
+                    onFolderDragStart={beginFolderDrag}
+                    onSelect={selectFolder}
+                    onToggle={toggleFolder}
+                    parentId="root"
+                    selectedFolderId={selectedFolderId}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+      <div className="organization-tree-controls">
+        <button aria-label="缩小组织树" disabled={treeZoom <= 0.65} onClick={() => zoomTree(-0.1)} type="button">−</button>
+        <span>{Math.round(treeZoom * 100)}%</span>
+        <button aria-label="放大组织树" disabled={treeZoom >= 1.2} onClick={() => zoomTree(0.1)} type="button">＋</button>
+      </div>
+      <div className="tree-drop-guide">
+        <Link2 size={15} />
+        <span>左侧书签拖入文件夹；右侧文件夹可互相嵌套，拖到“全部书签”可移回顶级</span>
+      </div>
+    </aside>
+  ), [allFolders, beginFolderDrag, drag, dropFolderId, endDrag, expandedIds, moving, refreshing, rootDropDisabled, selectedFolderId, tree, treeZoom])
 
   return <div className="category-management-page">
     {error && tree && <div aria-live="polite" className="bookmark-alert error"><strong>操作失败</strong><span>{error}</span></div>}
@@ -708,11 +711,6 @@ const CategoryVirtualList = memo(function CategoryVirtualList({
     </div>
   )
 })
-
-function TreeConnectionLayer({ state }: { state: TreeConnectionLayerState }) {
-  if (!state.width || !state.height || state.connections.length === 0) return null
-  return <svg aria-hidden="true" className="organization-tree-connections" height={state.height} viewBox={`0 0 ${state.width} ${state.height}`} width={state.width}>{state.connections.map((connection) => <path className="organization-tree-connection" d={connection.path} data-tree-child-id={connection.childId} data-tree-parent-id={connection.parentId} key={connection.id} />)}</svg>
-}
 
 function FolderTreeNode({ folder, parentId, selectedFolderId, expandedIds, dropFolderId, drag, moving, depth = 0, onSelect, onToggle, onFolderDragStart, onDragEnd, onDragOver, onDragLeave, onDrop }: { folder: api.BookmarkFolder; parentId: string; selectedFolderId: string; expandedIds: Set<string>; dropFolderId: string | null; drag: DragState; moving: boolean; depth?: number; onSelect: (id: string) => void; onToggle: (id: string) => void; onFolderDragStart: (event: DragEvent<HTMLButtonElement>, folder: api.BookmarkFolder) => void; onDragEnd: () => void; onDragOver: (event: DragEvent<HTMLElement>, id: string | null) => void; onDrop: (event: DragEvent<HTMLElement>, id: string | null) => void; onDragLeave: (event: DragEvent<HTMLElement>, id: string | null) => void }) {
   const expanded = expandedIds.has(folder.id)
