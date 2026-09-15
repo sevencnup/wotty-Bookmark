@@ -2316,21 +2316,218 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 .category-bulk-bar > span { color: var(--muted); font-size: 11px; }
 .category-bulk-bar select { min-width: 170px; height: 32px; margin-left: auto; padding: 0 9px; border: 1px solid var(--primary-border); border-radius: var(--radius-sm); outline: 0; background: var(--paper); font-size: 12px; }
 .category-bulk-bar .category-delete-selected { min-height: 32px; padding: 0 12px; border-radius: var(--radius-sm); font-size: 12px; }
-.category-bookmark-list { overflow: hidden; border: 1px solid var(--line); border-radius: var(--radius-lg); }
-.category-list-header, .category-bookmark-row { display: grid; grid-template-columns: 34px 30px minmax(200px, 1.25fr) minmax(170px, 1fr) 34px; align-items: center; gap: 0; padding: 0 12px; }
-.category-list-header { min-height: 43px; border-bottom: 1px solid var(--line); color: var(--muted); background: var(--surface-subtle); font-size: 11px; font-weight: 700; }
-.category-bookmark-row { min-height: 62px; border-bottom: 1px solid var(--soft-line); background: var(--paper); transition: background var(--duration) var(--ease), opacity var(--duration) var(--ease); }
-.category-bookmark-row:last-child { border-bottom: 0; }
-.category-bookmark-row:hover, .category-bookmark-row.selected { background: #f8fbff; }
-.category-bookmark-row.dragging { opacity: 0.38; }
-.category-bookmark-info { display: flex; align-items: center; min-width: 0; gap: 11px; }
-.category-bookmark-info > div { display: grid; min-width: 0; gap: 3px; }
-.category-bookmark-info strong { overflow: hidden; color: var(--ink); font-size: 13px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
-.category-bookmark-info small { overflow: hidden; color: var(--soft-muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
-.category-location { overflow: hidden; padding-right: 10px; color: var(--muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
-.category-drag-handle { display: grid; place-items: center; width: 26px; height: 32px; padding: 0; border: 0; border-radius: var(--radius-sm); color: var(--soft-muted); background: transparent; cursor: grab; }
-.category-drag-handle:hover, .category-drag-handle:focus-visible { color: var(--primary); background: var(--primary-soft); outline: 0; }
-.category-drag-handle:active { cursor: grabbing; }
+.category-bookmark-group {
+  margin-bottom: 6px;
+}
+
+.category-bookmark-group-header {
+  min-height: 42px;
+  padding: 4px 10px 4px 6px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-subtle);
+  border: 1px solid var(--soft-line);
+  transition: all var(--duration) var(--ease);
+}
+
+.category-bookmark-group-header:hover {
+  background: var(--soft-line);
+  border-color: var(--line);
+}
+
+.category-group-toggle {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-xs);
+  color: var(--muted);
+  background: transparent;
+  cursor: pointer;
+  transition: all var(--duration) var(--ease);
+}
+
+.category-group-toggle:hover {
+  color: var(--primary);
+  background: var(--paper);
+}
+
+.category-group-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 0 4px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.category-group-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  color: #f59e0b;
+}
+
+.category-group-summary strong {
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 13.5px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.folder-count-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 19px;
+  padding: 0 7px;
+  border-radius: var(--radius-full);
+  color: var(--soft-muted);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.category-bookmark-list {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--paper);
+}
+
+.category-list-header, .category-bookmark-row {
+  display: grid;
+  grid-template-columns: 28px 24px minmax(180px, 1fr) 32px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+}
+
+.category-list-header {
+  min-height: 40px;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  background: var(--surface-subtle);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.category-list-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.category-bookmark-row {
+  min-height: 54px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--soft-line);
+  background: var(--paper);
+  transition: background var(--duration) var(--ease), opacity var(--duration) var(--ease);
+}
+
+.category-bookmark-row:last-child {
+  border-bottom: 0;
+}
+
+.category-bookmark-row:hover, .category-bookmark-row.selected {
+  background: #f8fbff;
+}
+
+.category-bookmark-row.dragging {
+  opacity: 0.38;
+}
+
+.category-bookmark-info {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 10px;
+}
+
+.category-bookmark-info .library-site-icon {
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  font-size: 12px;
+}
+
+.category-bookmark-info .library-site-icon img {
+  width: 16px;
+  height: 16px;
+}
+
+.category-bookmark-info > div {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+}
+
+.category-bookmark-info strong {
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.category-bookmark-info small {
+  overflow: hidden;
+  color: #64748b;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  font-size: 11.5px;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.category-location {
+  overflow: hidden;
+  padding-right: 10px;
+  color: var(--muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.category-drag-handle {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-xs);
+  color: var(--soft-muted);
+  background: transparent;
+  cursor: grab;
+  transition: all var(--duration) var(--ease);
+}
+
+.category-drag-handle:hover, .category-drag-handle:focus-visible {
+  color: var(--primary);
+  background: var(--primary-soft);
+  outline: 0;
+}
+
+.category-drag-handle:active {
+  cursor: grabbing;
+}
 .category-empty { display: grid; place-items: center; min-height: 230px; padding: 30px; color: var(--soft-muted); text-align: center; }
 .category-empty strong { margin: 10px 0 4px; color: var(--ink); font-size: 15px; }
 .category-empty p, .category-keyboard-hint { margin: 0; color: var(--muted); font-size: 12px; }
