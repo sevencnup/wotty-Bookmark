@@ -2269,36 +2269,6 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 .category-root-row small, .organization-folder-button small { margin-left: auto; color: var(--soft-muted); font-size: 11px; }
 .category-root-row svg { flex: 0 0 auto; color: currentColor; }
 .organization-folder-button svg { flex: 0 0 auto; color: #d97706; }
-.organization-tree { position: relative; display: grid; gap: 2px; min-height: 520px; max-height: min(72vh, 820px); margin-top: 8px; padding: 16px 18px 22px; overflow: auto; background: linear-gradient(180deg, #fbfdff 0%, #f8fbff 100%); border: 1px solid #e3ebf6; border-radius: var(--radius-lg); }
-.organization-tree-canvas { min-width: 520px; min-height: 100%; transition: transform var(--duration) var(--ease); }
-.organization-root-node { position: relative; min-width: 460px; padding: 12px 12px 30px; }
-.organization-root-card { position: relative; z-index: 3; display: flex; align-items: center; gap: 12px; width: 230px; min-height: 64px; margin: 0 auto; padding: 12px 16px; border: 1px solid #b8c8ec; border-radius: var(--radius-lg); background: linear-gradient(145deg, #eef2ff, #ffffff); box-shadow: 0 8px 20px rgba(37, 99, 235, 0.12); text-align: left; }
-.organization-root-symbol { display: grid; flex: 0 0 auto; place-items: center; width: 34px; height: 34px; border-radius: var(--radius-md); color: #fff; background: var(--primary); }
-.organization-root-card > div { display: grid; gap: 2px; min-width: 0; }
-.organization-root-card strong { color: var(--ink); font-size: 14px; }
-.organization-root-card small { color: var(--muted); font-size: 11px; }
-.organization-root-rail { position: relative; display: flex; align-items: flex-start; justify-content: center; gap: 14px; min-width: max-content; margin: 44px auto 0; padding: 30px 24px 0; }
-.organization-root-rail-line { position: absolute; top: 0; left: 50%; width: 2px; height: 31px; background: #b9c8e4; transform: translateX(-50%); }
-.organization-root-rail::before { position: absolute; top: 30px; left: 50%; right: 50%; height: 2px; min-width: calc(100% - 150px); background: #b9c8e4; content: ''; transform: translateX(-50%); }
-.organization-root-rail > .organization-node { min-width: 178px; padding-top: 20px; }
-.organization-root-rail > .organization-node::before { position: absolute; top: 0; left: 50%; width: 2px; height: 21px; background: #b9c8e4; content: ''; }
-.organization-root-rail > .organization-node > .organization-folder-row::before { display: none; }
-.organization-root-rail > .organization-node > .organization-children { margin-left: 0; padding-left: 0; }
-.organization-root-rail > .organization-node > .organization-children::before { display: none; }
-.organization-root-rail > .organization-node > .organization-children > .organization-node { margin-top: 22px; }
-.organization-root-rail > .organization-node > .organization-children > .organization-node::before { position: absolute; top: -22px; left: 24px; width: 2px; height: 22px; background: #b9c8e4; content: ''; }
-.organization-root-rail > .organization-node > .organization-children > .organization-node > .organization-folder-row::before { display: none; }
-.organization-root-rail > .organization-node > .organization-children > .organization-node > .organization-children { margin-left: 18px; padding-left: 16px; }
-.organization-root-rail > .organization-node > .organization-children > .organization-node > .organization-children::before { display: block; left: 4px; top: -3px; bottom: 18px; background: #d1dced; }
-.organization-folder-row { min-height: 50px; padding: 5px 8px; border-color: #e2e8f0; background: #fff; box-shadow: 0 3px 10px rgba(15, 23, 42, 0.035); }
-.organization-folder-row:hover { border-color: #c7d2fe; background: #f8fbff; box-shadow: 0 6px 16px rgba(37, 99, 235, 0.08); }
-.organization-folder-row.drag-over { border-color: var(--primary); background: #dbeafe; box-shadow: 0 0 0 4px var(--primary-glow), 0 8px 20px rgba(37, 99, 235, 0.14); }
-.organization-folder-button { min-height: 36px; }
-.organization-folder-button span { font-size: 12px; }
-.organization-folder-button small { color: var(--primary); }
-.organization-children { margin-left: 22px; padding-left: 17px; }
-.organization-children::before { left: 5px; top: -4px; bottom: 21px; width: 2px; background: #d1dced; }
-.organization-children .organization-folder-row::before { left: -18px; width: 18px; height: 2px; background: #d1dced; }
 .organization-tree-controls { display: flex; align-items: center; justify-content: center; gap: 2px; margin: 10px 0 0; }
 .organization-tree-controls button { display: grid; place-items: center; width: 28px; height: 26px; padding: 0; border: 1px solid var(--line); color: var(--muted); background: var(--paper); font-size: 15px; }
 .organization-tree-controls button:first-child { border-radius: var(--radius-sm) 0 0 var(--radius-sm); }
@@ -2673,23 +2643,25 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   line-height: 1.5;
 }
 
+/* ── 分类管理：现代自适应纯 CSS 树状组织架构 ─────────────────── */
 .category-management-page .organization-root-node {
   position: relative;
   z-index: 1;
   display: flex;
   min-width: max-content;
   align-items: flex-start;
-  padding: 16px 20px 48px;
+  padding: 24px 28px 48px;
 }
 
 .category-management-page .organization-root-card {
   position: sticky;
-  top: 16px;
-  z-index: 5;
+  top: 24px;
+  z-index: 10;
   flex: 0 0 220px;
   width: 220px;
   min-height: 64px;
   margin: 0;
+  box-sizing: border-box;
 }
 
 .category-management-page .organization-root-rail {
@@ -2699,54 +2671,71 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   flex-direction: column;
   align-items: flex-start;
   gap: 16px;
-  margin: 0 0 0 48px;
+  margin: 0 0 0 36px;
   padding: 0;
 }
 
-/* 根节点卡片到右侧垂直主导轨的水平引线 */
+/* 根节点卡片到顶级分支轨道的水平引线 */
 .category-management-page .organization-root-rail::before {
   position: absolute;
   top: 32px;
-  left: -48px;
-  width: 48px;
+  left: -36px;
+  width: 36px;
   height: 2px;
   min-width: 0;
-  background: #94a3b8;
-  content: '';
-}
-
-/* 垂直主总线导轨 */
-.category-management-page .organization-root-rail::after {
-  position: absolute;
-  top: 26px;
-  bottom: 26px;
-  left: 0;
-  width: 2px;
-  background: #94a3b8;
+  background: #cbd5e1;
   content: '';
 }
 
 .category-management-page .organization-root-rail > .organization-node,
-.category-management-page .organization-node {
+.category-management-page .organization-children > .organization-node {
   position: relative;
   display: flex;
   min-width: max-content;
   align-items: flex-start;
 }
 
-.category-management-page .organization-root-rail > .organization-node {
-  padding: 0;
+/* 自适应分支垂直主导轨与水平支线（默认中间节点：上下贯通 + 向右水平线） */
+.category-management-page .organization-root-rail > .organization-node::before,
+.category-management-page .organization-children > .organization-node::before {
+  position: absolute;
+  top: 0;
+  bottom: -16px;
+  left: 0;
+  width: 28px;
+  border-left: 2px solid #cbd5e1;
+  content: '';
+  box-sizing: border-box;
 }
 
-/* 垂直主导轨到顶级文件夹节点的水平分支线 */
-.category-management-page .organization-root-rail > .organization-node::before {
+.category-management-page .organization-root-rail > .organization-node::after,
+.category-management-page .organization-children > .organization-node::after {
   position: absolute;
   top: 26px;
   left: 0;
   width: 28px;
   height: 2px;
-  background: #94a3b8;
+  background: #cbd5e1;
   content: '';
+}
+
+/* 第一个子节点：垂直线从水平分支处开始向下 */
+.category-management-page .organization-root-rail > .organization-node:first-child::before,
+.category-management-page .organization-children > .organization-node:first-child::before {
+  top: 26px;
+}
+
+/* 最后一个子节点：垂直线在水平分支处终止，并形成圆润优雅的 L 形拐角 */
+.category-management-page .organization-root-rail > .organization-node:last-child::before,
+.category-management-page .organization-children > .organization-node:last-child::before {
+  bottom: auto;
+  height: 26px;
+}
+
+/* 唯一子节点：只有水平分支，没有上下多余竖线 */
+.category-management-page .organization-root-rail > .organization-node:only-child::before,
+.category-management-page .organization-children > .organization-node:only-child::before {
+  display: none;
 }
 
 .category-management-page .organization-folder-row {
@@ -2775,47 +2764,26 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   box-shadow: 0 0 0 4px var(--primary-glow), 0 10px 24px rgba(37, 99, 235, 0.16);
 }
 
+/* 子文件夹容器 */
 .category-management-page .organization-children {
   position: relative;
   display: flex;
   min-width: max-content;
   flex-direction: column;
   align-items: flex-start;
-  gap: 14px;
-  margin: 0 0 0 36px;
+  gap: 16px;
+  margin: 0 0 0 32px;
   padding: 0;
 }
 
-/* 父文件夹到子级垂直导轨的水平引线 */
-.category-management-page .organization-children::after {
-  position: absolute;
-  top: 26px;
-  left: -36px;
-  width: 36px;
-  height: 2px;
-  background: #94a3b8;
-  content: '';
-}
-
-/* 子级垂直导轨 */
+/* 父卡片到子级列表的水平引线 */
 .category-management-page .organization-children::before {
   position: absolute;
   top: 26px;
-  bottom: 26px;
-  left: 0;
-  width: 2px;
-  background: #94a3b8;
-  content: '';
-}
-
-/* 子级垂直导轨到子文件夹节点的水平分支线 */
-.category-management-page .organization-children > .organization-node::before {
-  position: absolute;
-  top: 26px;
-  left: 0;
-  width: 28px;
+  left: -32px;
+  width: 32px;
   height: 2px;
-  background: #94a3b8;
+  background: #cbd5e1;
   content: '';
 }
 
