@@ -2643,188 +2643,541 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   line-height: 1.5;
 }
 
-/* ── 分类管理：优雅思维导图式树状架构（Mindmap Tree Hierarchy） ── */
-.category-management-page .organization-root-node {
-  position: relative;
-  z-index: 1;
+/* ── 分类管理：Windows 资源管理器风格文件夹与 26 字母排序系统 ────── */
+.category-management-page .explorer-folder-panel {
   display: flex;
-  min-width: max-content;
-  align-items: flex-start;
-  padding: 24px 32px 48px;
-}
-
-.category-management-page .organization-root-card {
-  position: sticky;
-  top: 24px;
-  z-index: 10;
-  flex: 0 0 220px;
-  width: 220px;
-  min-height: 60px;
-  margin: 0;
-  padding: 8px 12px;
-  border-radius: 12px;
-  border: 1px solid #bfdbfe;
-  background: linear-gradient(145deg, #ffffff 0%, #f0f6ff 100%);
-  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.08);
-  box-sizing: border-box;
-  cursor: pointer;
-}
-
-/* 根节点右侧引出到一级树干的水平主干线 */
-.category-management-page .organization-root-card::after {
-  position: absolute;
-  top: 50%;
-  right: -32px;
-  z-index: 1;
-  width: 32px;
-  height: 2px;
-  background: #cbd5e1;
-  transform: translateY(-50%);
-  content: '';
-}
-
-.category-management-page .organization-root-card:hover,
-.category-management-page .organization-root-card.active {
-  border-color: #3b82f6;
-  background: linear-gradient(145deg, #eff6ff 0%, #dbeafe 100%);
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.18), 0 8px 20px rgba(37, 99, 235, 0.12);
-}
-
-.category-management-page .organization-root-rail {
-  position: relative;
-  z-index: 2;
-  display: flex;
-  min-width: max-content;
   flex-direction: column;
-  align-items: flex-start;
-  gap: 12px;
-  margin: 0 0 0 48px;
-  padding: 0;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--paper);
 }
 
-.category-management-page .organization-root-rail > .organization-node,
-.category-management-page .organization-children > .organization-node {
+.category-management-page .explorer-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.category-management-page .explorer-sort-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  border: 1px solid #bfdbfe;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.category-management-page .explorer-view-toggle {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-subtle);
+}
+
+.category-management-page .explorer-toggle-btn {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all var(--duration) var(--ease);
+}
+
+.category-management-page .explorer-toggle-btn:hover {
+  color: var(--ink);
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.category-management-page .explorer-toggle-btn.active {
+  background: #ffffff;
+  color: var(--primary);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+/* 顶部面包屑路径栏 (Breadcrumb Path Bar) */
+.category-management-page .explorer-path-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  margin-bottom: 10px;
+  border-radius: var(--radius-md);
+  border: 1px solid #dbe2ea;
+  background: #f8fafc;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.02);
+}
+
+.category-management-page .explorer-nav-back-btn {
+  display: grid;
+  place-items: center;
+  flex: 0 0 30px;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #ffffff;
+  color: var(--ink-secondary);
+  cursor: pointer;
+  transition: all var(--duration) var(--ease);
+}
+
+.category-management-page .explorer-nav-back-btn:hover:not(:disabled) {
+  border-color: var(--primary-border);
+  color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.category-management-page .explorer-nav-back-btn:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+  border-color: transparent;
+  background: transparent;
+}
+
+.category-management-page .explorer-breadcrumbs {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.category-management-page .explorer-breadcrumb-segment {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.category-management-page .explorer-breadcrumb-sep {
+  color: #94a3b8;
+  flex-shrink: 0;
+}
+
+.category-management-page .explorer-breadcrumb-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--duration) var(--ease);
+  white-space: nowrap;
+}
+
+.category-management-page .explorer-breadcrumb-btn:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.category-management-page .explorer-breadcrumb-btn.current {
+  background: #ffffff;
+  border-color: #cbd5e1;
+  color: #0f172a;
+  font-weight: 700;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.category-management-page .explorer-breadcrumb-btn.folder-drop-target {
+  background: #dbeafe !important;
+  border-color: #3b82f6 !important;
+  color: #1d4ed8 !important;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25) !important;
+}
+
+.category-management-page .explorer-breadcrumb-btn.folder-drop-disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* 过滤与统计副栏 */
+.category-management-page .explorer-sub-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.category-management-page .explorer-filter-input {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: var(--radius-md);
+  background: #ffffff;
+  color: var(--muted);
+  width: 240px;
+  transition: all var(--duration) var(--ease);
+}
+
+.category-management-page .explorer-filter-input:focus-within {
+  border-color: #93c5fd;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+  color: var(--primary);
+}
+
+.category-management-page .explorer-filter-input input {
+  width: 100%;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--ink);
+  font-size: 12px;
+}
+
+.category-management-page .explorer-count-summary {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* 滚动内容区 */
+.category-management-page .explorer-content-container {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 4px 2px;
+}
+
+/* 网格卡片布局 (Grid View) */
+.category-management-page .explorer-folder-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 14px;
+}
+
+.category-management-page .explorer-card {
   position: relative;
   display: flex;
-  min-width: max-content;
-  align-items: flex-start;
-}
-
-/* 节点左侧分支线：圆角平滑过渡 (Mindmap Smooth Branch Arc) */
-.category-management-page .organization-root-rail > .organization-node::before,
-.category-management-page .organization-children > .organization-node::before {
-  position: absolute;
-  top: 0;
-  left: -24px;
-  z-index: 1;
-  width: 24px;
-  height: 25px;
-  border-bottom: 2px solid #cbd5e1;
-  border-left: 2px solid #cbd5e1;
-  border-bottom-left-radius: 12px;
-  box-sizing: border-box;
-  content: '';
-}
-
-/* 垂直主干导轨：贯穿至最后一个同级节点 */
-.category-management-page .organization-root-rail > .organization-node:not(:last-child)::after,
-.category-management-page .organization-children > .organization-node:not(:last-child)::after {
-  position: absolute;
-  top: 25px;
-  bottom: -12px;
-  left: -24px;
-  z-index: 1;
-  width: 2px;
-  background: #cbd5e1;
-  content: '';
-}
-
-.category-management-page .organization-folder-row {
-  position: relative;
-  z-index: 3;
-  flex: 0 0 220px;
-  width: 220px;
-  min-height: 48px;
-  margin-left: 0;
-  padding: 6px 10px;
-  border-radius: 10px;
+  flex-direction: column;
+  padding: 14px 12px 12px;
+  border-radius: 12px;
   border: 1px solid #e2e8f0;
   background: #ffffff;
-  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
-  box-sizing: border-box;
-  transition: border-color var(--duration) var(--ease), background var(--duration) var(--ease), box-shadow var(--duration) var(--ease);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+  cursor: pointer;
+  user-select: none;
+  transition: all var(--duration) var(--ease);
 }
 
-.category-management-page .organization-folder-row:hover {
+.category-management-page .explorer-card:hover {
   border-color: #93c5fd;
   background: #f8faff;
+  transform: translateY(-2px);
   box-shadow: 0 6px 16px rgba(37, 99, 235, 0.08);
 }
 
-.category-management-page .organization-folder-row.active {
+.category-management-page .explorer-card.selected {
   border-color: #3b82f6;
   background: #eff6ff;
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15), 0 4px 12px rgba(37, 99, 235, 0.08);
 }
 
-.category-management-page .organization-folder-row.drag-over {
-  border-color: var(--primary);
-  background: #dbeafe;
-  box-shadow: 0 0 0 4px var(--primary-glow), 0 10px 24px rgba(37, 99, 235, 0.16);
+.category-management-page .explorer-card.folder-drop-target {
+  border-color: #2563eb !important;
+  background: #dbeafe !important;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.25), 0 8px 24px rgba(37, 99, 235, 0.18) !important;
+  transform: scale(1.02);
 }
 
-/* 子文件夹容器与父节点水平连线 */
-.category-management-page .organization-children {
-  position: relative;
-  z-index: 2;
+.category-management-page .explorer-card.folder-drag-source {
+  opacity: 0.45;
+  border-style: dashed;
+}
+
+.category-management-page .explorer-card.folder-drop-disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.category-management-page .explorer-card-header {
   display: flex;
-  min-width: max-content;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 12px;
-  margin: 0 0 0 48px;
-  padding: 0;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
 }
 
-.category-management-page .organization-children::before {
-  position: absolute;
-  top: 24px;
-  left: -48px;
-  z-index: 1;
-  width: 24px;
-  height: 2px;
-  background: #cbd5e1;
-  content: '';
-}
-
-.category-management-page .organization-folder-button small {
+.category-management-page .explorer-letter-chip {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   min-width: 20px;
+  height: 20px;
+  padding: 0 4px;
+  border-radius: 6px;
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.category-management-page .explorer-letter-chip.small {
+  min-width: 18px;
   height: 18px;
-  margin-left: auto;
+  font-size: 10px;
+}
+
+.category-management-page .explorer-card-icon-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #eab308;
+}
+
+.category-management-page .explorer-card.selected .explorer-card-icon-wrap {
+  color: #2563eb;
+}
+
+.category-management-page .explorer-card-enter-btn {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all var(--duration) var(--ease);
+}
+
+.category-management-page .explorer-card-enter-btn:hover {
+  background: #e2e8f0;
+  color: var(--ink);
+}
+
+.category-management-page .explorer-card.selected .explorer-card-enter-btn {
+  color: var(--primary);
+}
+
+.category-management-page .explorer-card.selected .explorer-card-enter-btn:hover {
+  background: #dbeafe;
+}
+
+.category-management-page .explorer-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.category-management-page .explorer-card-title {
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.category-management-page .explorer-card-meta {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.category-management-page .explorer-card-drop-badge {
+  position: absolute;
+  top: -10px;
+  right: 12px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #2563eb;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.4);
+}
+
+/* 列表视图 (List View) */
+.category-management-page .explorer-folder-list {
+  display: flex;
+  flex-direction: column;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.category-management-page .explorer-list-head {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) 90px 90px 80px;
+  align-items: center;
+  padding: 8px 14px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.category-management-page .explorer-list-body {
+  display: flex;
+  flex-direction: column;
+}
+
+.category-management-page .explorer-list-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) 90px 90px 80px;
+  align-items: center;
+  padding: 9px 14px;
+  border-bottom: 1px solid #f1f5f9;
+  background: #ffffff;
+  cursor: pointer;
+  transition: all var(--duration) var(--ease);
+}
+
+.category-management-page .explorer-list-row:last-child {
+  border-bottom: 0;
+}
+
+.category-management-page .explorer-list-row:hover {
+  background: #f8faff;
+}
+
+.category-management-page .explorer-list-row.selected {
+  background: #eff6ff;
+}
+
+.category-management-page .explorer-list-row.folder-drop-target {
+  background: #dbeafe !important;
+  box-shadow: inset 0 0 0 2px #2563eb !important;
+}
+
+.category-management-page .explorer-list-col-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.category-management-page .explorer-row-icon {
+  color: #eab308;
+  flex-shrink: 0;
+}
+
+.category-management-page .explorer-list-row.selected .explorer-row-icon {
+  color: #2563eb;
+}
+
+.category-management-page .explorer-list-col-name strong {
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.category-management-page .explorer-count-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 20px;
   padding: 0 6px;
   border-radius: 999px;
   background: #f1f5f9;
-  color: #64748b;
+  color: #475569;
   font-size: 11px;
   font-weight: 600;
 }
 
-.category-management-page .organization-folder-row.active .organization-folder-button small {
-  background: #dbeafe;
-  color: #1d4ed8;
+.category-management-page .explorer-list-col-sub {
+  color: #64748b;
+  font-size: 12px;
 }
 
-.category-management-page .folder-drop-label {
-  right: auto;
-  left: 224px;
-  white-space: nowrap;
+.category-management-page .explorer-list-col-actions {
+  display: flex;
+  justify-content: flex-end;
 }
 
-.category-management-page .organization-tree-controls {
-  flex: 0 0 auto;
+.category-management-page .explorer-row-enter-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--duration) var(--ease);
+}
+
+.category-management-page .explorer-row-enter-btn:hover {
+  border-color: #93c5fd;
+  color: #2563eb;
+  background: #eff6ff;
+}
+
+/* 空状态 */
+.category-management-page .explorer-empty-folder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  text-align: center;
+}
+
+.category-management-page .explorer-empty-icon {
+  display: grid;
+  place-items: center;
+  width: 72px;
+  height: 72px;
+  margin-bottom: 14px;
+  border-radius: 50%;
+  background: #fef9c3;
+  color: #ca8a04;
+}
+
+.category-management-page .explorer-empty-folder h4 {
+  margin: 0 0 8px;
+  color: #0f172a;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.category-management-page .explorer-empty-folder p {
+  max-width: 440px;
+  margin: 0 0 18px;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.category-management-page .explorer-footer-guide {
+  margin-top: 10px;
 }
 
 .category-management-page .category-tree-actions {

@@ -1,8 +1,8 @@
-import { ChevronDown, ChevronRight, Folder, FolderOpen, Folders, GripVertical, Home, Link2, LoaderCircle, RefreshCw, Search, Trash2 } from 'lucide-react'
+import { ArrowLeft, ArrowRight, ChevronDown, ChevronRight, CornerDownRight, Folder, FolderOpen, Folders, GripVertical, Home, LayoutGrid, List, ListFilter, LoaderCircle, RefreshCw, Search, Trash2 } from 'lucide-react'
 import type { DragEvent, MouseEvent as ReactMouseEvent } from 'react'
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as api from './api'
-import { descendantFolderIds, findFolderParentId, flattenFolders as flattenBookmarkFolders, folderHasChildren, groupBookmarksByFolder, resolveDraggedBookmarkIds, type FlatBookmarkFolder } from './bookmark-tree'
+import { descendantFolderIds, findFolderParentId, flattenFolders as flattenBookmarkFolders, groupBookmarksByFolder, resolveDraggedBookmarkIds, type FlatBookmarkFolder } from './bookmark-tree'
 import { toCategoryTree } from './category-library'
 import { LibrarySiteIcon } from './LibraryManagementPage'
 import { confirmDangerousAction } from './preferences'
@@ -33,6 +33,35 @@ const EMPTY_FOLDERS: api.BookmarkFolder[] = []
 const EMPTY_BOOKMARK_IDS: string[] = []
 const ROOT_FOLDER_DROP_ID = '__tree_root__'
 
+const collator = new Intl.Collator('zh-CN', { numeric: true, sensitivity: 'base' })
+
+function sortFoldersAlphabetically(folders: api.BookmarkFolder[]): api.BookmarkFolder[] {
+  return [...folders]
+    .sort((a, b) => collator.compare(a.title, b.title))
+    .map((folder) => ({
+      ...folder,
+      children: sortFoldersAlphabetically(folder.children),
+    }))
+}
+
+function getFolderFirstLetter(title: string): string {
+  const trimmed = title.trim()
+  if (!trimmed) return '#'
+  const first = trimmed[0].toUpperCase()
+  if (/[A-Z0-9]/.test(first)) return first
+  return first
+}
+
+function findFolderPath(folders: api.BookmarkFolder[], targetId: string, currentPath: api.BookmarkFolder[] = []): api.BookmarkFolder[] | null {
+  for (const folder of folders) {
+    const path = [...currentPath, folder]
+    if (folder.id === targetId) return path
+    const match = findFolderPath(folder.children, targetId, path)
+    if (match) return match
+  }
+  return null
+}
+
 export function CategoryManagementPage({ token }: Props) {
   const [tree, setTree] = useState<api.BookmarkTree | null>(null)
   const [loading, setLoading] = useState(true)
@@ -41,18 +70,14 @@ export function CategoryManagementPage({ token }: Props) {
   const [query, setQuery] = useState('')
   const [selectedFolderId, setSelectedFolderId] = useState('all')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const [collapsedGroupIds, setCollapsedGroupIds] = useState<Set<string>>(new Set())
   const [drag, setDrag] = useState<DragState>(null)
   const [dropFolderId, setDropFolderId] = useState<string | null>(null)
-  const [treeZoom, setTreeZoom] = useState(1)
+  const [currentExplorerFolderId, setCurrentExplorerFolderId] = useState<string | null>(null)
+  const [folderLayoutMode, setFolderLayoutMode] = useState<'grid' | 'list'>('grid')
+  const [folderFilterQuery, setFolderFilterQuery] = useState('')
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
-  const treeCanvasRef = useRef<HTMLDivElement>(null)
-  const treeContentRef = useRef<HTMLDivElement>(null)
-  const folderExpandTimerRef = useRef<number | null>(null)
-  const folderExpandTargetRef = useRef<string | null>(null)
-  const expandedInitializedRef = useRef(false)
   const selectionPaintRef = useRef<SelectionPaintState>(null)
 
   const load = useCallback(async (showRefreshing = false) => {
@@ -63,10 +88,6 @@ export function CategoryManagementPage({ token }: Props) {
       const nextTree = toCategoryTree(library)
       setTree(nextTree)
       setSelectedIds((current) => new Set([...current].filter((id) => nextTree.bookmarks.some((bookmark) => bookmark.id === id))))
-      if (!expandedInitializedRef.current && nextTree.folders.length > 0) {
-        setExpandedIds(new Set(allFolderIds(nextTree.folders)))
-        expandedInitializedRef.current = true
-      }
     } catch (requestError) {
       setError(readableError(requestError, '服务器书签库读取失败'))
     } finally {
@@ -121,11 +142,30 @@ export function CategoryManagementPage({ token }: Props) {
     const searchable = `${bookmark.title} ${bookmark.url} ${bookmark.folderPath}`.toLowerCase()
     return inFolder && (!normalizedQuery || searchable.includes(normalizedQuery))
   }), [folderIds, normalizedQuery, tree])
+
   const allFolders = tree?.folders ?? EMPTY_FOLDERS
-  const flatFolders = useMemo(() => flattenBookmarkFolders(allFolders), [allFolders])
-  const bookmarkGroups = useMemo(() => groupBookmarksByFolder(visibleBookmarks, allFolders), [allFolders, visibleBookmarks])
+  const sortedAllFolders = useMemo(() => sortFoldersAlphabetically(allFolders), [allFolders])
+  const flatFolders = useMemo(() => flattenBookmarkFolders(sortedAllFolders), [sortedAllFolders])
+  const bookmarkGroups = useMemo(() => groupBookmarksByFolder(visibleBookmarks, sortedAllFolders), [sortedAllFolders, visibleBookmarks])
   const draggedIds = drag?.kind === 'bookmarks' ? drag.ids : EMPTY_BOOKMARK_IDS
   const ready = Boolean(tree)
+
+  const explorerPath = useMemo<api.BookmarkFolder[]>(() => {
+    if (!currentExplorerFolderId) return []
+    return findFolderPath(sortedAllFolders, currentExplorerFolderId) ?? []
+  }, [currentExplorerFolderId, sortedAllFolders])
+
+  const currentExplorerFolder = useMemo<api.BookmarkFolder | null>(() => {
+    if (!currentExplorerFolderId) return null
+    return findFolder(sortedAllFolders, currentExplorerFolderId)
+  }, [currentExplorerFolderId, sortedAllFolders])
+
+  const currentSubfolders = useMemo(() => {
+    const list = currentExplorerFolder ? currentExplorerFolder.children : sortedAllFolders
+    const q = folderFilterQuery.trim().toLowerCase()
+    if (!q) return list
+    return list.filter((folder) => folder.title.toLowerCase().includes(q))
+  }, [currentExplorerFolder, folderFilterQuery, sortedAllFolders])
 
   const toggleSelected = useCallback((id: string) => {
     setSelectedIds((current) => {
@@ -252,7 +292,6 @@ export function CategoryManagementPage({ token }: Props) {
     try {
       await api.moveLibraryNode(token, folderId, parentId)
       setNotice(parentId ? '文件夹及其全部内容已移动' : '文件夹已移动到顶级目录')
-      if (parentId) setExpandedIds((current) => new Set(current).add(parentId))
       await load()
     } catch (requestError) {
       await load()
@@ -276,7 +315,7 @@ export function CategoryManagementPage({ token }: Props) {
     setDrag({ kind: 'bookmarks', ids, sourceFolderIds })
   }, [moving, ready, selectedIds, tree])
 
-  const beginFolderDrag = useCallback((event: DragEvent<HTMLButtonElement>, folder: api.BookmarkFolder) => {
+  const beginFolderDrag = useCallback((event: DragEvent<HTMLElement>, folder: api.BookmarkFolder) => {
     if (!ready || moving) return
     const sourceParentId = findFolderParentId(allFolders, folder.id)
     if (sourceParentId === undefined) return
@@ -286,12 +325,6 @@ export function CategoryManagementPage({ token }: Props) {
     event.dataTransfer.setData('text/plain', folder.id)
     setDrag({ kind: 'folder', folderId: folder.id, title: folder.title, sourceParentId, invalidTargetIds })
   }, [allFolders, moving, ready])
-
-  function clearFolderExpandTimer() {
-    if (folderExpandTimerRef.current !== null) window.clearTimeout(folderExpandTimerRef.current)
-    folderExpandTimerRef.current = null
-    folderExpandTargetRef.current = null
-  }
 
   function allowDrop(event: DragEvent<HTMLElement>, folderId: string | null) {
     if (!drag || moving) return
@@ -303,20 +336,11 @@ export function CategoryManagementPage({ token }: Props) {
     event.preventDefault()
     event.dataTransfer.dropEffect = 'move'
     setDropFolderId(folderId ?? ROOT_FOLDER_DROP_ID)
-    if (folderId && drag.kind === 'folder' && !expandedIds.has(folderId) && folderExpandTargetRef.current !== folderId) {
-      clearFolderExpandTimer()
-      folderExpandTargetRef.current = folderId
-      folderExpandTimerRef.current = window.setTimeout(() => {
-        setExpandedIds((current) => new Set(current).add(folderId))
-        clearFolderExpandTimer()
-      }, 550)
-    }
   }
 
   function dropOnFolder(event: DragEvent<HTMLElement>, folderId: string | null) {
     if (!drag || moving) return
     event.preventDefault()
-    clearFolderExpandTimer()
     if (drag.kind === 'folder') {
       if ((folderId !== null && drag.invalidTargetIds.has(folderId)) || folderId === drag.sourceParentId) return
       void moveFolder(drag.folderId, folderId)
@@ -333,119 +357,315 @@ export function CategoryManagementPage({ token }: Props) {
     if (relatedTarget instanceof Node && event.currentTarget.contains(relatedTarget)) return
     const targetId = folderId ?? ROOT_FOLDER_DROP_ID
     setDropFolderId((current) => current === targetId ? null : current)
-    if (folderExpandTargetRef.current === folderId) clearFolderExpandTimer()
   }
 
   const endDrag = useCallback(() => {
-    if (folderExpandTimerRef.current !== null) window.clearTimeout(folderExpandTimerRef.current)
-    folderExpandTimerRef.current = null
-    folderExpandTargetRef.current = null
     setDrag(null)
     setDropFolderId(null)
   }, [])
 
-  function toggleFolder(folderId: string) {
-    setExpandedIds((current) => {
-      const next = new Set(current)
-      if (next.has(folderId)) next.delete(folderId)
-      else next.add(folderId)
-      return next
-    })
+  function enterFolder(id: string) {
+    setCurrentExplorerFolderId(id)
+    selectFolder(id)
   }
 
-  function expandAll() {
-    setExpandedIds(new Set(allFolderIds(allFolders)))
+  function navigateUp() {
+    if (explorerPath.length <= 1) {
+      setCurrentExplorerFolderId(null)
+      setSelectedFolderId('all')
+    } else {
+      const parent = explorerPath[explorerPath.length - 2]
+      setCurrentExplorerFolderId(parent.id)
+      selectFolder(parent.id)
+    }
   }
 
-  function collapseAll() {
-    setExpandedIds(new Set())
-  }
-
-  function zoomTree(delta: number) {
-    setTreeZoom((value) => Math.min(1.2, Math.max(0.65, Number((value + delta).toFixed(2)))))
-  }
-
-  function resetTreeView() {
-    setTreeZoom(1)
-    treeCanvasRef.current?.scrollTo({ left: 0, top: 0, behavior: 'smooth' })
+  function navigateTo(id: string | null) {
+    setCurrentExplorerFolderId(id)
+    if (id) {
+      selectFolder(id)
+    } else {
+      setSelectedFolderId('all')
+    }
   }
 
   const rootDropDisabled = drag?.kind === 'folder' && drag.sourceParentId === null
+
   const organizationPanel = useMemo(() => (
-    <aside className="panel category-tree-panel category-layout-tree">
+    <aside className="panel category-tree-panel category-layout-tree explorer-folder-panel">
       <div className="category-panel-title">
         <div>
-          <p className="eyebrow">SERVER LIBRARY TREE</p>
-          <h3>服务器书签组织架构</h3>
+          <p className="eyebrow">EXPLORER FOLDERS (A-Z)</p>
+          <h3>服务器文件夹管理</h3>
         </div>
-        <div className="category-tree-actions">
-          <button className="tree-action-button" onClick={collapseAll} type="button">收起</button>
-          <button className="tree-action-button" onClick={expandAll} type="button">展开</button>
-          <button aria-label="重置组织树视图" className="tree-control-button" onClick={resetTreeView} type="button">⌖</button>
-          <button aria-label="刷新分类树" className="icon-button" disabled={refreshing || moving} onClick={() => void load(true)} type="button">
+        <div className="category-tree-actions explorer-header-actions">
+          <span className="explorer-sort-badge" title="所有层级文件夹均按照 26 字母自然排序 (A-Z)">
+            <ListFilter size={13} />
+            <span>26 字母排序</span>
+          </span>
+          <div className="explorer-view-toggle">
+            <button
+              aria-label="网格视图"
+              className={`explorer-toggle-btn ${folderLayoutMode === 'grid' ? 'active' : ''}`}
+              onClick={() => setFolderLayoutMode('grid')}
+              title="网格视图"
+              type="button"
+            >
+              <LayoutGrid size={15} />
+            </button>
+            <button
+              aria-label="列表视图"
+              className={`explorer-toggle-btn ${folderLayoutMode === 'list' ? 'active' : ''}`}
+              onClick={() => setFolderLayoutMode('list')}
+              title="列表视图"
+              type="button"
+            >
+              <List size={15} />
+            </button>
+          </div>
+          <button
+            aria-label="刷新文件夹"
+            className="icon-button"
+            disabled={refreshing || moving}
+            onClick={() => void load(true)}
+            type="button"
+          >
             <RefreshCw className={refreshing ? 'spin' : ''} size={16} />
           </button>
         </div>
       </div>
-      <p className="category-tree-description">和“我的书签库”共享同一份服务器数据；书签和文件夹都可以拖动重组。</p>
-      <div className="organization-tree category-layout-tree-canvas" ref={treeCanvasRef}>
-        <div className="organization-tree-canvas" ref={treeContentRef} style={{ transform: `scale(${treeZoom})`, transformOrigin: 'top left' }}>
-          <div className="organization-root-node">
-            <button
-              aria-current={selectedFolderId === 'all' ? 'page' : undefined}
-              className={`organization-root-card ${selectedFolderId === 'all' ? 'active' : ''} ${dropFolderId === ROOT_FOLDER_DROP_ID ? 'folder-drop-target' : ''} ${rootDropDisabled ? 'folder-drop-disabled' : ''}`}
-              data-tree-node-id="root"
-              onClick={() => selectFolder('all')}
-              onDragLeave={(event) => leaveDropTarget(event, null)}
-              onDragOver={(event) => allowDrop(event, null)}
-              onDrop={(event) => dropOnFolder(event, null)}
-              type="button"
-            >
-              <span className="organization-root-symbol"><Home size={18} /></span>
-              <span>
-                <strong>全部书签</strong>
-                <small>{tree?.bookmarks.length ?? 0} 个书签 · 总目录</small>
+
+      <div className="explorer-path-bar">
+        <button
+          aria-label="返回上一级"
+          className="explorer-nav-back-btn"
+          disabled={!currentExplorerFolderId}
+          onClick={navigateUp}
+          title={currentExplorerFolderId ? '返回上一级目录' : '已在根目录'}
+          type="button"
+        >
+          <ArrowLeft size={16} />
+        </button>
+
+        <div className="explorer-breadcrumbs">
+          <button
+            className={`explorer-breadcrumb-btn ${!currentExplorerFolderId ? 'current' : ''} ${dropFolderId === ROOT_FOLDER_DROP_ID ? 'folder-drop-target' : ''} ${rootDropDisabled ? 'folder-drop-disabled' : ''}`}
+            onClick={() => navigateTo(null)}
+            onDragLeave={(event) => leaveDropTarget(event, null)}
+            onDragOver={(event) => allowDrop(event, null)}
+            onDrop={(event) => dropOnFolder(event, null)}
+            title="点击回到根目录，也可将文件夹拖放到此处移至根目录"
+            type="button"
+          >
+            <Home size={14} />
+            <span>全部书签</span>
+          </button>
+
+          {explorerPath.map((seg, index) => {
+            const isLast = index === explorerPath.length - 1
+            const isDrop = dropFolderId === seg.id
+            return (
+              <span className="explorer-breadcrumb-segment" key={seg.id}>
+                <ChevronRight className="explorer-breadcrumb-sep" size={13} />
+                <button
+                  className={`explorer-breadcrumb-btn ${isLast ? 'current' : ''} ${isDrop ? 'folder-drop-target' : ''}`}
+                  onClick={() => navigateTo(seg.id)}
+                  onDragLeave={(event) => leaveDropTarget(event, seg.id)}
+                  onDragOver={(event) => allowDrop(event, seg.id)}
+                  onDrop={(event) => dropOnFolder(event, seg.id)}
+                  title={`点击进入 ${seg.title}，也可拖拽到此处`}
+                  type="button"
+                >
+                  <Folder size={14} />
+                  <span>{seg.title}</span>
+                </button>
               </span>
-              {dropFolderId === ROOT_FOLDER_DROP_ID && drag?.kind === 'folder' && <span className="root-folder-drop-label">移动为顶级文件夹</span>}
-            </button>
-            {allFolders.length > 0 && (
-              <div className="organization-root-rail">
-                {allFolders.map((folder) => (
-                  <FolderTreeNode
-                    depth={0}
-                    drag={drag}
-                    dropFolderId={dropFolderId}
-                    expandedIds={expandedIds}
-                    folder={folder}
-                    key={folder.id}
-                    moving={moving}
-                    onDragEnd={endDrag}
-                    onDragLeave={leaveDropTarget}
-                    onDragOver={allowDrop}
-                    onDrop={dropOnFolder}
-                    onFolderDragStart={beginFolderDrag}
-                    onSelect={selectFolder}
-                    onToggle={toggleFolder}
-                    parentId="root"
-                    selectedFolderId={selectedFolderId}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
+            )
+          })}
         </div>
       </div>
-      <div className="organization-tree-controls">
-        <button aria-label="缩小组织树" disabled={treeZoom <= 0.65} onClick={() => zoomTree(-0.1)} type="button">−</button>
-        <span>{Math.round(treeZoom * 100)}%</span>
-        <button aria-label="放大组织树" disabled={treeZoom >= 1.2} onClick={() => zoomTree(0.1)} type="button">＋</button>
+
+      <div className="explorer-sub-bar">
+        <label className="explorer-filter-input">
+          <Search size={14} />
+          <input
+            onChange={(event) => setFolderFilterQuery(event.target.value)}
+            placeholder="过滤当前层级文件夹..."
+            type="search"
+            value={folderFilterQuery}
+          />
+        </label>
+        <span className="explorer-count-summary">
+          共 {currentSubfolders.length} 个文件夹
+          {currentExplorerFolder && ` · ${currentExplorerFolder.bookmarkCount} 个直属书签`}
+        </span>
       </div>
-      <div className="tree-drop-guide">
-        <Link2 size={15} />
-        <span>左侧书签拖入文件夹；右侧文件夹可互相嵌套，拖到“全部书签”可移回顶级</span>
+
+      <div className="explorer-content-container">
+        {currentSubfolders.length === 0 ? (
+          <div className="explorer-empty-folder">
+            <div className="explorer-empty-icon">
+              <FolderOpen size={42} />
+            </div>
+            <h4>{folderFilterQuery ? '没有找到匹配的文件夹' : '此目录下暂无子文件夹'}</h4>
+            <p>
+              {currentExplorerFolder
+                ? `当前文件夹「${currentExplorerFolder.title}」共包含 ${currentExplorerFolder.bookmarkCount} 个书签。左侧列表可直接管理书签，或从其他目录拖入文件夹重组。`
+                : '当前服务器书签库暂无顶级文件夹。在书签库中创建或导入文件夹后将自动按 26 字母排序展示。'}
+            </p>
+            {currentExplorerFolder && (
+              <button className="secondary-button" onClick={navigateUp} type="button">
+                <ArrowLeft size={14} /> 返回上一级
+              </button>
+            )}
+          </div>
+        ) : folderLayoutMode === 'grid' ? (
+          <div className="explorer-folder-grid">
+            {currentSubfolders.map((folder) => {
+              const isBookmarkSource = drag?.kind === 'bookmarks' && drag.sourceFolderIds.has(folder.id)
+              const isFolderSource = drag?.kind === 'folder' && drag.folderId === folder.id
+              const isFolderDropDisabled = drag?.kind === 'folder' && (drag.invalidTargetIds.has(folder.id) || drag.sourceParentId === folder.id)
+              const isDropTarget = dropFolderId === folder.id && !isFolderDropDisabled
+              const isSelected = selectedFolderId === folder.id
+              const firstLetter = getFolderFirstLetter(folder.title)
+
+              return (
+                <div
+                  className={`explorer-card ${isSelected ? 'selected' : ''} ${isDropTarget ? 'folder-drop-target' : ''} ${isBookmarkSource ? 'source-folder' : ''} ${isFolderSource ? 'folder-drag-source' : ''} ${isFolderDropDisabled ? 'folder-drop-disabled' : ''}`}
+                  draggable={!moving}
+                  key={folder.id}
+                  onClick={() => selectFolder(folder.id)}
+                  onDoubleClick={() => enterFolder(folder.id)}
+                  onDragEnd={endDrag}
+                  onDragLeave={(event) => leaveDropTarget(event, folder.id)}
+                  onDragOver={(event) => allowDrop(event, folder.id)}
+                  onDragStart={(event) => beginFolderDrag(event, folder)}
+                  onDrop={(event) => dropOnFolder(event, folder.id)}
+                  title="单击选择并在左侧查看，双击进入下级；可拖动重组"
+                >
+                  <div className="explorer-card-header">
+                    <span className="explorer-letter-chip">{firstLetter}</span>
+                    <div className="explorer-card-icon-wrap">
+                      {isSelected ? <FolderOpen className="explorer-card-icon" size={26} /> : <Folder className="explorer-card-icon" size={26} />}
+                    </div>
+                    <button
+                      aria-label={`进入 ${folder.title}`}
+                      className="explorer-card-enter-btn"
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        enterFolder(folder.id)
+                      }}
+                      title="进入此文件夹"
+                      type="button"
+                    >
+                      <ArrowRight size={14} />
+                    </button>
+                  </div>
+
+                  <div className="explorer-card-body">
+                    <strong className="explorer-card-title" title={folder.title}>
+                      {folder.title}
+                    </strong>
+                    <div className="explorer-card-meta">
+                      <span>{folder.bookmarkCount} 书签</span>
+                      {folder.children.length > 0 && <span> · {folder.children.length} 子目录</span>}
+                    </div>
+                  </div>
+
+                  {isDropTarget && drag && (
+                    <div className="explorer-card-drop-badge">
+                      {drag.kind === 'folder' ? '移入此目录' : '放入此目录'}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        ) : (
+          <div className="explorer-folder-list">
+            <div className="explorer-list-head">
+              <span>文件夹名称</span>
+              <span>书签数</span>
+              <span>子文件夹</span>
+              <span style={{ textAlign: 'right' }}>操作</span>
+            </div>
+            <div className="explorer-list-body">
+              {currentSubfolders.map((folder) => {
+                const isBookmarkSource = drag?.kind === 'bookmarks' && drag.sourceFolderIds.has(folder.id)
+                const isFolderSource = drag?.kind === 'folder' && drag.folderId === folder.id
+                const isFolderDropDisabled = drag?.kind === 'folder' && (drag.invalidTargetIds.has(folder.id) || drag.sourceParentId === folder.id)
+                const isDropTarget = dropFolderId === folder.id && !isFolderDropDisabled
+                const isSelected = selectedFolderId === folder.id
+                const firstLetter = getFolderFirstLetter(folder.title)
+
+                return (
+                  <div
+                    className={`explorer-list-row ${isSelected ? 'selected' : ''} ${isDropTarget ? 'folder-drop-target' : ''} ${isBookmarkSource ? 'source-folder' : ''} ${isFolderSource ? 'folder-drag-source' : ''} ${isFolderDropDisabled ? 'folder-drop-disabled' : ''}`}
+                    draggable={!moving}
+                    key={folder.id}
+                    onClick={() => selectFolder(folder.id)}
+                    onDoubleClick={() => enterFolder(folder.id)}
+                    onDragEnd={endDrag}
+                    onDragLeave={(event) => leaveDropTarget(event, folder.id)}
+                    onDragOver={(event) => allowDrop(event, folder.id)}
+                    onDragStart={(event) => beginFolderDrag(event, folder)}
+                    onDrop={(event) => dropOnFolder(event, folder.id)}
+                  >
+                    <div className="explorer-list-col-name">
+                      <span className="explorer-letter-chip small">{firstLetter}</span>
+                      {isSelected ? <FolderOpen className="explorer-row-icon" size={18} /> : <Folder className="explorer-row-icon" size={18} />}
+                      <strong title={folder.title}>{folder.title}</strong>
+                    </div>
+                    <div className="explorer-list-col-count">
+                      <span className="explorer-count-badge">{folder.bookmarkCount}</span>
+                    </div>
+                    <div className="explorer-list-col-sub">
+                      {folder.children.length > 0 ? `${folder.children.length} 个` : '—'}
+                    </div>
+                    <div className="explorer-list-col-actions">
+                      <button
+                        className="explorer-row-enter-btn"
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          enterFolder(folder.id)
+                        }}
+                        title="进入文件夹"
+                        type="button"
+                      >
+                        <span>进入</span>
+                        <ArrowRight size={13} />
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="tree-drop-guide explorer-footer-guide">
+        <CornerDownRight size={15} />
+        <span>单击在左侧展示书签，双击/点击“进入”进入下级；拖动文件夹可互相嵌套，拖至上方路径栏可移回上级。</span>
       </div>
     </aside>
-  ), [allFolders, beginFolderDrag, drag, dropFolderId, endDrag, expandedIds, moving, refreshing, rootDropDisabled, selectedFolderId, tree, treeZoom])
+  ), [
+    beginFolderDrag,
+    currentExplorerFolder,
+    currentExplorerFolderId,
+    currentSubfolders,
+    drag,
+    dropFolderId,
+    endDrag,
+    explorerPath,
+    folderFilterQuery,
+    folderLayoutMode,
+    moving,
+    refreshing,
+    rootDropDisabled,
+    selectedFolderId,
+    tree?.bookmarks.length,
+  ])
 
   return <div className="category-management-page">
     {error && tree && <div aria-live="polite" className="bookmark-alert error"><strong>操作失败</strong><span>{error}</span></div>}
@@ -712,16 +932,6 @@ const CategoryVirtualList = memo(function CategoryVirtualList({
     </div>
   )
 })
-
-function FolderTreeNode({ folder, parentId, selectedFolderId, expandedIds, dropFolderId, drag, moving, depth = 0, onSelect, onToggle, onFolderDragStart, onDragEnd, onDragOver, onDragLeave, onDrop }: { folder: api.BookmarkFolder; parentId: string; selectedFolderId: string; expandedIds: Set<string>; dropFolderId: string | null; drag: DragState; moving: boolean; depth?: number; onSelect: (id: string) => void; onToggle: (id: string) => void; onFolderDragStart: (event: DragEvent<HTMLButtonElement>, folder: api.BookmarkFolder) => void; onDragEnd: () => void; onDragOver: (event: DragEvent<HTMLElement>, id: string | null) => void; onDrop: (event: DragEvent<HTMLElement>, id: string | null) => void; onDragLeave: (event: DragEvent<HTMLElement>, id: string | null) => void }) {
-  const expanded = expandedIds.has(folder.id)
-  const hasChildren = folderHasChildren(folder)
-  const isBookmarkSource = drag?.kind === 'bookmarks' && drag.sourceFolderIds.has(folder.id)
-  const isFolderSource = drag?.kind === 'folder' && drag.folderId === folder.id
-  const isFolderDropDisabled = drag?.kind === 'folder' && (drag.invalidTargetIds.has(folder.id) || drag.sourceParentId === folder.id)
-  const isDropTarget = dropFolderId === folder.id && !isFolderDropDisabled
-  return <div className="organization-node"><div className={`organization-folder-row ${selectedFolderId === folder.id ? 'active' : ''} ${isDropTarget ? 'folder-drop-target' : ''} ${isBookmarkSource ? 'source-folder' : ''} ${isFolderSource ? 'folder-drag-source' : ''} ${isFolderDropDisabled ? 'folder-drop-disabled' : ''}`} data-tree-node-id={folder.id} data-tree-parent-id={parentId} onDragLeave={(event) => onDragLeave(event, folder.id)} onDragOver={(event) => onDragOver(event, folder.id)} onDrop={(event) => onDrop(event, folder.id)} style={{ '--folder-depth': depth } as React.CSSProperties}>{hasChildren ? <button aria-expanded={expanded} aria-label={`${expanded ? '折叠' : '展开'} ${folder.title}`} className="organization-toggle" onClick={() => onToggle(folder.id)} type="button">{expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</button> : <span aria-hidden="true" className="organization-toggle-spacer" />}<button aria-current={selectedFolderId === folder.id ? 'page' : undefined} aria-label={`拖动文件夹 ${folder.title}`} className="organization-folder-button" disabled={moving} draggable={!moving} onClick={() => onSelect(folder.id)} onDragEnd={onDragEnd} onDragStart={(event) => onFolderDragStart(event, folder)} title="拖动到其他文件夹可移动整棵分支" type="button">{expanded ? <FolderOpen size={17} /> : <Folder size={17} />}<span>{folder.title}</span><small>{folder.bookmarkCount}</small></button>{isDropTarget && drag && <span className="folder-drop-label">{drag.kind === 'folder' ? '移动到此处' : '放入此处'}</span>}</div>{expanded && hasChildren && <div className="organization-children">{folder.children.map((child) => <FolderTreeNode depth={depth + 1} drag={drag} dropFolderId={dropFolderId} expandedIds={expandedIds} folder={child} key={child.id} moving={moving} onDragEnd={onDragEnd} onDragLeave={onDragLeave} onDragOver={onDragOver} onDrop={onDrop} onFolderDragStart={onFolderDragStart} onSelect={onSelect} onToggle={onToggle} parentId={folder.id} selectedFolderId={selectedFolderId} />)}</div>}</div>
-}
 
 function toggleSet(current: Set<string>, id: string) { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next }
 function allFolderIds(folders: api.BookmarkFolder[]): string[] { return folders.flatMap((folder) => [folder.id, ...allFolderIds(folder.children)]) }
