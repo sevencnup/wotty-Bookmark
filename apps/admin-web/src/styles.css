@@ -2399,6 +2399,8 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 }
 
 .category-bookmark-list {
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
@@ -2557,8 +2559,10 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 .category-management-page .category-bookmarks-panel .category-bookmark-list {
   min-height: 0;
   flex: 1;
-  overflow-y: auto;
-  overflow-x: hidden;
+  overflow: hidden;
+}
+
+.category-virtual-scroll-container {
   scrollbar-color: #b9c8e4 transparent;
 }
 
