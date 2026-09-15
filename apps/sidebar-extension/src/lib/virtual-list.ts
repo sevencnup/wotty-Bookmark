@@ -5,7 +5,7 @@ export type VirtualWindow = {
   totalSize: number;
 };
 
-/** Calculate the slice of rows needed for the current viewport in the sidebar. */
+/** Calculate the slice of rows needed for fixed-height items in the viewport. */
 export function getVirtualWindow(
   total: number,
   scrollTop: number,
@@ -28,5 +28,72 @@ export function getVirtualWindow(
     end: Math.max(start, end),
     offset: start * safeHeight,
     totalSize: safeTotal * safeHeight,
+  };
+}
+
+/** Calculate the slice of rows needed for variable-height items in the viewport. */
+export function getVariableVirtualWindow(
+  itemHeights: number[],
+  scrollTop: number,
+  viewportHeight: number,
+  overscan = 6,
+): VirtualWindow {
+  const total = itemHeights.length;
+  if (total === 0) {
+    return { start: 0, end: 0, offset: 0, totalSize: 0 };
+  }
+
+  const positions: number[] = new Array(total + 1);
+  positions[0] = 0;
+  for (let i = 0; i < total; i++) {
+    positions[i + 1] = positions[i] + Math.max(1, itemHeights[i]);
+  }
+  const totalSize = positions[total];
+
+  if (Math.max(0, scrollTop) >= totalSize) {
+    return { start: total, end: total, offset: totalSize, totalSize };
+  }
+
+  const safeScrollTop = Math.max(0, scrollTop);
+  const safeOverscan = Math.max(0, Math.floor(overscan));
+
+  // Binary search for the first visible item
+  let low = 0;
+  let high = total - 1;
+  let firstVisible = 0;
+  while (low <= high) {
+    const mid = (low + high) >> 1;
+    if (positions[mid + 1] > safeScrollTop) {
+      firstVisible = mid;
+      high = mid - 1;
+    } else {
+      low = mid + 1;
+    }
+  }
+
+  // Binary search for the last visible item
+  const viewportBottom = safeScrollTop + Math.max(1, viewportHeight);
+  low = firstVisible;
+  high = total - 1;
+  let lastVisible = firstVisible;
+  while (low <= high) {
+    const mid = (low + high) >> 1;
+    if (positions[mid] < viewportBottom) {
+      lastVisible = mid;
+      low = mid + 1;
+    } else {
+      high = mid - 1;
+    }
+  }
+
+  const start = Math.max(0, firstVisible - safeOverscan);
+  const end = Math.min(total, lastVisible + 1 + safeOverscan);
+  const offset = positions[start];
+
+  return {
+    start,
+    end: Math.max(start, end),
+    offset,
+    totalSize,
   };
 }

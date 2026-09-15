@@ -10,7 +10,7 @@ import type { LibraryFolder, LibraryTree } from './lib/library';
 import { loadSiteFavicon } from './lib/site-favicon';
 import { loadSidebarLocale, refreshSidebarLocale } from './lib/preferences';
 import type { SidebarLocale } from './lib/preferences';
-import { getVirtualWindow } from './lib/virtual-list';
+import { getVariableVirtualWindow, getVirtualWindow } from './lib/virtual-list';
 import { SidebarUiLocalization } from './sidebar-i18n';
 
 type Modal = { type: 'connect' } | { type: 'create'; kind: 'bookmark' | 'folder'; parentId?: string } | { type: 'edit' | 'move' | 'delete'; nodeId: string } | null;
@@ -18,8 +18,9 @@ type Editor = { kind: 'bookmark' | 'folder'; title: string; url: string; parentI
 type RefreshOptions = { silent?: boolean };
 const AUTO_REFRESH_INTERVAL_MS = 10_000;
 const LANGUAGE_REFRESH_INTERVAL_MS = 10 * 60_000;
-const BOOKMARK_ROW_HEIGHT = 38;
-const SEARCH_ROW_HEIGHT = 50;
+const FOLDER_ROW_HEIGHT = 38;
+const BOOKMARK_ROW_HEIGHT = 52;
+const SEARCH_ROW_HEIGHT = 56;
 
 function toNodes(tree: LibraryTree): BookmarkNode[] {
   const build = (folder: LibraryFolder): BookmarkNode => ({ id: folder.id, title: folder.title, children: folder.children.map(build) });
@@ -221,9 +222,11 @@ function App() {
 }
 
 function VirtualBookmarkList({ visible, expanded, scrollTop, viewportHeight, onToggle, onEdit, onMove, onDelete }: { visible: Array<BookmarkNode & { depth: number }>; expanded: Set<string>; scrollTop: number; viewportHeight: number; onToggle: (nodeId: string) => void; onEdit: (nodeId: string) => void; onMove: (nodeId: string) => void; onDelete: (nodeId: string) => void }) {
-  const win = getVirtualWindow(visible.length, scrollTop, viewportHeight, BOOKMARK_ROW_HEIGHT, 8);
+  const itemHeights = useMemo(() => visible.map((node) => (isFolder(node) ? FOLDER_ROW_HEIGHT : BOOKMARK_ROW_HEIGHT)), [visible]);
+  const win = getVariableVirtualWindow(itemHeights, scrollTop, viewportHeight, 8);
   const slice = visible.slice(win.start, win.end);
-  const bottomPadding = Math.max(0, win.totalSize - win.offset - (slice.length * BOOKMARK_ROW_HEIGHT));
+  const sliceHeights = itemHeights.slice(win.start, win.end).reduce((sum, h) => sum + h, 0);
+  const bottomPadding = Math.max(0, win.totalSize - win.offset - sliceHeights);
 
   return (
     <div className="bookmark-list" style={{ paddingTop: `${win.offset}px`, paddingBottom: `${bottomPadding}px` }}>
@@ -274,7 +277,7 @@ function VirtualSearchList({ results, scrollTop, viewportHeight, onEdit, onMove,
   );
 }
 
-function NodeRow({ node, expanded, onToggle, onOpen, onEdit, onMove, onDelete }: { node: BookmarkNode & { depth: number }; expanded: boolean; onToggle: () => void; onOpen: () => void; onEdit: () => void; onMove: () => void; onDelete: () => void }) { const folder = isFolder(node); const depth = node.depth; const bookmarkCount = folder ? countBookmarks(node.children ?? []) : 0; return <div className={`bookmark-row ${folder ? 'bookmark-folder-row' : ''}`} style={{ '--depth': depth } as React.CSSProperties}><div className="bookmark-row-main">{folder ? <button className="folder-toggle" onClick={onToggle} type="button">{expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}</button> : <span className="folder-toggle-spacer" />}<span className={`node-icon ${folder ? 'folder-color' : ''}`}>{folder ? <span className="folder-icon-card">{expanded ? <FolderOpen size={15} /> : <Folder size={15} />}</span> : <Favicon url={node.url!} />}</span><button className="bookmark-title" onClick={folder ? onToggle : onOpen} type="button">{node.title || '未命名'}</button>{folder && <span aria-label={`${bookmarkCount} 个书签`} className="folder-count-badge">{bookmarkCount}</span>}<div className="row-actions"><button aria-label="编辑" className="row-action" onClick={onEdit} type="button"><Pencil size={14} /></button><button aria-label="移动" className="row-action" onClick={onMove} type="button">↗</button><button aria-label="删除" className="row-action danger-action" onClick={onDelete} type="button"><Trash2 size={14} /></button></div></div>{node.url && <span className="bookmark-url">{hostname(node.url)}</span>}</div>; }
+function NodeRow({ node, expanded, onToggle, onOpen, onEdit, onMove, onDelete }: { node: BookmarkNode & { depth: number }; expanded: boolean; onToggle: () => void; onOpen: () => void; onEdit: () => void; onMove: () => void; onDelete: () => void }) { const folder = isFolder(node); const depth = node.depth; const bookmarkCount = folder ? countBookmarks(node.children ?? []) : 0; return <div className={`bookmark-row ${folder ? 'bookmark-folder-row' : 'bookmark-item-row'}`} style={{ '--depth': depth } as React.CSSProperties}><div className="bookmark-row-main">{folder ? <button className="folder-toggle" onClick={onToggle} type="button">{expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}</button> : <span className="folder-toggle-spacer" />}<span className={`node-icon ${folder ? 'folder-color' : ''}`}>{folder ? <span className="folder-icon-card">{expanded ? <FolderOpen size={15} /> : <Folder size={15} />}</span> : <Favicon url={node.url!} />}</span><button className="bookmark-title" onClick={folder ? onToggle : onOpen} type="button">{node.title || '未命名'}</button>{folder && <span aria-label={`${bookmarkCount} 个书签`} className="folder-count-badge">{bookmarkCount}</span>}<div className="row-actions"><button aria-label="编辑" className="row-action" onClick={onEdit} type="button"><Pencil size={14} /></button><button aria-label="移动" className="row-action" onClick={onMove} type="button">↗</button><button aria-label="删除" className="row-action danger-action" onClick={onDelete} type="button"><Trash2 size={14} /></button></div></div>{node.url && <span className="bookmark-url">{hostname(node.url)}</span>}</div>; }
 const faviconMemoryCache = new Map<string, Awaited<ReturnType<typeof loadSiteFavicon>>>();
 function Favicon({ url }: { url: string }) { const cached = faviconMemoryCache.get(url); const [asset, setAsset] = useState<Awaited<ReturnType<typeof loadSiteFavicon>>>(cached ?? null); useEffect(() => { if (cached !== undefined) return; void loadSiteFavicon(url).then((next) => { faviconMemoryCache.set(url, next); setAsset(next); }); }, [url, cached]); if (asset?.kind === 'image') return <img alt="" className="site-favicon" height={16} src={asset.source} width={16} />; if (asset?.kind === 'svg') return <span aria-hidden="true" className="site-favicon-svg" dangerouslySetInnerHTML={{ __html: asset.source }} />; return <Bookmark size={15} />; }
 function Loading() { return <div className="loading-state"><LoaderCircle className="spin" size={24} /><span>正在读取服务器书签库…</span></div>; }
