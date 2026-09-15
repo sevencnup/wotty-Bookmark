@@ -74,6 +74,10 @@ const englishText: Record<string, string> = {
   '语言偏好读取失败': 'Could not load language preference',
   '服务器返回了不支持的界面语言': 'The server returned an unsupported interface language',
   '服务器是唯一数据源': 'The server is the only data source',
+  '搜索文件夹…': 'Search folders…',
+  '搜索文件夹': 'Search folders',
+  '无匹配文件夹': 'No matching folders',
+  '选择文件夹': 'Select folder',
 };
 
 const englishPatterns: Array<[RegExp, string]> = [

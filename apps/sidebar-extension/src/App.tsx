@@ -11,6 +11,8 @@ import { loadSiteFavicon } from './lib/site-favicon';
 import { loadSidebarLocale, refreshSidebarLocale } from './lib/preferences';
 import type { SidebarLocale } from './lib/preferences';
 import { getVariableVirtualWindow, getVirtualWindow } from './lib/virtual-list';
+import { FolderPickerDropdown } from './components/FolderPickerDropdown';
+import type { FolderOption } from './components/FolderPickerDropdown';
 import { SidebarUiLocalization } from './sidebar-i18n';
 
 type Modal = { type: 'connect' } | { type: 'create'; kind: 'bookmark' | 'folder'; parentId?: string } | { type: 'edit' | 'move' | 'delete'; nodeId: string } | null;
@@ -206,7 +208,23 @@ function App() {
     <section className="workspace" ref={workspaceRef}>
       <div className="server-library-banner"><Server size={15} /><span><strong>只保存到服务器</strong> · 不读取或写入浏览器原生书签</span></div>
       <div className="search-shell"><Search size={16} /><input aria-label="搜索服务器书签" disabled={!connection} onChange={(event) => setQuery(event.target.value)} placeholder="搜索服务器书签或网址" type="search" value={query} />{query && <button className="icon-button" onClick={() => setQuery('')} type="button"><X size={14} /></button>}</div>
-      <section className={`quick-save-card ${!activeTab || !connection ? 'is-disabled' : ''}`}><div className="quick-save-icon"><Globe size={17} /></div><div className="quick-save-copy"><span className="eyebrow">收藏当前页 · SERVER</span><strong {...(!activeTab ? { 'data-i18n-force': '' } : {})}>{activeTab?.title ?? '当前页面不可收藏'}</strong><span>{activeTab ? hostname(activeTab.url) : '请在普通网页中打开侧边栏'}</span></div><label className="quick-save-folder"><Folder size={13} /><span className="sr-only">保存到文件夹</span><select aria-label="收藏到文件夹" disabled={!activeTab || !connection || currentSaved || busy} onChange={(event) => setQuickSaveFolder(event.target.value)} value={quickSaveFolder}><option data-i18n-force value="">根目录</option>{folderOptions.map((folder) => <option key={folder.id} value={folder.id}>{'　'.repeat(folder.depth)}{folder.title}</option>)}</select></label><button className={`save-current-button ${currentSaved ? 'is-saved' : ''}`} disabled={!activeTab || !connection || currentSaved || busy} onClick={() => activeTab && void perform((active) => createLibraryBookmark(active, { title: activeTab.title, url: activeTab.url, parentId: quickSaveFolder || null }))} type="button">{currentSaved ? <Check size={15} /> : '收藏'}</button></section>
+      <section className={`quick-save-card ${!activeTab || !connection ? 'is-disabled' : ''}`}>
+        <div className="quick-save-icon"><Globe size={17} /></div>
+        <div className="quick-save-copy">
+          <span className="eyebrow">收藏当前页 · SERVER</span>
+          <strong {...(!activeTab ? { 'data-i18n-force': '' } : {})}>{activeTab?.title ?? '当前页面不可收藏'}</strong>
+          <span>{activeTab ? hostname(activeTab.url) : '请在普通网页中打开侧边栏'}</span>
+        </div>
+        <FolderPickerDropdown
+          ariaLabel="收藏到文件夹"
+          compact
+          disabled={!activeTab || !connection || currentSaved || busy}
+          onChange={setQuickSaveFolder}
+          options={folderOptions}
+          value={quickSaveFolder}
+        />
+        <button className={`save-current-button ${currentSaved ? 'is-saved' : ''}`} disabled={!activeTab || !connection || currentSaved || busy} onClick={() => activeTab && void perform((active) => createLibraryBookmark(active, { title: activeTab.title, url: activeTab.url, parentId: quickSaveFolder || null }))} type="button">{currentSaved ? <Check size={15} /> : '收藏'}</button>
+      </section>
       <div className="section-heading"><div><span className="section-kicker">PRIVATE LIBRARY</span><h1>我的服务器书签</h1></div><div className="heading-actions"><button className="new-bookmark-button" disabled={!connection} onClick={() => setModal({ type: 'create', kind: 'folder' })} type="button"><Folder size={15} />文件夹</button><button className="new-bookmark-button primary" disabled={!connection} onClick={() => setModal({ type: 'create', kind: 'bookmark' })} type="button"><Plus size={15} />新增</button></div></div>
       <div className="library-meta"><span>{countBookmarks(nodes)} 个书签</span><span className="meta-separator">·</span><span>{countFolders(nodes)} 个文件夹</span><span className="sync-time" title="侧边栏每 10 秒自动同步一次，重新聚焦时会立即同步">{formatSyncTime(lastSyncedAt)}</span><span className="meta-spacer" /><button className="refresh-button" disabled={!connection || loading} onClick={() => void refresh()} type="button"><RefreshCw className={loading ? 'spin' : ''} size={13} />刷新</button></div>
       {!connection ? <Disconnected onConnect={() => setModal({ type: 'connect' })} /> : error && !tree ? <Failure message={error} onRetry={() => void refresh()} /> : loading ? <Loading /> : query.trim() ? <VirtualSearchList onDelete={(nodeId) => setModal({ type: 'edit', nodeId })} onEdit={(nodeId) => setModal({ type: 'edit', nodeId })} onMove={(nodeId) => setModal({ type: 'move', nodeId })} results={results} scrollTop={scrollTop} viewportHeight={viewportHeight} /> : visible.length ? <VirtualBookmarkList expanded={expanded} onDelete={(nodeId) => setModal({ type: 'delete', nodeId })} onEdit={(nodeId) => setModal({ type: 'edit', nodeId })} onMove={(nodeId) => setModal({ type: 'move', nodeId })} onToggle={(nodeId) => setExpanded((current) => { const next = new Set(current); if (next.has(nodeId)) next.delete(nodeId); else next.add(nodeId); return next; })} scrollTop={scrollTop} viewportHeight={viewportHeight} visible={visible} /> : <Empty onCreate={() => setModal({ type: 'create', kind: 'bookmark' })} />}{error && tree && <p className="inline-error">{error}</p>}
@@ -286,7 +304,66 @@ function Failure({ message, onRetry }: { message: string; onRetry: () => void })
 function Empty({ onCreate }: { onCreate: () => void }) { return <div className="empty-state"><div className="empty-orbit"><Bookmark size={23} /></div><strong>书签库还是空的</strong><span>在当前页点击“收藏”，或手动添加第一条服务器书签。</span><button onClick={onCreate} type="button"><Plus size={14} /> 新增书签</button></div>; }
 function Frame({ title, children, onClose }: { title: string; children: React.ReactNode; onClose: () => void }) { return <div className="modal-backdrop"><section className="modal-card"><header className="modal-header"><div><p className="section-kicker">SERVER LIBRARY</p><h2>{title}</h2></div><button className="modal-close" onClick={onClose} type="button"><X size={16} /></button></header>{children}</section></div>; }
 function ConnectionModal({ busy, connection, onClose, onConnect, onDisconnect }: { busy: boolean; connection: BackendConnection | null; onClose: () => void; onConnect: (serverUrl: string, code: string) => void; onDisconnect: () => void }) { const [serverUrl, setServerUrl] = useState(''); const [code, setCode] = useState(''); return <Frame onClose={onClose} title={connection ? '服务器已连接' : '连接服务器'}>{connection ? <div className="connection-content"><div className="connection-status-card"><Server size={20} /><div><strong>服务器书签库已启用</strong><span>{connection.loginIdentifier}</span></div></div><p className="connection-help">侧边栏收藏会直接保存到服务器；不会读取或写入浏览器原生书签。</p><div className="modal-actions"><button className="secondary-button" onClick={onClose} type="button">关闭</button><button className="danger-button" disabled={busy} onClick={onDisconnect} type="button">断开连接</button></div></div> : <form className="editor-form" onSubmit={(event) => { event.preventDefault(); onConnect(serverUrl, code); }}><p className="connection-help">从管理后台生成一次性设备码。这里只建立服务器书签库连接，不需要 WebDAV 密码。</p><label className="field-label">API 地址<input autoFocus onChange={(event) => setServerUrl(event.target.value)} placeholder="https://bookmark.example.com" required type="url" value={serverUrl} /></label><label className="field-label">一次性设备码<input onChange={(event) => setCode(event.target.value)} placeholder="bv_..." required value={code} /></label><div className="modal-actions"><button className="secondary-button" onClick={onClose} type="button">取消</button><button className="primary-button" disabled={busy} type="submit">{busy ? '连接中…' : '连接服务器'}</button></div></form>}</Frame>; }
-function EditorModal({ busy, node, initial, nodes, onClose, onSubmit }: { busy: boolean; node?: BookmarkNode; initial?: Partial<Editor>; nodes: BookmarkNode[]; onClose: () => void; onSubmit: (value: Editor) => void }) { const [value, setValue] = useState<Editor>({ kind: node ? (node.url ? 'bookmark' : 'folder') : initial?.kind ?? 'bookmark', title: node?.title ?? '', url: node?.url ?? '', parentId: node?.parentId ?? initial?.parentId ?? '' }); const choices = getFolderOptions(nodes, node && isFolder(node) ? node.id : undefined); return <Frame onClose={onClose} title={node ? '编辑服务器书签' : value.kind === 'folder' ? '新建文件夹' : '新建服务器书签'}><form className="editor-form" onSubmit={(event) => { event.preventDefault(); onSubmit(value); }}><label className="field-label">名称<input autoFocus onChange={(event) => setValue({ ...value, title: event.target.value })} required value={value.title} /></label>{value.kind === 'bookmark' && <label className="field-label">网址<input onChange={(event) => setValue({ ...value, url: event.target.value })} placeholder="https://example.com" required type="url" value={value.url} /></label>}<label className="field-label">保存到<select onChange={(event) => setValue({ ...value, parentId: event.target.value })} value={value.parentId}><option data-i18n-force value="">根目录</option>{choices.map((folder) => <option key={folder.id} value={folder.id}>{folder.title}</option>)}</select></label><div className="modal-actions"><button className="secondary-button" onClick={onClose} type="button">取消</button><button className="primary-button" disabled={busy || !value.title.trim() || (value.kind === 'bookmark' && !value.url.trim())} type="submit">{busy ? '保存中…' : '保存到服务器'}</button></div></form></Frame>; }
-function MoveModal({ busy, node, nodes, onClose, onSubmit }: { busy: boolean; node?: BookmarkNode; nodes: BookmarkNode[]; onClose: () => void; onSubmit: (parent: string) => void }) { if (!node) return null; const choices = getFolderOptions(nodes, isFolder(node) ? node.id : undefined); const [parent, setParent] = useState(node.parentId ?? ''); return <Frame onClose={onClose} title="移动服务器书签"><form className="editor-form" onSubmit={(event) => { event.preventDefault(); onSubmit(parent); }}><label className="field-label">目标文件夹<select onChange={(event) => setParent(event.target.value)} value={parent}><option data-i18n-force value="">根目录</option>{choices.map((folder) => <option key={folder.id} value={folder.id}>{folder.title}</option>)}</select></label><div className="modal-actions"><button className="secondary-button" onClick={onClose} type="button">取消</button><button className="primary-button" disabled={busy} type="submit">{busy ? '移动中…' : '移动'}</button></div></form></Frame>; }
+function EditorModal({ busy, node, initial, nodes, onClose, onSubmit }: { busy: boolean; node?: BookmarkNode; initial?: Partial<Editor>; nodes: BookmarkNode[]; onClose: () => void; onSubmit: (value: Editor) => void }) {
+  const [value, setValue] = useState<Editor>({
+    kind: node ? (node.url ? 'bookmark' : 'folder') : initial?.kind ?? 'bookmark',
+    title: node?.title ?? '',
+    url: node?.url ?? '',
+    parentId: node?.parentId ?? initial?.parentId ?? '',
+  });
+  const choices = getFolderOptions(nodes, node && isFolder(node) ? node.id : undefined);
+  return (
+    <Frame onClose={onClose} title={node ? '编辑服务器书签' : value.kind === 'folder' ? '新建文件夹' : '新建服务器书签'}>
+      <form className="editor-form" onSubmit={(event) => { event.preventDefault(); onSubmit(value); }}>
+        <label className="field-label">
+          名称
+          <input autoFocus onChange={(event) => setValue({ ...value, title: event.target.value })} required value={value.title} />
+        </label>
+        {value.kind === 'bookmark' && (
+          <label className="field-label">
+            网址
+            <input onChange={(event) => setValue({ ...value, url: event.target.value })} placeholder="https://example.com" required type="url" value={value.url} />
+          </label>
+        )}
+        <label className="field-label">
+          保存到
+          <FolderPickerDropdown
+            onChange={(parentId) => setValue({ ...value, parentId })}
+            options={choices}
+            value={value.parentId}
+          />
+        </label>
+        <div className="modal-actions">
+          <button className="secondary-button" onClick={onClose} type="button">取消</button>
+          <button className="primary-button" disabled={busy || !value.title.trim() || (value.kind === 'bookmark' && !value.url.trim())} type="submit">{busy ? '保存中…' : '保存到服务器'}</button>
+        </div>
+      </form>
+    </Frame>
+  );
+}
+
+function MoveModal({ busy, node, nodes, onClose, onSubmit }: { busy: boolean; node?: BookmarkNode; nodes: BookmarkNode[]; onClose: () => void; onSubmit: (parent: string) => void }) {
+  if (!node) return null;
+  const choices = getFolderOptions(nodes, isFolder(node) ? node.id : undefined);
+  const [parent, setParent] = useState(node.parentId ?? '');
+  return (
+    <Frame onClose={onClose} title="移动服务器书签">
+      <form className="editor-form" onSubmit={(event) => { event.preventDefault(); onSubmit(parent); }}>
+        <label className="field-label">
+          目标文件夹
+          <FolderPickerDropdown
+            onChange={setParent}
+            options={choices}
+            value={parent}
+          />
+        </label>
+        <div className="modal-actions">
+          <button className="secondary-button" onClick={onClose} type="button">取消</button>
+          <button className="primary-button" disabled={busy} type="submit">{busy ? '移动中…' : '移动'}</button>
+        </div>
+      </form>
+    </Frame>
+  );
+}
 function DeleteModal({ busy, node, onClose, onConfirm }: { busy: boolean; node?: BookmarkNode; onClose: () => void; onConfirm: () => void }) { if (!node) return null; return <Frame onClose={onClose} title={node.url ? '删除书签？' : '删除文件夹？'}><div className="delete-content"><Trash2 size={20} /><p>将 <strong>{node.title}</strong> 移入服务器书签库回收站。{node.url ? '' : '文件夹中的内容也会一并移入。'}</p></div><div className="modal-actions"><button className="secondary-button" onClick={onClose} type="button">取消</button><button className="danger-button" disabled={busy} onClick={onConfirm} type="button">{busy ? '删除中…' : '移入回收站'}</button></div></Frame>; }
 export default App;
