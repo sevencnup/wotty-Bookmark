@@ -2267,7 +2267,8 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 .category-root-row, .organization-folder-button { display: flex; align-items: center; gap: 9px; width: 100%; min-height: 38px; padding: 0 10px; border: 0; border-radius: var(--radius-sm); color: var(--ink-secondary); background: transparent; font-size: 13px; text-align: left; transition: background var(--duration) var(--ease), color var(--duration) var(--ease); }
 .category-root-row:hover, .category-root-row.active, .organization-folder-row:hover, .organization-folder-row.active { color: var(--primary); background: var(--primary-soft); }
 .category-root-row small, .organization-folder-button small { margin-left: auto; color: var(--soft-muted); font-size: 11px; }
-.category-root-row svg, .organization-folder-button svg { flex: 0 0 auto; color: currentColor; }
+.category-root-row svg { flex: 0 0 auto; color: currentColor; }
+.organization-folder-button svg { flex: 0 0 auto; color: #d97706; }
 .organization-tree { position: relative; display: grid; gap: 2px; min-height: 520px; max-height: min(72vh, 820px); margin-top: 8px; padding: 16px 18px 22px; overflow: auto; background: linear-gradient(180deg, #fbfdff 0%, #f8fbff 100%); border: 1px solid #e3ebf6; border-radius: var(--radius-lg); }
 .organization-tree-canvas { min-width: 520px; min-height: 100%; transition: transform var(--duration) var(--ease); }
 .organization-root-node { position: relative; min-width: 460px; padding: 12px 12px 30px; }
@@ -3435,37 +3436,39 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   transform: translateY(-50%);
 }
 
-/* 分类管理：文件夹目录带，与白底书签内容建立清晰层级 */
+/* 分类管理：文件夹目录带，极简行设计，与白底书签内容建立清晰层级 */
 .category-management-page .category-bookmark-group > .category-bookmark-group-header {
-  border-right: 1px solid #c9d8f2 !important;
-  border-bottom: 1px solid #b9ccec !important;
-  border-left: 1px solid #c9d8f2 !important;
-  background: linear-gradient(90deg, #dce9ff 0%, #e8f1ff 58%, #f0f5ff 100%) !important;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72), 0 2px 7px rgba(63, 91, 153, 0.08) !important;
+  border-right: 0 !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+  border-left: 0 !important;
+  background: #fafbfc !important;
+  box-shadow: none !important;
   width: calc(100% - (var(--folder-depth, 0) * 14px)) !important;
   margin-left: calc(var(--folder-depth, 0) * 14px);
 }
 
 .category-management-page .category-bookmark-group > .category-bookmark-group-header:hover {
-  background: linear-gradient(90deg, #d2e3ff 0%, #e1edff 58%, #edf4ff 100%) !important;
+  background: #f1f5f9 !important;
 }
 
 .category-management-page .category-bookmark-group.collapsed > .category-bookmark-group-header {
-  background: linear-gradient(90deg, #e8f0ff 0%, #f0f5ff 62%, #f6f8fc 100%) !important;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.76) !important;
+  background: #f8fafc !important;
+  box-shadow: none !important;
 }
 
 .category-management-page .category-bookmark-group > .category-bookmark-group-header .category-group-icon {
-  border-color: #b2c7ee !important;
-  color: #2f5fbd !important;
-  background: #ffffff !important;
-  box-shadow: 0 2px 5px rgba(47, 95, 189, 0.1);
+  border: 0 !important;
+  color: #d97706 !important;
+  background: transparent !important;
+  box-shadow: none !important;
 }
 
 .category-management-page .category-bookmark-group > .category-bookmark-group-header .category-group-count {
-  border-color: #b4c8ec !important;
-  color: #2f559d !important;
-  background: rgba(255, 255, 255, 0.84) !important;
+  border: 1px solid var(--line) !important;
+  color: var(--muted) !important;
+  background: #ffffff !important;
+  font-size: 11px !important;
+  font-weight: 500 !important;
 }
 
 .category-management-page .category-bookmark-group > .category-group-items,
@@ -3576,17 +3579,16 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   grid-template-columns: 24px 26px minmax(0, 1fr) auto;
   align-items: center;
   gap: 4px;
-  min-height: 48px;
-  padding: 6px 12px;
-  border-bottom: 1px solid #dce6f3;
-  background:
-    linear-gradient(90deg, rgba(219, 234, 254, 0.72), rgba(244, 248, 255, 0.96) 52%, rgba(248, 250, 252, 0.98));
-  box-shadow: 0 2px 8px rgba(30, 64, 175, 0.045);
+  min-height: 40px;
+  padding: 4px 12px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #fafbfc;
+  box-shadow: none;
 }
 
 .category-bookmark-group.collapsed .category-bookmark-group-header {
   border-bottom: 0;
-  background: linear-gradient(90deg, #f1f5fb, #f8fafc);
+  background: #f8fafc;
   box-shadow: none;
 }
 
@@ -3635,9 +3637,9 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 
 .category-group-summary strong {
   overflow: hidden;
-  color: #263b5f;
-  font-size: 12px;
-  font-weight: 750;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -3655,23 +3657,27 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   display: grid;
   flex: 0 0 auto;
   place-items: center;
-  width: 28px;
-  height: 28px;
-  border: 1px solid rgba(96, 136, 204, 0.18);
-  border-radius: 8px;
-  color: #356fc8;
-  background: rgba(255, 255, 255, 0.72);
+  width: 20px;
+  height: 20px;
+  border: 0;
+  border-radius: var(--radius-xs);
+  color: #d97706;
+  background: transparent;
 }
 
 .category-group-count {
-  min-width: 25px;
-  padding: 3px 7px;
-  border: 1px solid rgba(96, 136, 204, 0.18);
-  border-radius: 999px;
-  color: #52709f;
-  background: rgba(255, 255, 255, 0.76);
-  font-size: 10px;
-  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-full);
+  color: var(--muted);
+  background: #ffffff;
+  font-size: 11px;
+  font-weight: 500;
   text-align: center;
 }
 
@@ -3835,10 +3841,10 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 
 .category-management-page .category-group-icon {
   display: grid !important;
-  flex: 0 0 28px !important;
+  flex: 0 0 20px !important;
   place-items: center !important;
-  width: 28px !important;
-  height: 28px !important;
+  width: 20px !important;
+  height: 20px !important;
 }
 
 .category-management-page .category-group-summary strong,
@@ -3854,7 +3860,8 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
-  min-width: 25px !important;
+  min-width: 20px !important;
+  height: 20px !important;
   white-space: nowrap !important;
 }
 
