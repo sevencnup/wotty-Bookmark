@@ -62,12 +62,13 @@ export function FolderPickerDropdown({
     };
   }, [open]);
 
-  // 打开时自动聚焦搜索框
+  // 打开时自动聚焦搜索框并确保在弹窗/容器可视区域内
   useEffect(() => {
     if (open) {
       setQuery('');
       requestAnimationFrame(() => {
         searchInputRef.current?.focus();
+        containerRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
       });
     }
   }, [open]);
