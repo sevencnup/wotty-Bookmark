@@ -204,7 +204,7 @@ function App() {
   });
 
   return <SidebarUiLocalization locale={locale}><main className="app-shell self-hosted-library">
-    <header className="topbar"><div className="brand-lockup"><div className="brand-mark"><img alt="WOTTY BOOKMARK" className="brand-logo-img" src="/logo.png" /></div><div><div className="brand-title">书签库</div><div className="brand-subtitle">WOTTY · SERVER LIBRARY</div></div></div><button className={`sync-status ${connection ? 'is-connected' : 'is-disconnected'}`} onClick={() => setModal({ type: 'connect' })} type="button"><span className="status-dot" />{connection ? '服务器已连接' : '连接服务器'}<Server size={13} /></button></header>
+    <header className="topbar"><div className="brand-lockup"><div className="brand-mark"><img alt="WOTTY BOOKMARK" className="brand-logo-img" src="/logo.webp" /></div><div><div className="brand-title">书签库</div><div className="brand-subtitle">WOTTY · SERVER LIBRARY</div></div></div><button className={`sync-status ${connection ? 'is-connected' : 'is-disconnected'}`} onClick={() => setModal({ type: 'connect' })} type="button"><span className="status-dot" />{connection ? '服务器已连接' : '连接服务器'}<Server size={13} /></button></header>
     <section className="workspace" ref={workspaceRef}>
       <div className="server-library-banner"><Server size={15} /><span><strong>只保存到服务器</strong> · 不读取或写入浏览器原生书签</span></div>
       <div className="search-shell"><Search size={16} /><input aria-label="搜索服务器书签" disabled={!connection} onChange={(event) => setQuery(event.target.value)} placeholder="搜索服务器书签或网址" type="search" value={query} />{query && <button className="icon-button" onClick={() => setQuery('')} type="button"><X size={14} /></button>}</div>

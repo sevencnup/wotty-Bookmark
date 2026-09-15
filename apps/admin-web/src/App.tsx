@@ -169,7 +169,7 @@ function NavIcon({ name, size = 18 }: { name: NavIconName; size?: number }) {
   }
 }
 
-function BrandLogo({ size = 20, src = '/logo.png' }: { size?: number; src?: string }) {
+function BrandLogo({ size = 20, src = '/logo.webp' }: { size?: number; src?: string }) {
   return (
     <img
       alt="Wotty Bookmark Logo"

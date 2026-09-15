@@ -21,17 +21,17 @@ export default defineConfig({
     action: {
       default_title: '打开服务器书签库',
       default_icon: {
-        16: 'logo.png',
-        32: 'logo.png',
-        48: 'logo.png',
-        128: 'logo.png',
+        16: 'logo.webp',
+        32: 'logo.webp',
+        48: 'logo.webp',
+        128: 'logo.webp',
       },
     },
     icons: {
-      16: 'logo.png',
-      32: 'logo.png',
-      48: 'logo.png',
-      128: 'logo.png',
+      16: 'logo.webp',
+      32: 'logo.webp',
+      48: 'logo.webp',
+      128: 'logo.webp',
     },
     browser_specific_settings: {
       gecko: {
