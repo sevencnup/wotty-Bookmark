@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, ChevronDown, ChevronRight, CornerDownRight, Folder, FolderOpen, Folders, GripVertical, Home, LayoutGrid, List, ListFilter, LoaderCircle, RefreshCw, Search, Trash2 } from 'lucide-react'
+import { ArrowLeft, ArrowRight, ChevronDown, ChevronRight, Clipboard, CornerDownRight, Edit3, Folder, FolderOpen, FolderPlus, Folders, GripVertical, Home, LayoutGrid, List, ListFilter, LoaderCircle, RefreshCw, Scissors, Search, Trash2, X } from 'lucide-react'
 import type { DragEvent, MouseEvent as ReactMouseEvent } from 'react'
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as api from './api'
@@ -27,6 +27,25 @@ type DragState = {
 type SelectionPaintState = {
   selected: boolean
   visitedIds: Set<string>
+} | null
+
+type ContextMenuState = {
+  x: number
+  y: number
+  folder: api.BookmarkFolder | null
+} | null
+
+type CutFolderState = {
+  folderId: string
+  title: string
+  sourceParentId: string | null
+} | null
+
+type FolderModalState = {
+  type: 'rename' | 'create'
+  folderId?: string
+  title: string
+  parentId?: string | null
 } | null
 
 const EMPTY_FOLDERS: api.BookmarkFolder[] = []
@@ -76,6 +95,10 @@ export function CategoryManagementPage({ token }: Props) {
   const [currentExplorerFolderId, setCurrentExplorerFolderId] = useState<string | null>(null)
   const [folderLayoutMode, setFolderLayoutMode] = useState<'grid' | 'list'>('grid')
   const [folderFilterQuery, setFolderFilterQuery] = useState('')
+  const [contextMenu, setContextMenu] = useState<ContextMenuState>(null)
+  const [cutFolder, setCutFolder] = useState<CutFolderState>(null)
+  const [folderModal, setFolderModal] = useState<FolderModalState>(null)
+  const [modalInputTitle, setModalInputTitle] = useState('')
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const selectionPaintRef = useRef<SelectionPaintState>(null)
@@ -130,6 +153,26 @@ export function CategoryManagementPage({ token }: Props) {
       window.removeEventListener('blur', stopSelectionPaint)
     }
   }, [])
+
+  useEffect(() => {
+    if (!contextMenu) return
+    const handleOutsideClick = (e: Event) => {
+      const target = e.target as HTMLElement | null
+      if (target && target.closest?.('.explorer-context-menu')) return
+      setContextMenu(null)
+    }
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setContextMenu(null)
+    }
+    window.addEventListener('mousedown', handleOutsideClick)
+    window.addEventListener('scroll', handleOutsideClick, true)
+    window.addEventListener('keydown', handleKeyDown)
+    return () => {
+      window.removeEventListener('mousedown', handleOutsideClick)
+      window.removeEventListener('scroll', handleOutsideClick, true)
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [contextMenu])
 
   const selectedFolder = useMemo(() => {
     if (!tree || selectedFolderId === 'all') return null
@@ -389,6 +432,124 @@ export function CategoryManagementPage({ token }: Props) {
     }
   }
 
+  function handleFolderContextMenu(event: ReactMouseEvent, folder: api.BookmarkFolder) {
+    event.preventDefault()
+    event.stopPropagation()
+    const x = Math.min(event.clientX, window.innerWidth - 210)
+    const y = Math.min(event.clientY, window.innerHeight - 270)
+    setContextMenu({ x, y, folder })
+  }
+
+  function handleEmptyContextMenu(event: ReactMouseEvent) {
+    event.preventDefault()
+    const x = Math.min(event.clientX, window.innerWidth - 210)
+    const y = Math.min(event.clientY, window.innerHeight - 230)
+    setContextMenu({ x, y, folder: null })
+  }
+
+  function openRenameModal(folder: api.BookmarkFolder) {
+    setModalInputTitle(folder.title)
+    setFolderModal({ type: 'rename', folderId: folder.id, title: folder.title })
+    setContextMenu(null)
+  }
+
+  function openCreateModal(parentId: string | null = currentExplorerFolderId) {
+    setModalInputTitle('')
+    setFolderModal({ type: 'create', title: '', parentId })
+    setContextMenu(null)
+  }
+
+  async function handleRenameFolder(folderId: string, newTitle: string) {
+    const trimmed = newTitle.trim()
+    if (!trimmed || moving) return
+    setMoving(true)
+    setError('')
+    setNotice('')
+    try {
+      await api.updateLibraryNode(token, folderId, { title: trimmed })
+      setNotice(`文件夹已重命名为「${trimmed}」`)
+      await load()
+    } catch (requestError) {
+      await load()
+      setError(readableError(requestError, '重命名文件夹失败，请刷新后重试'))
+    } finally {
+      setMoving(false)
+      setFolderModal(null)
+    }
+  }
+
+  async function handleCreateFolder(title: string, parentId: string | null) {
+    const trimmed = title.trim()
+    if (!trimmed || moving) return
+    setMoving(true)
+    setError('')
+    setNotice('')
+    try {
+      await api.createLibraryFolder(token, { title: trimmed, parentId })
+      setNotice(`文件夹「${trimmed}」已创建`)
+      await load()
+    } catch (requestError) {
+      await load()
+      setError(readableError(requestError, '新建文件夹失败，请刷新后重试'))
+    } finally {
+      setMoving(false)
+      setFolderModal(null)
+    }
+  }
+
+  async function handleDeleteFolder(folder: api.BookmarkFolder) {
+    const confirmed = confirmDangerousAction(
+      `确定将文件夹「${folder.title}」及其包含的全部书签和子文件夹移入服务器书签库回收站吗？`,
+    )
+    if (!confirmed || moving) return
+    setMoving(true)
+    setError('')
+    setNotice('')
+    try {
+      await api.deleteLibraryNode(token, folder.id)
+      setNotice(`已将文件夹「${folder.title}」移入回收站`)
+      if (currentExplorerFolderId === folder.id || descendantFolderIds(folder).includes(currentExplorerFolderId ?? '')) {
+        setCurrentExplorerFolderId(findFolderParentId(allFolders, folder.id) ?? null)
+      }
+      await load()
+    } catch (requestError) {
+      await load()
+      setError(readableError(requestError, '删除文件夹失败，请刷新后重试'))
+    } finally {
+      setMoving(false)
+      setContextMenu(null)
+    }
+  }
+
+  function handleCutFolder(folder: api.BookmarkFolder) {
+    const sourceParentId = findFolderParentId(allFolders, folder.id) ?? null
+    setCutFolder({ folderId: folder.id, title: folder.title, sourceParentId })
+    setNotice(`已剪切文件夹「${folder.title}」，可在目标位置右键或点击“粘贴”`)
+    setContextMenu(null)
+  }
+
+  async function handlePasteFolder(targetParentId: string | null) {
+    if (!cutFolder || moving) return
+    const cutFolderNode = findFolder(allFolders, cutFolder.folderId)
+    if (cutFolderNode) {
+      const invalidIds = new Set([cutFolder.folderId, ...descendantFolderIds(cutFolderNode)])
+      if (targetParentId && invalidIds.has(targetParentId)) {
+        setError('无法将文件夹移动到自身或其子目录中')
+        setContextMenu(null)
+        return
+      }
+    }
+    if (targetParentId === cutFolder.sourceParentId) {
+      setNotice('文件夹已在目标目录下')
+      setCutFolder(null)
+      setContextMenu(null)
+      return
+    }
+    await moveFolder(cutFolder.folderId, targetParentId)
+    setCutFolder(null)
+    setContextMenu(null)
+  }
+
   const rootDropDisabled = drag?.kind === 'folder' && drag.sourceParentId === null
 
   const organizationPanel = useMemo(() => (
@@ -399,6 +560,16 @@ export function CategoryManagementPage({ token }: Props) {
           <h3>服务器文件夹管理</h3>
         </div>
         <div className="category-tree-actions explorer-header-actions">
+          <button
+            className="secondary-button explorer-create-btn"
+            disabled={moving}
+            onClick={() => openCreateModal(currentExplorerFolderId)}
+            title="在此目录下新建文件夹"
+            type="button"
+          >
+            <FolderPlus size={14} />
+            <span>新建文件夹</span>
+          </button>
           <span className="explorer-sort-badge" title="所有层级文件夹均按照 26 字母自然排序 (A-Z)">
             <ListFilter size={13} />
             <span>26 字母排序</span>
@@ -434,6 +605,28 @@ export function CategoryManagementPage({ token }: Props) {
           </button>
         </div>
       </div>
+
+      {cutFolder && (
+        <div className="explorer-cut-bar">
+          <Scissors size={14} />
+          <span>已剪切文件夹<strong>「{cutFolder.title}」</strong></span>
+          <button
+            className="explorer-cut-paste-btn"
+            disabled={moving}
+            onClick={() => void handlePasteFolder(currentExplorerFolderId)}
+            type="button"
+          >
+            <Clipboard size={13} /> 粘贴到当前目录
+          </button>
+          <button
+            className="explorer-cut-cancel-btn"
+            onClick={() => setCutFolder(null)}
+            type="button"
+          >
+            取消
+          </button>
+        </div>
+      )}
 
       <div className="explorer-path-bar">
         <button
@@ -501,23 +694,38 @@ export function CategoryManagementPage({ token }: Props) {
         </span>
       </div>
 
-      <div className="explorer-content-container">
+      <div
+        className="explorer-content-container"
+        onContextMenu={handleEmptyContextMenu}
+      >
         {currentSubfolders.length === 0 ? (
-          <div className="explorer-empty-folder">
+          <div
+            className="explorer-empty-folder"
+            onContextMenu={handleEmptyContextMenu}
+          >
             <div className="explorer-empty-icon">
               <FolderOpen size={42} />
             </div>
             <h4>{folderFilterQuery ? '没有找到匹配的文件夹' : '此目录下暂无子文件夹'}</h4>
             <p>
               {currentExplorerFolder
-                ? `当前文件夹「${currentExplorerFolder.title}」共包含 ${currentExplorerFolder.bookmarkCount} 个书签。左侧列表可直接管理书签，或从其他目录拖入文件夹重组。`
-                : '当前服务器书签库暂无顶级文件夹。在书签库中创建或导入文件夹后将自动按 26 字母排序展示。'}
+                ? `当前文件夹「${currentExplorerFolder.title}」共包含 ${currentExplorerFolder.bookmarkCount} 个书签。支持右键新建文件夹、重命名或粘贴。`
+                : '当前服务器书签库暂无顶级文件夹。右键空白处或点击上方按钮可新建文件夹。'}
             </p>
-            {currentExplorerFolder && (
-              <button className="secondary-button" onClick={navigateUp} type="button">
-                <ArrowLeft size={14} /> 返回上一级
+            <div className="explorer-empty-actions">
+              {currentExplorerFolder && (
+                <button className="secondary-button" onClick={navigateUp} type="button">
+                  <ArrowLeft size={14} /> 返回上一级
+                </button>
+              )}
+              <button
+                className="primary-button"
+                onClick={() => openCreateModal(currentExplorerFolderId)}
+                type="button"
+              >
+                <FolderPlus size={14} /> 新建文件夹
               </button>
-            )}
+            </div>
           </div>
         ) : folderLayoutMode === 'grid' ? (
           <div className="explorer-folder-grid">
@@ -527,21 +735,23 @@ export function CategoryManagementPage({ token }: Props) {
               const isFolderDropDisabled = drag?.kind === 'folder' && (drag.invalidTargetIds.has(folder.id) || drag.sourceParentId === folder.id)
               const isDropTarget = dropFolderId === folder.id && !isFolderDropDisabled
               const isSelected = selectedFolderId === folder.id
+              const isCut = cutFolder?.folderId === folder.id
               const firstLetter = getFolderFirstLetter(folder.title)
 
               return (
                 <div
-                  className={`explorer-card ${isSelected ? 'selected' : ''} ${isDropTarget ? 'folder-drop-target' : ''} ${isBookmarkSource ? 'source-folder' : ''} ${isFolderSource ? 'folder-drag-source' : ''} ${isFolderDropDisabled ? 'folder-drop-disabled' : ''}`}
+                  className={`explorer-card ${isSelected ? 'selected' : ''} ${isCut ? 'folder-is-cut' : ''} ${isDropTarget ? 'folder-drop-target' : ''} ${isBookmarkSource ? 'source-folder' : ''} ${isFolderSource ? 'folder-drag-source' : ''} ${isFolderDropDisabled ? 'folder-drop-disabled' : ''}`}
                   draggable={!moving}
                   key={folder.id}
                   onClick={() => selectFolder(folder.id)}
+                  onContextMenu={(event) => handleFolderContextMenu(event, folder)}
                   onDoubleClick={() => enterFolder(folder.id)}
                   onDragEnd={endDrag}
                   onDragLeave={(event) => leaveDropTarget(event, folder.id)}
                   onDragOver={(event) => allowDrop(event, folder.id)}
                   onDragStart={(event) => beginFolderDrag(event, folder)}
                   onDrop={(event) => dropOnFolder(event, folder.id)}
-                  title="单击选择并在左侧查看，双击进入下级；可拖动重组"
+                  title="单击选择，双击进入；右键展开重命名、剪切、删除"
                 >
                   <div className="explorer-card-header">
                     <span className="explorer-letter-chip">{firstLetter}</span>
@@ -596,14 +806,16 @@ export function CategoryManagementPage({ token }: Props) {
                 const isFolderDropDisabled = drag?.kind === 'folder' && (drag.invalidTargetIds.has(folder.id) || drag.sourceParentId === folder.id)
                 const isDropTarget = dropFolderId === folder.id && !isFolderDropDisabled
                 const isSelected = selectedFolderId === folder.id
+                const isCut = cutFolder?.folderId === folder.id
                 const firstLetter = getFolderFirstLetter(folder.title)
 
                 return (
                   <div
-                    className={`explorer-list-row ${isSelected ? 'selected' : ''} ${isDropTarget ? 'folder-drop-target' : ''} ${isBookmarkSource ? 'source-folder' : ''} ${isFolderSource ? 'folder-drag-source' : ''} ${isFolderDropDisabled ? 'folder-drop-disabled' : ''}`}
+                    className={`explorer-list-row ${isSelected ? 'selected' : ''} ${isCut ? 'folder-is-cut' : ''} ${isDropTarget ? 'folder-drop-target' : ''} ${isBookmarkSource ? 'source-folder' : ''} ${isFolderSource ? 'folder-drag-source' : ''} ${isFolderDropDisabled ? 'folder-drop-disabled' : ''}`}
                     draggable={!moving}
                     key={folder.id}
                     onClick={() => selectFolder(folder.id)}
+                    onContextMenu={(event) => handleFolderContextMenu(event, folder)}
                     onDoubleClick={() => enterFolder(folder.id)}
                     onDragEnd={endDrag}
                     onDragLeave={(event) => leaveDropTarget(event, folder.id)}
@@ -646,7 +858,7 @@ export function CategoryManagementPage({ token }: Props) {
 
       <div className="tree-drop-guide explorer-footer-guide">
         <CornerDownRight size={15} />
-        <span>单击在左侧展示书签，双击/点击“进入”进入下级；拖动文件夹可互相嵌套，拖至上方路径栏可移回上级。</span>
+        <span>支持右键文件夹执行重命名、剪切、删除；右键空白处新建或粘贴。</span>
       </div>
     </aside>
   ), [
@@ -654,6 +866,7 @@ export function CategoryManagementPage({ token }: Props) {
     currentExplorerFolder,
     currentExplorerFolderId,
     currentSubfolders,
+    cutFolder,
     drag,
     dropFolderId,
     endDrag,
@@ -704,6 +917,192 @@ export function CategoryManagementPage({ token }: Props) {
       </section>
       {organizationPanel}
     </div> : null}
+
+    {contextMenu && (
+      <div
+        className="explorer-context-menu"
+        onClick={(e) => e.stopPropagation()}
+        style={{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }}
+      >
+        {contextMenu.folder ? (
+          <>
+            <div className="explorer-menu-header">
+              <Folder size={14} />
+              <span title={contextMenu.folder.title}>{contextMenu.folder.title}</span>
+            </div>
+            <div className="explorer-menu-divider" />
+            <button
+              className="explorer-menu-item"
+              onClick={() => {
+                const f = contextMenu.folder!
+                setContextMenu(null)
+                enterFolder(f.id)
+              }}
+              type="button"
+            >
+              <FolderOpen size={15} />
+              <span>进入 / 打开</span>
+            </button>
+            <button
+              className="explorer-menu-item"
+              onClick={() => openRenameModal(contextMenu.folder!)}
+              type="button"
+            >
+              <Edit3 size={15} />
+              <span>重命名</span>
+            </button>
+            <button
+              className="explorer-menu-item"
+              onClick={() => handleCutFolder(contextMenu.folder!)}
+              type="button"
+            >
+              <Scissors size={15} />
+              <span>剪切</span>
+            </button>
+            {cutFolder && cutFolder.folderId !== contextMenu.folder.id && (
+              <button
+                className="explorer-menu-item"
+                onClick={() => void handlePasteFolder(contextMenu.folder!.id)}
+                type="button"
+              >
+                <Clipboard size={15} />
+                <span>粘贴到此目录</span>
+              </button>
+            )}
+            <button
+              className="explorer-menu-item"
+              onClick={() => openCreateModal(contextMenu.folder!.id)}
+              type="button"
+            >
+              <FolderPlus size={15} />
+              <span>新建子文件夹</span>
+            </button>
+            <div className="explorer-menu-divider" />
+            <button
+              className="explorer-menu-item danger"
+              onClick={() => void handleDeleteFolder(contextMenu.folder!)}
+              type="button"
+            >
+              <Trash2 size={15} />
+              <span>删除</span>
+            </button>
+          </>
+        ) : (
+          <>
+            <div className="explorer-menu-header">
+              <Home size={14} />
+              <span>{currentExplorerFolder ? currentExplorerFolder.title : '全部书签 (根目录)'}</span>
+            </div>
+            <div className="explorer-menu-divider" />
+            <button
+              className="explorer-menu-item"
+              onClick={() => openCreateModal(currentExplorerFolderId)}
+              type="button"
+            >
+              <FolderPlus size={15} />
+              <span>新建文件夹</span>
+            </button>
+            {cutFolder && (
+              <button
+                className="explorer-menu-item"
+                onClick={() => void handlePasteFolder(currentExplorerFolderId)}
+                type="button"
+              >
+                <Clipboard size={15} />
+                <span>粘贴「{cutFolder.title}」</span>
+              </button>
+            )}
+            {currentExplorerFolderId && (
+              <button
+                className="explorer-menu-item"
+                onClick={() => {
+                  setContextMenu(null)
+                  navigateUp()
+                }}
+                type="button"
+              >
+                <ArrowLeft size={15} />
+                <span>返回上一级</span>
+              </button>
+            )}
+            <button
+              className="explorer-menu-item"
+              onClick={() => {
+                setContextMenu(null)
+                void load(true)
+              }}
+              type="button"
+            >
+              <RefreshCw size={15} />
+              <span>刷新</span>
+            </button>
+          </>
+        )}
+      </div>
+    )}
+
+    {folderModal && (
+      <div className="explorer-modal-backdrop" onClick={() => setFolderModal(null)}>
+        <div className="explorer-modal-card" onClick={(e) => e.stopPropagation()}>
+          <div className="explorer-modal-head">
+            <div className="explorer-modal-title">
+              {folderModal.type === 'rename' ? <Edit3 size={18} /> : <FolderPlus size={18} />}
+              <h4>{folderModal.type === 'rename' ? '重命名文件夹' : '新建文件夹'}</h4>
+            </div>
+            <button
+              aria-label="关闭"
+              className="explorer-modal-close"
+              onClick={() => setFolderModal(null)}
+              type="button"
+            >
+              <X size={16} />
+            </button>
+          </div>
+          <form
+            className="explorer-modal-form"
+            onSubmit={(e) => {
+              e.preventDefault()
+              if (folderModal.type === 'rename' && folderModal.folderId) {
+                void handleRenameFolder(folderModal.folderId, modalInputTitle)
+              } else {
+                void handleCreateFolder(modalInputTitle, folderModal.parentId ?? null)
+              }
+            }}
+          >
+            <label className="explorer-modal-label">
+              <span>文件夹名称</span>
+              <input
+                autoFocus
+                className="explorer-modal-input"
+                maxLength={100}
+                onChange={(e) => setModalInputTitle(e.target.value)}
+                onFocus={(e) => e.target.select()}
+                placeholder="请输入文件夹名称..."
+                required
+                type="text"
+                value={modalInputTitle}
+              />
+            </label>
+            <div className="explorer-modal-foot">
+              <button
+                className="secondary-button"
+                onClick={() => setFolderModal(null)}
+                type="button"
+              >
+                取消
+              </button>
+              <button
+                className="primary-button"
+                disabled={!modalInputTitle.trim() || moving}
+                type="submit"
+              >
+                {moving ? '处理中…' : folderModal.type === 'rename' ? '保存' : '创建'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    )}
   </div>
 }
 

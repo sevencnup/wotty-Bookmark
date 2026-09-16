@@ -2659,6 +2659,81 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   gap: 8px;
 }
 
+.category-management-page .explorer-create-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: var(--radius-md);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* 剪切状态指示条 */
+.category-management-page .explorer-cut-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  margin-bottom: 8px;
+  border-radius: var(--radius-md);
+  border: 1px dashed #3b82f6;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 12.5px;
+  animation: explorerFadeIn 0.18s ease;
+}
+
+.category-management-page .explorer-cut-bar strong {
+  color: #0f172a;
+}
+
+.category-management-page .explorer-cut-paste-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  padding: 3px 10px;
+  border: 1px solid #3b82f6;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #2563eb;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--duration) var(--ease);
+}
+
+.category-management-page .explorer-cut-paste-btn:hover:not(:disabled) {
+  background: #2563eb;
+  color: #ffffff;
+}
+
+.category-management-page .explorer-cut-cancel-btn {
+  padding: 3px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #64748b;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.category-management-page .explorer-cut-cancel-btn:hover {
+  background: rgba(0, 0, 0, 0.05);
+  color: #0f172a;
+}
+
+/* 处于剪切状态的文件夹视觉反馈 */
+.category-management-page .explorer-card.folder-is-cut,
+.category-management-page .explorer-list-row.folder-is-cut {
+  opacity: 0.45 !important;
+  filter: grayscale(40%);
+  border-style: dashed !important;
+  border-color: #3b82f6 !important;
+}
+
 .category-management-page .explorer-sort-badge {
   display: inline-flex;
   align-items: center;
@@ -3174,6 +3249,244 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   color: #64748b;
   font-size: 13px;
   line-height: 1.6;
+}
+
+.category-management-page .explorer-empty-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* ── 自定义 Windows 资源管理器风格右键上下文菜单 ──────────────── */
+.explorer-context-menu {
+  position: fixed;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  min-width: 190px;
+  max-width: 260px;
+  padding: 6px;
+  border-radius: 12px;
+  border: 1px solid rgba(226, 232, 240, 0.85);
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.16), 0 2px 6px rgba(15, 23, 42, 0.06);
+  user-select: none;
+  animation: explorerMenuPop 0.14s cubic-bezier(0.16, 1, 0.3, 1);
+  transform-origin: top left;
+}
+
+@keyframes explorerMenuPop {
+  0% {
+    opacity: 0;
+    transform: scale(0.94) translateY(-4px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.explorer-menu-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px 4px;
+  color: #64748b;
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.explorer-menu-header span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.explorer-menu-divider {
+  height: 1px;
+  margin: 4px 2px;
+  background: #f1f5f9;
+}
+
+.explorer-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #1e293b;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.explorer-menu-item:hover {
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.explorer-menu-item svg {
+  color: #64748b;
+  flex-shrink: 0;
+  transition: color 0.12s ease;
+}
+
+.explorer-menu-item:hover svg {
+  color: #2563eb;
+}
+
+.explorer-menu-item.danger {
+  color: #ef4444;
+}
+
+.explorer-menu-item.danger svg {
+  color: #ef4444;
+}
+
+.explorer-menu-item.danger:hover {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.explorer-menu-item.danger:hover svg {
+  color: #dc2626;
+}
+
+/* ── 文件夹重命名/新建模态框 ──────────────────────────────── */
+.explorer-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  animation: explorerFadeIn 0.16s ease;
+}
+
+@keyframes explorerFadeIn {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+.explorer-modal-card {
+  width: min(440px, 100%);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  background: #ffffff;
+  box-shadow: 0 20px 48px rgba(15, 23, 42, 0.22);
+  overflow: hidden;
+  animation: explorerModalPop 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes explorerModalPop {
+  0% {
+    opacity: 0;
+    transform: scale(0.95) translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.explorer-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px 14px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.explorer-modal-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #0f172a;
+}
+
+.explorer-modal-title svg {
+  color: #2563eb;
+}
+
+.explorer-modal-title h4 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.explorer-modal-close {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+  transition: all var(--duration) var(--ease);
+}
+
+.explorer-modal-close:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.explorer-modal-form {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.explorer-modal-label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.explorer-modal-label span {
+  color: #334155;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.explorer-modal-input {
+  width: 100%;
+  height: 42px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #0f172a;
+  font-size: 14px;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color var(--duration) var(--ease), box-shadow var(--duration) var(--ease);
+}
+
+.explorer-modal-input:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+.explorer-modal-foot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 4px;
 }
 
 .category-management-page .explorer-footer-guide {
