@@ -597,7 +597,7 @@ Object.assign(englishInterfaceText, {
   '拖动到其他文件夹可移动整棵分支': 'Drag to another folder to move this entire branch',
   '拖动到右侧文件夹': 'Drag to the folder on the right',
   '拖动到左侧文件夹': 'Drag to the folder on the left',
-  '按住书签行并上下滑动可连续多选；按住任意书签行拖到右侧文件夹即可归档，已选书签会一并移动。': 'Hold a bookmark row and slide up or down to select continuously; drag any part of a bookmark row to a folder on the right to organize it. Selected bookmarks move together.',
+  '单击选择；Shift 选择连续区域；Ctrl 点击添加或取消选择；Ctrl + Shift 追加连续区域。拖动任意已选书签到右侧文件夹即可归档。': 'Click to select; Shift-click selects a range; Ctrl-click adds or removes an item; Ctrl + Shift-click adds a range. Drag any selected bookmark to a folder on the right to organize it.',
   '按服务器本地时间执行。服务重启后会继续运行。': 'Runs in the server local time and continues after a service restart.',
   '换一个关键词试试。': 'Try another keyword.',
   '换个关键词，或切换左侧文件夹。': 'Try another keyword or choose a folder on the left.',

@@ -80,6 +80,42 @@ export function getBookmarkDragPayload(
   return ids.length > 0 ? { ids, textPlain: ids.join(',') } : null
 }
 
+export type BookmarkSelectionModifiers = {
+  ctrlKey?: boolean
+  metaKey?: boolean
+  shiftKey?: boolean
+}
+
+export function calculateBookmarkSelection(
+  orderedIds: string[],
+  selectedIds: Set<string>,
+  anchorId: string | null,
+  clickedId: string,
+  modifiers: BookmarkSelectionModifiers,
+) {
+  const additive = Boolean(modifiers.ctrlKey || modifiers.metaKey)
+  if (modifiers.shiftKey && anchorId !== null) {
+    const anchorIndex = orderedIds.indexOf(anchorId)
+    const clickedIndex = orderedIds.indexOf(clickedId)
+    if (anchorIndex >= 0 && clickedIndex >= 0) {
+      const range = orderedIds.slice(Math.min(anchorIndex, clickedIndex), Math.max(anchorIndex, clickedIndex) + 1)
+      return {
+        ids: additive ? new Set([...selectedIds, ...range]) : new Set(range),
+        anchorId,
+      }
+    }
+  }
+
+  if (additive) {
+    const ids = new Set(selectedIds)
+    if (ids.has(clickedId)) ids.delete(clickedId)
+    else ids.add(clickedId)
+    return { ids, anchorId: clickedId }
+  }
+
+  return { ids: new Set([clickedId]), anchorId: clickedId }
+}
+
 export function groupBookmarksByFolder(
   bookmarks: BookmarkItem[],
   folders: BookmarkFolder[],

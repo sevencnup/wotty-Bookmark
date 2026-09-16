@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { BookmarkFolder, BookmarkItem } from './api'
-import { descendantFolderIds, findFolderParentId, flattenFolders, folderHasChildren, getBookmarkDragPayload, groupBookmarksByFolder, resolveDraggedBookmarkIds, ROOT_BOOKMARK_GROUP_ID, visibleFolders } from './bookmark-tree'
+import { calculateBookmarkSelection, descendantFolderIds, findFolderParentId, flattenFolders, folderHasChildren, getBookmarkDragPayload, groupBookmarksByFolder, resolveDraggedBookmarkIds, ROOT_BOOKMARK_GROUP_ID, visibleFolders } from './bookmark-tree'
 
 const folders: BookmarkFolder[] = [
   { id: 'work', title: '工作', bookmarkCount: 3, children: [
@@ -49,6 +49,26 @@ describe('bookmark tree helpers', () => {
       textPlain: 'one,two',
     })
     expect(getBookmarkDragPayload(bookmarks, 'missing', new Set(['one']))).toBeNull()
+  })
+
+  it('calculates Windows-style single, range, additive-range, and toggle selections', () => {
+    const order = ['root', 'one', 'two', 'three', 'four']
+
+    const single = calculateBookmarkSelection(order, new Set(['two']), 'two', 'one', {})
+    expect([...single.ids]).toEqual(['one'])
+    expect(single.anchorId).toBe('one')
+
+    const range = calculateBookmarkSelection(order, single.ids, single.anchorId, 'three', { shiftKey: true })
+    expect([...range.ids]).toEqual(['one', 'two', 'three'])
+    expect(range.anchorId).toBe('one')
+
+    const additiveRange = calculateBookmarkSelection(order, new Set(['root']), 'two', 'four', { ctrlKey: true, shiftKey: true })
+    expect([...additiveRange.ids]).toEqual(['root', 'two', 'three', 'four'])
+    expect(additiveRange.anchorId).toBe('two')
+
+    const deselected = calculateBookmarkSelection(order, range.ids, range.anchorId, 'two', { ctrlKey: true })
+    expect([...deselected.ids]).toEqual(['one', 'three'])
+    expect(deselected.anchorId).toBe('two')
   })
 
   it('detects folders with children', () => {

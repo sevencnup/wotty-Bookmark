@@ -3,7 +3,7 @@ import type { DragEvent, MouseEvent as ReactMouseEvent } from 'react'
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as api from './api'
 import { getExplorerFolderList, getExplorerNavigationState } from './category-explorer'
-import { descendantFolderIds, findFolderParentId, flattenFolders as flattenBookmarkFolders, getBookmarkDragPayload, groupBookmarksByFolder, resolveDraggedBookmarkIds, type FlatBookmarkFolder } from './bookmark-tree'
+import { calculateBookmarkSelection, descendantFolderIds, findFolderParentId, flattenFolders as flattenBookmarkFolders, getBookmarkDragPayload, groupBookmarksByFolder, resolveDraggedBookmarkIds, type FlatBookmarkFolder } from './bookmark-tree'
 import { toCategoryTree } from './category-library'
 import { LibrarySiteIcon } from './LibraryManagementPage'
 import { confirmDangerousAction } from './preferences'
@@ -23,11 +23,6 @@ type DragState = {
   title: string
   sourceParentId: string | null
   invalidTargetIds: Set<string>
-} | null
-
-type SelectionPaintState = {
-  selected: boolean
-  visitedIds: Set<string>
 } | null
 
 type ContextMenuState = {
@@ -91,7 +86,8 @@ export function CategoryManagementPage({ token }: Props) {
   const [modalInputTitle, setModalInputTitle] = useState('')
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
-  const selectionPaintRef = useRef<SelectionPaintState>(null)
+  const [selectionAnchorId, setSelectionAnchorId] = useState<string | null>(null)
+  const selectedIdsBeforeDragRef = useRef<Set<string> | null>(null)
 
   const load = useCallback(async (showRefreshing = false) => {
     if (showRefreshing) setRefreshing(true)
@@ -101,6 +97,7 @@ export function CategoryManagementPage({ token }: Props) {
       const nextTree = toCategoryTree(library)
       setTree(nextTree)
       setSelectedIds((current) => new Set([...current].filter((id) => nextTree.bookmarks.some((bookmark) => bookmark.id === id))))
+      setSelectionAnchorId((current) => current && nextTree.bookmarks.some((bookmark) => bookmark.id === current) ? current : null)
     } catch (requestError) {
       setError(readableError(requestError, '服务器书签库读取失败'))
     } finally {
@@ -124,25 +121,6 @@ export function CategoryManagementPage({ token }: Props) {
       window.clearInterval(interval)
     }
   }, [load])
-
-  useEffect(() => {
-    const stopSelectionPaint = () => {
-      const paint = selectionPaintRef.current
-      selectionPaintRef.current = null
-      if (!paint) return
-      setSelectedIds((current) => {
-        const next = new Set(current)
-        paint.visitedIds.forEach((id) => paint.selected ? next.add(id) : next.delete(id))
-        return next
-      })
-    }
-    window.addEventListener('mouseup', stopSelectionPaint)
-    window.addEventListener('blur', stopSelectionPaint)
-    return () => {
-      window.removeEventListener('mouseup', stopSelectionPaint)
-      window.removeEventListener('blur', stopSelectionPaint)
-    }
-  }, [])
 
   useEffect(() => {
     if (!contextMenu) return
@@ -206,23 +184,19 @@ export function CategoryManagementPage({ token }: Props) {
       else next.add(id)
       return next
     })
+    setSelectionAnchorId(id)
   }, [])
 
-  const beginSelectionPaint = useCallback((event: ReactMouseEvent<HTMLDivElement>, id: string) => {
+  const selectBookmarkRow = useCallback((event: ReactMouseEvent<HTMLDivElement>, id: string, orderedIds: string[]) => {
     const target = event.target as HTMLElement
     if (event.button !== 0 || target.closest('a, button, input, label, select, textarea')) return
-    const selected = !selectedIds.has(id)
-    selectionPaintRef.current = { selected, visitedIds: new Set([id]) }
-    event.currentTarget.classList.toggle('selected', selected)
-  }, [selectedIds])
-
-  const continueSelectionPaint = useCallback((event: ReactMouseEvent<HTMLDivElement>, id: string) => {
-    const paint = selectionPaintRef.current
-    if (!paint) return
-    if (paint.visitedIds.has(id)) return
-    paint.visitedIds.add(id)
-    event.currentTarget.classList.toggle('selected', paint.selected)
-  }, [])
+    selectedIdsBeforeDragRef.current = !event.ctrlKey && !event.metaKey && !event.shiftKey && selectedIds.has(id)
+      ? new Set(selectedIds)
+      : null
+    const next = calculateBookmarkSelection(orderedIds, selectedIds, selectionAnchorId, id, event)
+    setSelectedIds(next.ids)
+    setSelectionAnchorId(next.anchorId)
+  }, [selectedIds, selectionAnchorId])
 
   function toggleAll() {
     setSelectedIds((current) => {
@@ -336,8 +310,7 @@ export function CategoryManagementPage({ token }: Props) {
 
   const beginDrag = useCallback((event: DragEvent<HTMLElement>, bookmarkId: string) => {
     if (!ready || moving) return
-    selectionPaintRef.current = null
-    const payload = getBookmarkDragPayload(tree?.bookmarks ?? [], bookmarkId, selectedIds)
+    const payload = getBookmarkDragPayload(tree?.bookmarks ?? [], bookmarkId, selectedIdsBeforeDragRef.current ?? selectedIds)
     if (!payload) return
     const sourceFolderIds = new Set(payload.ids
       .map((id) => tree?.bookmarks.find((bookmark) => bookmark.id === id)?.parentId)
@@ -392,7 +365,7 @@ export function CategoryManagementPage({ token }: Props) {
   }
 
   const endDrag = useCallback(() => {
-    selectionPaintRef.current = null
+    selectedIdsBeforeDragRef.current = null
     setDrag(null)
     setDropFolderId(null)
   }, [])
@@ -881,8 +854,7 @@ export function CategoryManagementPage({ token }: Props) {
               normalizedQuery={normalizedQuery}
               onDragEnd={endDrag}
               onDragStart={beginDrag}
-              onSelectionMouseDown={beginSelectionPaint}
-              onSelectionMouseOver={continueSelectionPaint}
+              onSelectionMouseDown={selectBookmarkRow}
               onToggleGroup={toggleGroup}
               onToggleGroupSelection={toggleGroupSelection}
               onToggleSelected={toggleSelected}
@@ -890,7 +862,7 @@ export function CategoryManagementPage({ token }: Props) {
             />
           )}
         </div>
-        <p className="category-keyboard-hint">按住书签行并上下滑动可连续多选；按住任意书签行拖到右侧文件夹即可归档，已选书签会一并移动。</p>
+        <p className="category-keyboard-hint">单击选择；Shift 选择连续区域；Ctrl 点击添加或取消选择；Ctrl + Shift 追加连续区域。拖动任意已选书签到右侧文件夹即可归档。</p>
       </section>
       {organizationPanel}
     </div> : null}
@@ -1101,7 +1073,6 @@ const CategoryVirtualList = memo(function CategoryVirtualList({
   onToggleGroupSelection,
   onToggleSelected,
   onSelectionMouseDown,
-  onSelectionMouseOver,
   onDragStart,
   onDragEnd,
 }: {
@@ -1114,8 +1085,7 @@ const CategoryVirtualList = memo(function CategoryVirtualList({
   onToggleGroup: (id: string) => void
   onToggleGroupSelection: (bookmarks: api.BookmarkItem[]) => void
   onToggleSelected: (id: string) => void
-  onSelectionMouseDown: (event: ReactMouseEvent<HTMLDivElement>, id: string) => void
-  onSelectionMouseOver: (event: ReactMouseEvent<HTMLDivElement>, id: string) => void
+  onSelectionMouseDown: (event: ReactMouseEvent<HTMLDivElement>, id: string, orderedIds: string[]) => void
   onDragStart: (event: DragEvent<HTMLElement>, id: string) => void
   onDragEnd: () => void
 }) {
@@ -1136,6 +1106,11 @@ const CategoryVirtualList = memo(function CategoryVirtualList({
     }
     return list
   }, [bookmarkGroups, collapsedGroupIds, normalizedQuery])
+
+  const orderedBookmarkIds = useMemo(
+    () => items.flatMap((item) => item.kind === 'bookmark' ? [item.bookmark.id] : []),
+    [items],
+  )
 
   const itemHeights = useMemo(() => {
     return items.map((item) => (item.kind === 'group' ? GROUP_HEADER_HEIGHT : BOOKMARK_ROW_HEIGHT))
@@ -1264,8 +1239,7 @@ const CategoryVirtualList = memo(function CategoryVirtualList({
                 key={item.id}
                 onDragEnd={onDragEnd}
                 onDragStart={(event) => onDragStart(event, bookmark.id)}
-                onMouseDown={(event) => onSelectionMouseDown(event, bookmark.id)}
-                onMouseOver={(event) => onSelectionMouseOver(event, bookmark.id)}
+                onMouseDown={(event) => onSelectionMouseDown(event, bookmark.id, orderedBookmarkIds)}
                 style={{ height: `${BOOKMARK_ROW_HEIGHT}px`, boxSizing: 'border-box' }}
               >
                 <label className="checkbox-wrap">
