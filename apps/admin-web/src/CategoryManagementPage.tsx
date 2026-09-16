@@ -1,8 +1,8 @@
-import { ArrowLeft, ArrowRight, ChevronDown, ChevronRight, Clipboard, CornerDownRight, Edit3, Folder, FolderOpen, FolderPlus, Folders, GripVertical, Home, LayoutGrid, List, ListFilter, LoaderCircle, RefreshCw, Scissors, Search, Trash2, X } from 'lucide-react'
+import { ArrowLeft, ArrowRight, ChevronDown, ChevronRight, Clipboard, CornerDownRight, Edit3, Folder, FolderOpen, FolderPlus, Folders, GripVertical, Home, LayoutGrid, List, LoaderCircle, RefreshCw, Scissors, Search, Trash2, X } from 'lucide-react'
 import type { DragEvent, MouseEvent as ReactMouseEvent } from 'react'
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as api from './api'
-import { getExplorerNavigationState } from './category-explorer'
+import { getExplorerFolderList, getExplorerNavigationState } from './category-explorer'
 import { descendantFolderIds, findFolderParentId, flattenFolders as flattenBookmarkFolders, getBookmarkDragPayload, groupBookmarksByFolder, resolveDraggedBookmarkIds, type FlatBookmarkFolder } from './bookmark-tree'
 import { toCategoryTree } from './category-library'
 import { LibrarySiteIcon } from './LibraryManagementPage'
@@ -52,17 +52,6 @@ type FolderModalState = {
 const EMPTY_FOLDERS: api.BookmarkFolder[] = []
 const EMPTY_BOOKMARK_IDS: string[] = []
 const ROOT_FOLDER_DROP_ID = '__tree_root__'
-
-const collator = new Intl.Collator('zh-CN', { numeric: true, sensitivity: 'base' })
-
-function sortFoldersAlphabetically(folders: api.BookmarkFolder[]): api.BookmarkFolder[] {
-  return [...folders]
-    .sort((a, b) => collator.compare(a.title, b.title))
-    .map((folder) => ({
-      ...folder,
-      children: sortFoldersAlphabetically(folder.children),
-    }))
-}
 
 function getFolderFirstLetter(title: string): string {
   const trimmed = title.trim()
@@ -188,28 +177,27 @@ export function CategoryManagementPage({ token }: Props) {
   }), [folderIds, normalizedQuery, tree])
 
   const allFolders = tree?.folders ?? EMPTY_FOLDERS
-  const sortedAllFolders = useMemo(() => sortFoldersAlphabetically(allFolders), [allFolders])
-  const flatFolders = useMemo(() => flattenBookmarkFolders(sortedAllFolders), [sortedAllFolders])
-  const bookmarkGroups = useMemo(() => groupBookmarksByFolder(visibleBookmarks, sortedAllFolders), [sortedAllFolders, visibleBookmarks])
+  const flatFolders = useMemo(() => flattenBookmarkFolders(allFolders), [allFolders])
+  const bookmarkGroups = useMemo(() => groupBookmarksByFolder(visibleBookmarks, allFolders), [allFolders, visibleBookmarks])
   const draggedIds = drag?.kind === 'bookmarks' ? drag.ids : EMPTY_BOOKMARK_IDS
   const ready = Boolean(tree)
 
   const explorerPath = useMemo<api.BookmarkFolder[]>(() => {
     if (!currentExplorerFolderId) return []
-    return findFolderPath(sortedAllFolders, currentExplorerFolderId) ?? []
-  }, [currentExplorerFolderId, sortedAllFolders])
+    return findFolderPath(allFolders, currentExplorerFolderId) ?? []
+  }, [allFolders, currentExplorerFolderId])
 
   const currentExplorerFolder = useMemo<api.BookmarkFolder | null>(() => {
     if (!currentExplorerFolderId) return null
-    return findFolder(sortedAllFolders, currentExplorerFolderId)
-  }, [currentExplorerFolderId, sortedAllFolders])
+    return findFolder(allFolders, currentExplorerFolderId)
+  }, [allFolders, currentExplorerFolderId])
 
   const currentSubfolders = useMemo(() => {
-    const list = currentExplorerFolder ? currentExplorerFolder.children : sortedAllFolders
+    const list = getExplorerFolderList(allFolders, currentExplorerFolderId)
     const q = folderFilterQuery.trim().toLowerCase()
     if (!q) return list
     return list.filter((folder) => folder.title.toLowerCase().includes(q))
-  }, [currentExplorerFolder, folderFilterQuery, sortedAllFolders])
+  }, [allFolders, currentExplorerFolderId, folderFilterQuery])
 
   const toggleSelected = useCallback((id: string) => {
     setSelectedIds((current) => {
@@ -549,7 +537,7 @@ export function CategoryManagementPage({ token }: Props) {
     <aside className="panel category-tree-panel category-layout-tree explorer-folder-panel">
       <div className="category-panel-title">
         <div>
-          <p className="eyebrow">EXPLORER FOLDERS (A-Z)</p>
+          <p className="eyebrow">EXPLORER FOLDERS</p>
           <h3>服务器文件夹管理</h3>
         </div>
         <div className="category-tree-actions explorer-header-actions">
@@ -563,10 +551,6 @@ export function CategoryManagementPage({ token }: Props) {
             <FolderPlus size={14} />
             <span>新建文件夹</span>
           </button>
-          <span className="explorer-sort-badge" title="所有层级文件夹均按照 26 字母自然排序 (A-Z)">
-            <ListFilter size={13} />
-            <span>26 字母排序</span>
-          </span>
           <div className="explorer-view-toggle">
             <button
               aria-label="网格视图"

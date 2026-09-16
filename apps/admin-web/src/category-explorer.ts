@@ -1,3 +1,6 @@
+import type { BookmarkFolder } from './api'
+import { findFolder } from './bookmark-tree'
+
 export type ExplorerNavigationState = {
   currentExplorerFolderId: string | null
   selectedFolderId: string
@@ -14,4 +17,10 @@ export function getExplorerNavigationState(folderId: string | null): ExplorerNav
     selectedFolderId: folderId ?? 'all',
     folderFilterQuery: '',
   }
+}
+
+/** Keeps the server's position order for the root and every child directory. */
+export function getExplorerFolderList(folders: BookmarkFolder[], currentFolderId: string | null): BookmarkFolder[] {
+  if (!currentFolderId) return folders
+  return findFolder(folders, currentFolderId)?.children ?? []
 }
