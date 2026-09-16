@@ -2659,15 +2659,47 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   gap: 8px;
 }
 
-.category-management-page .explorer-create-btn {
+.category-management-page .secondary-button.explorer-create-btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   height: 30px;
   padding: 0 10px;
-  border-radius: var(--radius-md);
+  border: 1px solid #2767cf;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #3478e5, #2866c9);
+  color: #ffffff;
   font-size: 12px;
   font-weight: 600;
+  letter-spacing: 0.01em;
+  box-shadow: 0 2px 5px rgba(31, 91, 184, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  transition: background 160ms ease, border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.category-management-page .secondary-button.explorer-create-btn:hover:not(:disabled) {
+  border-color: #1f5bb8;
+  background: linear-gradient(135deg, #4387ef, #2b6ed5);
+  color: #ffffff;
+  box-shadow: 0 5px 12px rgba(31, 91, 184, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.24);
+  transform: translateY(-1px);
+}
+
+.category-management-page .secondary-button.explorer-create-btn:active:not(:disabled) {
+  background: #255fbd;
+  box-shadow: inset 0 1px 3px rgba(12, 54, 122, 0.25);
+  transform: translateY(0);
+}
+
+.category-management-page .secondary-button.explorer-create-btn:focus-visible {
+  outline: 0;
+  box-shadow: 0 0 0 3px rgba(52, 120, 229, 0.28), 0 2px 5px rgba(31, 91, 184, 0.22);
+}
+
+.category-management-page .secondary-button.explorer-create-btn:disabled {
+  border-color: #a9c3e8;
+  background: #a9c3e8;
+  color: rgba(255, 255, 255, 0.82);
+  box-shadow: none;
 }
 
 /* 剪切状态指示条 */
