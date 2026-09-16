@@ -339,10 +339,10 @@ html.reduce-motion *, html.reduce-motion *::before, html.reduce-motion *::after 
   width: 34px;
   height: 34px;
   overflow: hidden;
-  border: 1px solid #dbe5fb;
-  border-radius: 10px;
+  border: 0;
+  border-radius: 0;
   color: var(--primary);
-  background: #eef4ff;
+  background: transparent;
   font-size: 14px;
   font-weight: 750;
 }
@@ -355,9 +355,8 @@ html.reduce-motion *, html.reduce-motion *::before, html.reduce-motion *::after 
 }
 
 .library-site-icon.is-fallback {
-  border-color: #d9e2f5;
   color: #3b63bc;
-  background: linear-gradient(135deg, #edf3ff, #f8faff);
+  background: transparent;
 }
 
 .library-bookmark-copy {
