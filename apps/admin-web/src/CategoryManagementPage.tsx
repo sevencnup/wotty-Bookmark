@@ -2,6 +2,7 @@ import { ArrowLeft, ArrowRight, ChevronDown, ChevronRight, Clipboard, CornerDown
 import type { DragEvent, MouseEvent as ReactMouseEvent } from 'react'
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as api from './api'
+import { getExplorerNavigationState } from './category-explorer'
 import { descendantFolderIds, findFolderParentId, flattenFolders as flattenBookmarkFolders, groupBookmarksByFolder, resolveDraggedBookmarkIds, type FlatBookmarkFolder } from './bookmark-tree'
 import { toCategoryTree } from './category-library'
 import { LibrarySiteIcon } from './LibraryManagementPage'
@@ -408,28 +409,19 @@ export function CategoryManagementPage({ token }: Props) {
   }, [])
 
   function enterFolder(id: string) {
-    setCurrentExplorerFolderId(id)
-    selectFolder(id)
+    navigateTo(id)
   }
 
   function navigateUp() {
-    if (explorerPath.length <= 1) {
-      setCurrentExplorerFolderId(null)
-      setSelectedFolderId('all')
-    } else {
-      const parent = explorerPath[explorerPath.length - 2]
-      setCurrentExplorerFolderId(parent.id)
-      selectFolder(parent.id)
-    }
+    const parentId = explorerPath.length <= 1 ? null : explorerPath[explorerPath.length - 2].id
+    navigateTo(parentId)
   }
 
   function navigateTo(id: string | null) {
-    setCurrentExplorerFolderId(id)
-    if (id) {
-      selectFolder(id)
-    } else {
-      setSelectedFolderId('all')
-    }
+    const next = getExplorerNavigationState(id)
+    setCurrentExplorerFolderId(next.currentExplorerFolderId)
+    setSelectedFolderId(next.selectedFolderId)
+    setFolderFilterQuery(next.folderFilterQuery)
   }
 
   function handleFolderContextMenu(event: ReactMouseEvent, folder: api.BookmarkFolder) {
@@ -688,10 +680,10 @@ export function CategoryManagementPage({ token }: Props) {
             value={folderFilterQuery}
           />
         </label>
-        <span className="explorer-count-summary">
-          共 {currentSubfolders.length} 个文件夹
-          {currentExplorerFolder && ` · ${currentExplorerFolder.bookmarkCount} 个直属书签`}
-        </span>
+          <span className="explorer-count-summary">
+            共 {currentSubfolders.length} 个文件夹
+            {currentExplorerFolder && ` · 包含 ${currentExplorerFolder.bookmarkCount} 个书签`}
+          </span>
       </div>
 
       <div
