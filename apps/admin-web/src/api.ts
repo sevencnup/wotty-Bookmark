@@ -167,6 +167,7 @@ export type LibraryFaviconMap = Record<string, string>
 
 const LIBRARY_FAVICON_STORAGE_KEY = 'wotty.admin.library-favicons.v2'
 const libraryFaviconCache = new Map<string, string>()
+export const API_REQUEST_TIMEOUT_MS = 15_000
 
 function readLibraryFaviconCache() {
   try {
@@ -232,37 +233,45 @@ function networkRequestError(error: unknown): ApiRequestError | null {
   return new ApiRequestError('开发服务连接已断开，请重新运行 pnpm dev 后点击刷新重试。', 0, 'network_error')
 }
 
+function requestTimeoutError(): ApiRequestError {
+  return new ApiRequestError('服务器响应超时，请检查服务状态后点击刷新重试。', 0, 'request_timeout')
+}
+
 async function request<T>(path: string, init: RequestInit = {}, token?: string): Promise<T> {
   const headers = new Headers(init.headers)
   if (!headers.has('content-type')) headers.set('content-type', 'application/json')
   if (token) headers.set('authorization', `Bearer ${token}`)
+  const controller = new AbortController()
+  const timeoutId = globalThis.setTimeout(() => controller.abort(), API_REQUEST_TIMEOUT_MS)
 
-  let response: Response
   try {
-    response = await fetch(path, { ...init, headers })
+    const response = await fetch(path, { ...init, headers, signal: controller.signal })
+    const text = await response.text()
+    let payload: unknown = null
+    try {
+      payload = text ? JSON.parse(text) : null
+    } catch {
+      payload = text
+    }
+
+    if (!response.ok) {
+      const errorPayload = typeof payload === 'object' && payload ? payload as { message?: unknown; code?: unknown } : {}
+      const code = typeof errorPayload.code === 'string' ? errorPayload.code : undefined
+      const proxyConnectionFailed = response.status === 500 && !code && (payload === null || typeof payload === 'string')
+      const message = proxyConnectionFailed
+        ? 'API 服务未连接，请查看 pnpm dev 终端中的 api 退出原因，修复后点击刷新重试。'
+        : typeof errorPayload.message === 'string'
+        ? errorPayload.message
+        : `请求失败（${response.status}）`
+      throw new ApiRequestError(message, response.status, proxyConnectionFailed ? 'service_unavailable' : code)
+    }
+    return payload as T
   } catch (error) {
+    if (controller.signal.aborted) throw requestTimeoutError()
     throw networkRequestError(error) ?? error
+  } finally {
+    globalThis.clearTimeout(timeoutId)
   }
-  const text = await response.text()
-  let payload: unknown = null
-  try {
-    payload = text ? JSON.parse(text) : null
-  } catch {
-    payload = text
-  }
-
-  if (!response.ok) {
-    const errorPayload = typeof payload === 'object' && payload ? payload as { message?: unknown; code?: unknown } : {}
-    const code = typeof errorPayload.code === 'string' ? errorPayload.code : undefined
-    const proxyConnectionFailed = response.status === 500 && !code && (payload === null || typeof payload === 'string')
-    const message = proxyConnectionFailed
-      ? 'API 服务未连接，请查看 pnpm dev 终端中的 api 退出原因，修复后点击刷新重试。'
-      : typeof errorPayload.message === 'string'
-      ? errorPayload.message
-      : `请求失败（${response.status}）`
-    throw new ApiRequestError(message, response.status, proxyConnectionFailed ? 'service_unavailable' : code)
-  }
-  return payload as T
 }
 
 export function register(loginIdentifier: string, password: string) {

@@ -49,6 +49,7 @@ import {
   importLibraryXbel,
   importLibraryFromSync,
   resolveLibraryFavicons,
+  API_REQUEST_TIMEOUT_MS,
 } from './api'
 
 function response(payload: unknown, status = 200): Response {
@@ -61,6 +62,7 @@ function response(payload: unknown, status = 200): Response {
 
 describe('admin API contract', () => {
   afterEach(() => {
+    vi.useRealTimers()
     vi.unstubAllGlobals()
   })
 
@@ -359,6 +361,24 @@ describe('admin API contract', () => {
       code: 'network_error',
       message: '开发服务连接已断开，请重新运行 pnpm dev 后点击刷新重试。',
     })
+  })
+
+  it('aborts an API request that remains pending and returns a retryable timeout error', async () => {
+    vi.useFakeTimers()
+    const fetchMock = vi.fn().mockImplementation((_path: string, init?: RequestInit) => new Promise((_resolve, reject) => {
+      init?.signal?.addEventListener('abort', () => reject(new DOMException('The operation was aborted', 'AbortError')), { once: true })
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = expect(getLibrary('session-token')).rejects.toMatchObject({
+      status: 0,
+      code: 'request_timeout',
+      message: '服务器响应超时，请检查服务状态后点击刷新重试。',
+    })
+    await vi.advanceTimersByTimeAsync(API_REQUEST_TIMEOUT_MS)
+    await result
+
+    expect(fetchMock.mock.calls[0][1].signal?.aborted).toBe(true)
   })
 
   it('recognizes a Vite proxy 500 when the API process is unavailable', async () => {
