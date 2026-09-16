@@ -71,6 +71,15 @@ export function resolveDraggedBookmarkIds(
   return candidates.filter((id, index) => validIds.has(id) && candidates.indexOf(id) === index)
 }
 
+export function getBookmarkDragPayload(
+  bookmarks: BookmarkItem[],
+  bookmarkId: string,
+  selectedIds: Set<string>,
+) {
+  const ids = resolveDraggedBookmarkIds(bookmarks, bookmarkId, selectedIds)
+  return ids.length > 0 ? { ids, textPlain: ids.join(',') } : null
+}
+
 export function groupBookmarksByFolder(
   bookmarks: BookmarkItem[],
   folders: BookmarkFolder[],

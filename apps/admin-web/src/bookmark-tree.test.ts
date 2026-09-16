@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { BookmarkFolder, BookmarkItem } from './api'
-import { descendantFolderIds, findFolderParentId, flattenFolders, folderHasChildren, groupBookmarksByFolder, resolveDraggedBookmarkIds, ROOT_BOOKMARK_GROUP_ID, visibleFolders } from './bookmark-tree'
+import { descendantFolderIds, findFolderParentId, flattenFolders, folderHasChildren, getBookmarkDragPayload, groupBookmarksByFolder, resolveDraggedBookmarkIds, ROOT_BOOKMARK_GROUP_ID, visibleFolders } from './bookmark-tree'
 
 const folders: BookmarkFolder[] = [
   { id: 'work', title: '工作', bookmarkCount: 3, children: [
@@ -41,6 +41,14 @@ describe('bookmark tree helpers', () => {
     expect(resolveDraggedBookmarkIds(bookmarks, 'one', new Set(['one', 'two', 'missing']))).toEqual(['one', 'two'])
     expect(resolveDraggedBookmarkIds(bookmarks, 'two', new Set())).toEqual(['two'])
     expect(resolveDraggedBookmarkIds(bookmarks, 'missing', new Set(['missing']))).toEqual([])
+  })
+
+  it('serializes the selected bookmarks for a folder-drop operation', () => {
+    expect(getBookmarkDragPayload(bookmarks, 'one', new Set(['one', 'two', 'missing']))).toEqual({
+      ids: ['one', 'two'],
+      textPlain: 'one,two',
+    })
+    expect(getBookmarkDragPayload(bookmarks, 'missing', new Set(['one']))).toBeNull()
   })
 
   it('detects folders with children', () => {

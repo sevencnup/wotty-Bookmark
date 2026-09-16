@@ -3,7 +3,7 @@ import type { DragEvent, MouseEvent as ReactMouseEvent } from 'react'
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as api from './api'
 import { getExplorerNavigationState } from './category-explorer'
-import { descendantFolderIds, findFolderParentId, flattenFolders as flattenBookmarkFolders, groupBookmarksByFolder, resolveDraggedBookmarkIds, type FlatBookmarkFolder } from './bookmark-tree'
+import { descendantFolderIds, findFolderParentId, flattenFolders as flattenBookmarkFolders, getBookmarkDragPayload, groupBookmarksByFolder, resolveDraggedBookmarkIds, type FlatBookmarkFolder } from './bookmark-tree'
 import { toCategoryTree } from './category-library'
 import { LibrarySiteIcon } from './LibraryManagementPage'
 import { confirmDangerousAction } from './preferences'
@@ -226,7 +226,6 @@ export function CategoryManagementPage({ token }: Props) {
     const selected = !selectedIds.has(id)
     selectionPaintRef.current = { selected, visitedIds: new Set([id]) }
     event.currentTarget.classList.toggle('selected', selected)
-    event.preventDefault()
   }, [selectedIds])
 
   const continueSelectionPaint = useCallback((event: ReactMouseEvent<HTMLDivElement>, id: string) => {
@@ -347,16 +346,17 @@ export function CategoryManagementPage({ token }: Props) {
     }
   }
 
-  const beginDrag = useCallback((event: DragEvent<HTMLButtonElement>, bookmarkId: string) => {
+  const beginDrag = useCallback((event: DragEvent<HTMLElement>, bookmarkId: string) => {
     if (!ready || moving) return
-    const ids = resolveDraggedBookmarkIds(tree?.bookmarks ?? [], bookmarkId, selectedIds)
-    if (!ids.length) return
-    const sourceFolderIds = new Set(ids
+    selectionPaintRef.current = null
+    const payload = getBookmarkDragPayload(tree?.bookmarks ?? [], bookmarkId, selectedIds)
+    if (!payload) return
+    const sourceFolderIds = new Set(payload.ids
       .map((id) => tree?.bookmarks.find((bookmark) => bookmark.id === id)?.parentId)
       .filter((id): id is string => Boolean(id)))
     event.dataTransfer.effectAllowed = 'move'
-    event.dataTransfer.setData('text/plain', ids.join(','))
-    setDrag({ kind: 'bookmarks', ids, sourceFolderIds })
+    event.dataTransfer.setData('text/plain', payload.textPlain)
+    setDrag({ kind: 'bookmarks', ids: payload.ids, sourceFolderIds })
   }, [moving, ready, selectedIds, tree])
 
   const beginFolderDrag = useCallback((event: DragEvent<HTMLElement>, folder: api.BookmarkFolder) => {
@@ -404,6 +404,7 @@ export function CategoryManagementPage({ token }: Props) {
   }
 
   const endDrag = useCallback(() => {
+    selectionPaintRef.current = null
     setDrag(null)
     setDropFolderId(null)
   }, [])
@@ -905,7 +906,7 @@ export function CategoryManagementPage({ token }: Props) {
             />
           )}
         </div>
-        <p className="category-keyboard-hint">按住书签行并上下滑动可连续多选；拖动右侧手柄，可将选中的书签放入组织树文件夹。</p>
+        <p className="category-keyboard-hint">按住书签行并上下滑动可连续多选；按住任意书签行拖到右侧文件夹即可归档，已选书签会一并移动。</p>
       </section>
       {organizationPanel}
     </div> : null}
@@ -1131,7 +1132,7 @@ const CategoryVirtualList = memo(function CategoryVirtualList({
   onToggleSelected: (id: string) => void
   onSelectionMouseDown: (event: ReactMouseEvent<HTMLDivElement>, id: string) => void
   onSelectionMouseOver: (event: ReactMouseEvent<HTMLDivElement>, id: string) => void
-  onDragStart: (event: DragEvent<HTMLButtonElement>, id: string) => void
+  onDragStart: (event: DragEvent<HTMLElement>, id: string) => void
   onDragEnd: () => void
 }) {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -1275,7 +1276,10 @@ const CategoryVirtualList = memo(function CategoryVirtualList({
               <div
                 className={`category-bookmark-row ${isSelected ? 'selected' : ''} ${isDragging ? 'dragging' : ''}`}
                 data-bookmark-id={bookmark.id}
+                draggable={!moving}
                 key={item.id}
+                onDragEnd={onDragEnd}
+                onDragStart={(event) => onDragStart(event, bookmark.id)}
                 onMouseDown={(event) => onSelectionMouseDown(event, bookmark.id)}
                 onMouseOver={(event) => onSelectionMouseOver(event, bookmark.id)}
                 style={{ height: `${BOOKMARK_ROW_HEIGHT}px`, boxSizing: 'border-box' }}
@@ -1291,9 +1295,6 @@ const CategoryVirtualList = memo(function CategoryVirtualList({
                 <button
                   aria-label={`拖动 ${bookmark.title || bookmark.url}`}
                   className="category-drag-handle"
-                  draggable={!moving}
-                  onDragEnd={onDragEnd}
-                  onDragStart={(event) => onDragStart(event, bookmark.id)}
                   title="拖动到右侧文件夹"
                   type="button"
                 >

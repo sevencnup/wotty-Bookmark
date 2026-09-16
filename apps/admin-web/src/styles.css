@@ -4377,8 +4377,12 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 
 /* 分类管理：连续划选、圆角树线与搜索框焦点收敛 */
 .category-management-page .category-bookmark-row {
-  cursor: default;
+  cursor: grab;
   user-select: none;
+}
+
+.category-management-page .category-bookmark-row:active {
+  cursor: grabbing;
 }
 
 .category-management-page .bookmark-search input:focus,
