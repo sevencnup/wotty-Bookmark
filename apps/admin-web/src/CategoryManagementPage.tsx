@@ -706,7 +706,7 @@ export function CategoryManagementPage({ token }: Props) {
             </p>
             <div className="explorer-empty-actions">
               {currentExplorerFolder && (
-                <button className="secondary-button" onClick={navigateUp} type="button">
+                <button className="secondary-button explorer-empty-back-btn" onClick={navigateUp} type="button">
                   <ArrowLeft size={14} /> 返回上一级
                 </button>
               )}
