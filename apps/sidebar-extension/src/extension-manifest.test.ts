@@ -18,4 +18,10 @@ describe('extension manifest icon assets', () => {
 
     expect(config).toMatch(/vite:\s*\(\)\s*=>\s*\(\{[\s\S]*?server:\s*\{[\s\S]*?cors:\s*true/);
   });
+
+  it("keeps WXT's browser runner enabled for extension debugging", () => {
+    const config = readFileSync(resolve(import.meta.dirname, '..', 'wxt.config.ts'), 'utf8');
+
+    expect(config).not.toMatch(/webExt:\s*\{[\s\S]*?disabled:\s*true/);
+  });
 });

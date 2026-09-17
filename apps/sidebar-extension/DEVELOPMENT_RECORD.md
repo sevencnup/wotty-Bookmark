@@ -1,5 +1,9 @@
 # 书签侧边栏开发记录
 
+## 2026-09-17：恢复自动调试浏览器
+
+- 重新启用 WXT 的 Chromium 调试 runner，使 `pnpm dev:sidebar` 自动打开独立浏览器并临时加载扩展，避免开发时手动进入扩展管理页。
+
 ## 2026-09-17：修复侧边栏白屏
 
 - 为 WXT 开发服务器启用 CORS，允许 Chrome Side Panel 从扩展来源加载 localhost 开发模块。

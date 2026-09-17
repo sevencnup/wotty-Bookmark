@@ -16,9 +16,6 @@ export default defineConfig({
       cors: true,
     },
   }),
-  webExt: {
-    disabled: true,
-  },
   manifest: {
     name: 'wotty bookmark sidebar',
     short_name: 'Bookmarks',
