@@ -25,7 +25,7 @@ pnpm dev
 
 - 管理后台：http://localhost:56993/
 - 局域网管理后台：`http://<本机局域网 IP>:56993/`（例如 `http://192.168.15.22:56993/`）
-- 侧边栏插件开发页：http://localhost:56992/
+- 侧边栏插件：执行 `pnpm dev:sidebar` 会自动打开本地调试落地页；按 `Ctrl+Shift+Y` 打开 Side Panel。
 - Rust API：http://127.0.0.1:26626/
 
 管理后台会监听所有网络接口，并通过开发代理访问仅监听本机的 Rust API；局域网设备无需直接访问 API 端口。

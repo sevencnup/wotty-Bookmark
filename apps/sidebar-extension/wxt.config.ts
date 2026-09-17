@@ -8,6 +8,11 @@ export default defineConfig({
       strictPort: true,
     },
   },
+  webExt: {
+    // WXT's Chromium runner otherwise starts at about:blank. This static page
+    // is served by the dev server and gives the Side Panel a real tab context.
+    startUrls: ['http://localhost:56992/sidebar-debug.html'],
+  },
   vite: () => ({
     server: {
       // The Side Panel runs at chrome-extension://<id>. WXT's dev page imports
@@ -30,6 +35,14 @@ export default defineConfig({
         32: 'logo.png',
         48: 'logo.png',
         128: 'logo.png',
+      },
+    },
+    commands: {
+      'open-sidebar-for-debug': {
+        suggested_key: {
+          default: 'Ctrl+Shift+Y',
+        },
+        description: '打开书签侧边栏',
       },
     },
     icons: {

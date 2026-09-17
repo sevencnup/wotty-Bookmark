@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WOTTY BOOKMARK 侧边栏调试</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: Inter, "Microsoft YaHei", system-ui, sans-serif;
+        background: #f8fafc;
+        color: #0f172a;
+      }
+
+      body {
+        display: grid;
+        min-height: 100vh;
+        margin: 0;
+        place-items: center;
+      }
+
+      main {
+        width: min(34rem, calc(100% - 3rem));
+        padding: 2.5rem;
+        border: 1px solid #dbeafe;
+        border-radius: 1.25rem;
+        background: #ffffff;
+        box-shadow: 0 1rem 3rem rgb(15 23 42 / 8%);
+      }
+
+      h1 { margin: 0; font-size: 1.5rem; }
+      p { color: #475569; line-height: 1.7; }
+      kbd {
+        padding: 0.2rem 0.45rem;
+        border: 1px solid #cbd5e1;
+        border-bottom-width: 2px;
+        border-radius: 0.35rem;
+        background: #f8fafc;
+        color: #1d4ed8;
+        font-family: inherit;
+        font-weight: 700;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>WOTTY BOOKMARK 侧边栏调试已就绪</h1>
+      <p>按 <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>Y</kbd> 打开当前窗口的书签侧边栏。</p>
+      <p>修改侧边栏源码后，WXT 会自动刷新调试扩展。</p>
+    </main>
+  </body>
+</html>

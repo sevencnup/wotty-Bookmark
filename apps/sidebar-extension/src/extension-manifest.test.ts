@@ -24,4 +24,19 @@ describe('extension manifest icon assets', () => {
 
     expect(config).not.toMatch(/webExt:\s*\{[\s\S]*?disabled:\s*true/);
   });
+
+  it('opens a real debug page and registers the Side Panel shortcut', () => {
+    const config = readFileSync(resolve(import.meta.dirname, '..', 'wxt.config.ts'), 'utf8');
+
+    expect(config).toMatch(/webExt:\s*\{[\s\S]*?startUrls:\s*\[\s*'http:\/\/localhost:56992\/sidebar-debug\.html'\s*\]/);
+    expect(config).toMatch(/commands:\s*\{[\s\S]*?'open-sidebar-for-debug':[\s\S]*?default:\s*'Ctrl\+Shift\+Y'/);
+  });
+
+  it('opens the Side Panel from the registered command user gesture', () => {
+    const background = readFileSync(resolve(import.meta.dirname, '..', 'entrypoints', 'background.ts'), 'utf8');
+
+    expect(background).toContain('browser.commands.onCommand.addListener');
+    expect(background).toContain("command !== 'open-sidebar-for-debug'");
+    expect(background).toContain('browser.sidePanel?.open({ tabId: tab.id })');
+  });
 });
