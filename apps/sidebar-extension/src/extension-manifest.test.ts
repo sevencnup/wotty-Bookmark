@@ -24,6 +24,13 @@ describe('extension manifest icon assets', () => {
     expect(subtitleStyles).not.toContain('text-transform: uppercase');
   });
 
+  it('uses the English extension name for the Side Panel page title', () => {
+    const sidepanel = readFileSync(resolve(import.meta.dirname, '..', 'entrypoints', 'sidepanel', 'index.html'), 'utf8');
+
+    expect(sidepanel).toContain('<title>wotty bookmark sidebar</title>');
+    expect(sidepanel).not.toContain('<title>书签</title>');
+  });
+
   it('enables CORS for development modules loaded by the extension page', () => {
     const config = readFileSync(resolve(import.meta.dirname, '..', 'wxt.config.ts'), 'utf8');
 
