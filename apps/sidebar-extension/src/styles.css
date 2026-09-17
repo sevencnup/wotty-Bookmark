@@ -652,10 +652,10 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 }
 
 .bookmark-folder-row {
-  height: 32px;
-  min-height: 32px;
+  height: 36px;
+  min-height: 36px;
   width: 100%;
-  margin: 0 0 1px 0;
+  margin: 0 0 2px 0;
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
@@ -667,8 +667,8 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 }
 
 .bookmark-item-row {
-  height: 32px;
-  min-height: 32px;
+  height: 36px;
+  min-height: 36px;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -699,15 +699,15 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 .bookmark-row-main {
   display: flex;
   align-items: center;
-  gap: 6px;
-  height: 32px;
-  min-height: 32px;
-  padding: 0 6px 0 calc(4px + var(--depth) * 14px);
+  gap: 7px;
+  height: 36px;
+  min-height: 36px;
+  padding: 0 8px 0 calc(4px + var(--depth) * 14px);
 }
 
 .bookmark-folder-row .bookmark-row-main {
-  height: 32px;
-  min-height: 32px;
+  height: 36px;
+  min-height: 36px;
 }
 
 .drag-handle {

@@ -21,8 +21,8 @@ type Editor = { kind: 'bookmark' | 'folder'; title: string; url: string; parentI
 type RefreshOptions = { silent?: boolean };
 const AUTO_REFRESH_INTERVAL_MS = 10_000;
 const LANGUAGE_REFRESH_INTERVAL_MS = 10 * 60_000;
-const FOLDER_ROW_HEIGHT = 32;
-const BOOKMARK_ROW_HEIGHT = 32;
+const FOLDER_ROW_HEIGHT = 36;
+const BOOKMARK_ROW_HEIGHT = 36;
 const SEARCH_ROW_HEIGHT = 44;
 
 function toNodes(tree: LibraryTree): BookmarkNode[] {
