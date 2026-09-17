@@ -157,7 +157,6 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.04em;
-  text-transform: uppercase;
   line-height: 1.2;
 }
 

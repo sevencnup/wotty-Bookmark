@@ -22,8 +22,8 @@ export default defineConfig({
     },
   }),
   manifest: {
-    name: '书签',
-    short_name: '书签',
+    name: 'wotty bookmark sidebar',
+    short_name: 'Bookmarks',
     description: 'A private sidebar for your self-hosted bookmark library.',
     version: '0.1.14',
     permissions: ['tabs', 'storage'],
