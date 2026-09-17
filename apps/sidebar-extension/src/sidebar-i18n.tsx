@@ -6,6 +6,8 @@ const englishText: Record<string, string> = {
   '书签库': 'Bookmark library',
   '服务器已连接': 'Server connected',
   '连接服务器': 'Connect server',
+  '收起工具区': 'Collapse tools',
+  '展开工具区': 'Expand tools',
   '只保存到服务器': 'Server-only storage',
   '不读取或写入浏览器原生书签': 'Never reads or writes browser-native bookmarks',
   '搜索服务器书签': 'Search server bookmarks',

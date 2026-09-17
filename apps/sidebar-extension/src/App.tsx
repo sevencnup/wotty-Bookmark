@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowUp, Bookmark, Check, ChevronDown, ChevronRight, Folder, FolderOpen, Globe, LoaderCircle, LogIn, Pencil, Plus, RefreshCw, Search, Server, Trash2, X } from 'lucide-react';
+import { ArrowUp, Bookmark, Check, ChevronDown, ChevronRight, Folder, FolderOpen, Globe, LayoutPanelTop, LoaderCircle, LogIn, PanelTopOpen, Pencil, Plus, RefreshCw, Search, Server, Trash2, X } from 'lucide-react';
 import { getActiveTab, getTabsApi, openBookmark } from './lib/browser-api';
 import type { BookmarkNode } from './lib/browser-api';
 import { collectFolders, countBookmarks, countFolders, findNode, flattenVisibleNodes, getFolderOptions, isFolder, searchBookmarks } from './lib/bookmark-tree';
@@ -10,6 +10,7 @@ import type { LibraryFolder, LibraryTree } from './lib/library';
 import { loadSiteFavicon } from './lib/site-favicon';
 import { loadSidebarLocale, refreshSidebarLocale } from './lib/preferences';
 import type { SidebarLocale } from './lib/preferences';
+import { loadCompactToolbar, saveCompactToolbar } from './lib/layout-preferences';
 import { getVariableVirtualWindow, getVirtualWindow } from './lib/virtual-list';
 import { FolderPickerDropdown } from './components/FolderPickerDropdown';
 import type { FolderOption } from './components/FolderPickerDropdown';
@@ -81,6 +82,7 @@ function App() {
   const [activeTab, setActiveTab] = useState<{ title: string; url: string } | null>(null);
   const [quickSaveFolder, setQuickSaveFolder] = useState('');
   const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
+  const [compactToolbar, setCompactToolbar] = useState(false);
   const [scrollTop, setScrollTop] = useState(0);
   const [viewportHeight, setViewportHeight] = useState(600);
   const refreshInFlightRef = useRef(false);
@@ -93,6 +95,7 @@ function App() {
       setViewportHeight(el.clientHeight || 600);
     }
   }, []);
+  useEffect(() => { void loadCompactToolbar().then(setCompactToolbar).catch(() => undefined); }, []);
 
   useEffect(() => {
     const el = workspaceRef.current;
@@ -203,9 +206,18 @@ function App() {
     }
   });
 
-  return <SidebarUiLocalization locale={locale}><main className="app-shell self-hosted-library">
-    <header className="topbar"><div className="brand-lockup"><div className="brand-mark"><img alt="WOTTY BOOKMARK" className="brand-logo-img" src="/logo.webp" /></div><div><div className="brand-title">书签库</div><div className="brand-subtitle">WOTTY · SERVER LIBRARY</div></div></div><button className={`sync-status ${connection ? 'is-connected' : 'is-disconnected'}`} onClick={() => setModal({ type: 'connect' })} type="button"><span className="status-dot" />{connection ? '服务器已连接' : '连接服务器'}<Server size={13} /></button></header>
+  const toggleCompactToolbar = () => {
+    setCompactToolbar((current) => {
+      const next = !current;
+      void saveCompactToolbar(next);
+      return next;
+    });
+  };
+
+  return <SidebarUiLocalization locale={locale}><main className={`app-shell self-hosted-library ${compactToolbar ? 'is-compact-toolbar' : ''}`}>
+    <header className="topbar"><div className="brand-lockup"><div className="brand-mark"><img alt="WOTTY BOOKMARK" className="brand-logo-img" src="/logo.webp" /></div><div><div className="brand-title">书签库</div><div className="brand-subtitle">WOTTY · SERVER LIBRARY</div></div></div><div className="topbar-actions"><button aria-label={compactToolbar ? '展开工具区' : '收起工具区'} aria-pressed={compactToolbar} className="compact-toolbar-button" onClick={toggleCompactToolbar} title={compactToolbar ? '展开工具区' : '收起工具区'} type="button">{compactToolbar ? <PanelTopOpen size={15} /> : <LayoutPanelTop size={15} />}</button><button className={`sync-status ${connection ? 'is-connected' : 'is-disconnected'}`} onClick={() => setModal({ type: 'connect' })} type="button"><span className="status-dot" />{connection ? '服务器已连接' : '连接服务器'}<Server size={13} /></button></div></header>
     <section className="workspace" ref={workspaceRef}>
+      <div className="auxiliary-toolbar">
       <div className="server-library-banner"><Server size={15} /><span><strong>只保存到服务器</strong> · 不读取或写入浏览器原生书签</span></div>
       <div className="search-shell"><Search size={16} /><input aria-label="搜索服务器书签" disabled={!connection} onChange={(event) => setQuery(event.target.value)} placeholder="搜索服务器书签或网址" type="search" value={query} />{query && <button className="icon-button" onClick={() => setQuery('')} type="button"><X size={14} /></button>}</div>
       <section className={`quick-save-card ${!activeTab || !connection ? 'is-disabled' : ''}`}>
@@ -225,8 +237,9 @@ function App() {
         />
         <button className={`save-current-button ${currentSaved ? 'is-saved' : ''}`} disabled={!activeTab || !connection || currentSaved || busy} onClick={() => activeTab && void perform((active) => createLibraryBookmark(active, { title: activeTab.title, url: activeTab.url, parentId: quickSaveFolder || null }))} type="button">{currentSaved ? <Check size={15} /> : '收藏'}</button>
       </section>
+      </div>
       <div className="section-heading"><div><span className="section-kicker">PRIVATE LIBRARY</span><h1>我的服务器书签</h1></div><div className="heading-actions"><button className="new-bookmark-button" disabled={!connection} onClick={() => setModal({ type: 'create', kind: 'folder' })} type="button"><Folder size={15} />文件夹</button><button className="new-bookmark-button primary" disabled={!connection} onClick={() => setModal({ type: 'create', kind: 'bookmark' })} type="button"><Plus size={15} />新增</button></div></div>
-      <div className="library-meta"><span>{countBookmarks(nodes)} 个书签</span><span className="meta-separator">·</span><span>{countFolders(nodes)} 个文件夹</span><span className="sync-time" title="侧边栏每 10 秒自动同步一次，重新聚焦时会立即同步">{formatSyncTime(lastSyncedAt)}</span><span className="meta-spacer" /><button className="refresh-button" disabled={!connection || loading} onClick={() => void refresh()} type="button"><RefreshCw className={loading ? 'spin' : ''} size={13} />刷新</button></div>
+      <div className={`library-meta ${compactToolbar ? 'is-compact-meta' : ''}`}><span>{countBookmarks(nodes)} 个书签</span><span className="meta-separator">·</span><span>{countFolders(nodes)} 个文件夹</span><span className="sync-time" title="侧边栏每 10 秒自动同步一次，重新聚焦时会立即同步">{formatSyncTime(lastSyncedAt)}</span><span className="meta-spacer" /><button className="refresh-button" disabled={!connection || loading} onClick={() => void refresh()} type="button"><RefreshCw className={loading ? 'spin' : ''} size={13} />刷新</button></div>
       {!connection ? <Disconnected onConnect={() => setModal({ type: 'connect' })} /> : error && !tree ? <Failure message={error} onRetry={() => void refresh()} /> : loading ? <Loading /> : query.trim() ? <VirtualSearchList onDelete={(nodeId) => setModal({ type: 'edit', nodeId })} onEdit={(nodeId) => setModal({ type: 'edit', nodeId })} onMove={(nodeId) => setModal({ type: 'move', nodeId })} results={results} scrollTop={scrollTop} viewportHeight={viewportHeight} /> : visible.length ? <VirtualBookmarkList expanded={expanded} onDelete={(nodeId) => setModal({ type: 'delete', nodeId })} onEdit={(nodeId) => setModal({ type: 'edit', nodeId })} onMove={(nodeId) => setModal({ type: 'move', nodeId })} onToggle={(nodeId) => setExpanded((current) => { const next = new Set(current); if (next.has(nodeId)) next.delete(nodeId); else next.add(nodeId); return next; })} scrollTop={scrollTop} viewportHeight={viewportHeight} visible={visible} /> : <Empty onCreate={() => setModal({ type: 'create', kind: 'bookmark' })} />}{error && tree && <p className="inline-error">{error}</p>}
     </section>
     <button aria-label="回到顶部" className="back-to-top-button" onClick={() => scrollToTop(workspaceRef.current)} title="回到顶部" type="button"><ArrowUp size={16} /></button>
