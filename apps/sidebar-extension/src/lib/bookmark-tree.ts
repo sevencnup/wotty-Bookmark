@@ -51,7 +51,8 @@ export function searchBookmarks(nodes: BookmarkNode[], query: string): SearchRes
     for (const node of currentNodes) {
       const nextBreadcrumb = node.title ? [...breadcrumb, node.title] : breadcrumb;
       if (!isFolder(node)) {
-        const haystack = `${node.title} ${node.url ?? ''}`.toLocaleLowerCase();
+        const fullBreadcrumbPath = breadcrumb.join(' ');
+        const haystack = `${node.title ?? ''} ${node.url ?? ''} ${fullBreadcrumbPath}`.toLocaleLowerCase();
         if (haystack.includes(normalizedQuery)) {
           results.push({ node, breadcrumb });
         }

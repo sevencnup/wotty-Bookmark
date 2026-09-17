@@ -33,11 +33,14 @@ describe('bookmark tree helpers', () => {
     ]);
   });
 
-  it('searches titles and urls with folder breadcrumbs', () => {
+  it('searches titles, urls, and folder breadcrumbs', () => {
     expect(searchBookmarks(tree, 'linear')).toEqual([
       { node: tree[0]!.children![0]!.children![0], breadcrumb: ['书签栏', '设计灵感'] },
     ]);
     expect(searchBookmarks(tree, 'chrome')).toHaveLength(1);
+    expect(searchBookmarks(tree, '设计灵感')).toEqual([
+      { node: tree[0]!.children![0]!.children![0], breadcrumb: ['书签栏', '设计灵感'] },
+    ]);
   });
 
   it('counts bookmarks and excludes the edited folder from destinations', () => {
