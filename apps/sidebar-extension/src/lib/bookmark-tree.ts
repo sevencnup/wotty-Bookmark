@@ -84,19 +84,19 @@ export function isDescendant(nodes: BookmarkNode[], ancestorId: string, candidat
   return Boolean(ancestor?.children && findNode(ancestor.children, candidateId));
 }
 
-export function getFolderOptions(nodes: BookmarkNode[], excludedId?: string): BookmarkNode[] {
-  const options: BookmarkNode[] = [];
-  const visit = (currentNodes: BookmarkNode[]) => {
+export function getFolderOptions(nodes: BookmarkNode[], excludedId?: string): Array<BookmarkNode & { depth: number }> {
+  const options: Array<BookmarkNode & { depth: number }> = [];
+  const visit = (currentNodes: BookmarkNode[], depth: number) => {
     for (const node of currentNodes) {
-      if (isFolder(node) && node.id !== excludedId) {
-        options.push(node);
-        if (!excludedId || node.id !== excludedId) {
-          visit(node.children ?? []);
-        }
-      }
+      if (!isFolder(node)) continue;
+      // A folder cannot become its own descendant. Excluding the whole branch
+      // also keeps the move picker aligned with the server-side tree invariant.
+      if (node.id === excludedId) continue;
+      options.push({ ...node, depth });
+      visit(node.children ?? [], depth + 1);
     }
   };
-  visit(nodes);
+  visit(nodes, 0);
   return options;
 }
 

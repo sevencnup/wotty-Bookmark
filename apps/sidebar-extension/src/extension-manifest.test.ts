@@ -12,4 +12,10 @@ describe('extension manifest icon assets', () => {
     expect(config).not.toMatch(/default_icon:[\s\S]*?logo\.webp/);
     expect(config).not.toMatch(/icons:[\s\S]*?logo\.webp/);
   });
+
+  it('enables CORS for development modules loaded by the extension page', () => {
+    const config = readFileSync(resolve(import.meta.dirname, '..', 'wxt.config.ts'), 'utf8');
+
+    expect(config).toMatch(/vite:\s*\(\)\s*=>\s*\(\{[\s\S]*?server:\s*\{[\s\S]*?cors:\s*true/);
+  });
 });

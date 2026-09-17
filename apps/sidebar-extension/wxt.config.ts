@@ -8,6 +8,14 @@ export default defineConfig({
       strictPort: true,
     },
   },
+  vite: () => ({
+    server: {
+      // The Side Panel runs at chrome-extension://<id>. WXT's dev page imports
+      // its modules from localhost, so those module responses must allow the
+      // extension origin.
+      cors: true,
+    },
+  }),
   webExt: {
     disabled: true,
   },

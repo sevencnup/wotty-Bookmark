@@ -98,7 +98,12 @@ function translate(value: string, locale: SidebarLocale): string {
 
 const originalText = new WeakMap<Text, string>();
 const originalAttributes = new WeakMap<Element, Map<string, string>>();
+let hasOriginalTranslations = false;
 const attributes = ['aria-label', 'title', 'placeholder'];
+
+export function shouldApplyLocalization(locale: SidebarLocale, hasSavedOriginals: boolean): boolean {
+  return locale !== 'zh-CN' || hasSavedOriginals;
+}
 
 function skipsText(element: Element | null): boolean {
   return Boolean(element?.closest('[data-i18n-skip], textarea, code, img, svg, .site-favicon, .site-favicon-svg, option:not([data-i18n-force]), .bookmark-title, .bookmark-url, .result-copy, .quick-save-copy strong, .connection-status-card span, .delete-content strong'));
@@ -120,6 +125,7 @@ function localizeText(node: Text, locale: SidebarLocale) {
   }
   const source = saved && current === translate(saved, 'en') ? saved : current;
   originalText.set(node, source);
+  hasOriginalTranslations = true;
   const localized = translate(source, locale);
   if (localized !== current) node.data = localized;
 }
@@ -137,6 +143,7 @@ function localizeAttribute(element: Element, attribute: string, locale: SidebarL
   const source = saved && current === translate(saved, 'en') ? saved : current;
   values.set(attribute, source);
   originalAttributes.set(element, values);
+  hasOriginalTranslations = true;
   const localized = translate(source, locale);
   if (localized !== current) element.setAttribute(attribute, localized);
 }
@@ -158,7 +165,7 @@ export function SidebarUiLocalization({ children, locale }: { children: ReactNod
     if (!element) return;
     let scheduled: number | null = null;
     const apply = () => {
-      if (locale === 'zh-CN' && originalText.size === 0 && originalAttributes.size === 0) return;
+      if (!shouldApplyLocalization(locale, hasOriginalTranslations)) return;
       applyLocalization(element, locale);
     };
     apply();

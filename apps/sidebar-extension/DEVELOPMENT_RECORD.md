@@ -1,5 +1,11 @@
 # 书签侧边栏开发记录
 
+## 2026-09-17：修复侧边栏白屏
+
+- 为 WXT 开发服务器启用 CORS，允许 Chrome Side Panel 从扩展来源加载 localhost 开发模块。
+- 修复国际化初始化错误使用 `WeakMap.size` 的无效优化条件。
+- 收紧文件夹选择器与虚拟列表的类型边界，恢复扩展严格 TypeScript 检查。
+
 ## 2026-09-16：修复扩展图标显示
 
 - 浏览器扩展清单的 `icons` 与 `action.default_icon` 统一使用 `logo.png`。

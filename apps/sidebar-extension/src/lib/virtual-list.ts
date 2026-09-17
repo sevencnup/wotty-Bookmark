@@ -43,12 +43,13 @@ export function getVariableVirtualWindow(
     return { start: 0, end: 0, offset: 0, totalSize: 0 };
   }
 
-  const positions: number[] = new Array(total + 1);
-  positions[0] = 0;
+  const positions: number[] = [0];
   for (let i = 0; i < total; i++) {
-    positions[i + 1] = positions[i] + Math.max(1, itemHeights[i]);
+    const previousPosition = positions[i] ?? 0;
+    const itemHeight = itemHeights[i] ?? 1;
+    positions[i + 1] = previousPosition + Math.max(1, itemHeight);
   }
-  const totalSize = positions[total];
+  const totalSize = positions[total] ?? 0;
 
   if (Math.max(0, scrollTop) >= totalSize) {
     return { start: total, end: total, offset: totalSize, totalSize };
@@ -63,7 +64,7 @@ export function getVariableVirtualWindow(
   let firstVisible = 0;
   while (low <= high) {
     const mid = (low + high) >> 1;
-    if (positions[mid + 1] > safeScrollTop) {
+    if ((positions[mid + 1] ?? totalSize) > safeScrollTop) {
       firstVisible = mid;
       high = mid - 1;
     } else {
@@ -78,7 +79,7 @@ export function getVariableVirtualWindow(
   let lastVisible = firstVisible;
   while (low <= high) {
     const mid = (low + high) >> 1;
-    if (positions[mid] < viewportBottom) {
+    if ((positions[mid] ?? totalSize) < viewportBottom) {
       lastVisible = mid;
       low = mid + 1;
     } else {
@@ -88,7 +89,7 @@ export function getVariableVirtualWindow(
 
   const start = Math.max(0, firstVisible - safeOverscan);
   const end = Math.min(total, lastVisible + 1 + safeOverscan);
-  const offset = positions[start];
+  const offset = positions[start] ?? totalSize;
 
   return {
     start,

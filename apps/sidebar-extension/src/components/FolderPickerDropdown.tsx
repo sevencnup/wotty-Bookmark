@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, ChevronDown, Folder, Search, X } from 'lucide-react';
-import type { LibraryFolder } from '../lib/library';
-
-export type FolderOption = LibraryFolder & { depth: number };
+export type FolderOption = {
+  id: string;
+  title: string;
+  depth: number;
+};
 
 interface FolderPickerDropdownProps {
   value: string;
