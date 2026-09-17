@@ -38,28 +38,28 @@ describe('sidebar virtual list window calculator', () => {
     });
 
     it('handles mixed heights correctly', () => {
-      // 5 folders (38px) and 5 bookmarks (52px)
-      // heights = [38, 52, 38, 52, 38, 52, 38, 52, 38, 52]
-      // total = 5*38 + 5*52 = 190 + 260 = 450
-      const heights = [38, 52, 38, 52, 38, 52, 38, 52, 38, 52];
+      // 5 folders (32px) and 5 bookmarks (32px)
+      // heights = [32, 32, 32, 32, 32, 32, 32, 32, 32, 32]
+      // total = 10*32 = 320
+      const heights = [32, 32, 32, 32, 32, 32, 32, 32, 32, 32];
       const win = getVariableVirtualWindow(heights, 0, 100, 1);
       expect(win.start).toBe(0);
-      expect(win.totalSize).toBe(450);
+      expect(win.totalSize).toBe(320);
       expect(win.offset).toBe(0);
     });
 
     it('calculates accurate slice and offset when scrolled in mixed list', () => {
-      // item 0: 38 (0-38)
-      // item 1: 52 (38-90)
-      // item 2: 52 (90-142)
-      // item 3: 38 (142-180)
-      // item 4: 52 (180-232)
-      const heights = [38, 52, 52, 38, 52];
-      // scroll to 100px (item 2 is visible), viewport 50px, overscan 1
-      const win = getVariableVirtualWindow(heights, 100, 50, 1);
+      // item 0: 32 (0-32)
+      // item 1: 32 (32-64)
+      // item 2: 32 (64-96)
+      // item 3: 32 (96-128)
+      // item 4: 32 (128-160)
+      const heights = [32, 32, 32, 32, 32];
+      // scroll to 70px (item 2 is visible), viewport 50px, overscan 1
+      const win = getVariableVirtualWindow(heights, 70, 50, 1);
       expect(win.start).toBe(1); // item 2 - 1 = 1
-      expect(win.offset).toBe(38); // position before item 1
-      expect(win.totalSize).toBe(232);
+      expect(win.offset).toBe(32); // position before item 1
+      expect(win.totalSize).toBe(160);
     });
   });
 });

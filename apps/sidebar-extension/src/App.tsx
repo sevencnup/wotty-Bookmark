@@ -21,9 +21,9 @@ type Editor = { kind: 'bookmark' | 'folder'; title: string; url: string; parentI
 type RefreshOptions = { silent?: boolean };
 const AUTO_REFRESH_INTERVAL_MS = 10_000;
 const LANGUAGE_REFRESH_INTERVAL_MS = 10 * 60_000;
-const FOLDER_ROW_HEIGHT = 38;
-const BOOKMARK_ROW_HEIGHT = 52;
-const SEARCH_ROW_HEIGHT = 56;
+const FOLDER_ROW_HEIGHT = 32;
+const BOOKMARK_ROW_HEIGHT = 32;
+const SEARCH_ROW_HEIGHT = 44;
 
 function toNodes(tree: LibraryTree): BookmarkNode[] {
   const build = (folder: LibraryFolder): BookmarkNode => ({ id: folder.id, title: folder.title, children: folder.children.map(build) });
@@ -308,7 +308,61 @@ function VirtualSearchList({ results, scrollTop, viewportHeight, onEdit, onMove,
   );
 }
 
-function NodeRow({ node, expanded, onToggle, onOpen, onEdit, onMove, onDelete }: { node: BookmarkNode & { depth: number }; expanded: boolean; onToggle: () => void; onOpen: () => void; onEdit: () => void; onMove: () => void; onDelete: () => void }) { const folder = isFolder(node); const depth = node.depth; const bookmarkCount = folder ? countBookmarks(node.children ?? []) : 0; return <div className={`bookmark-row ${folder ? 'bookmark-folder-row' : 'bookmark-item-row'}`} style={{ '--depth': depth } as React.CSSProperties}><div className="bookmark-row-main">{folder ? <button className="folder-toggle" onClick={onToggle} type="button">{expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}</button> : <span className="folder-toggle-spacer" />}<span className={`node-icon ${folder ? 'folder-color' : ''}`}>{folder ? <span className="folder-icon-card">{expanded ? <FolderOpen size={15} /> : <Folder size={15} />}</span> : <Favicon url={node.url!} />}</span><button className="bookmark-title" onClick={folder ? onToggle : onOpen} type="button">{node.title || '未命名'}</button>{folder && <span aria-label={`${bookmarkCount} 个书签`} className="folder-count-badge">{bookmarkCount}</span>}<div className="row-actions"><button aria-label="编辑" className="row-action" onClick={onEdit} type="button"><Pencil size={14} /></button><button aria-label="移动" className="row-action" onClick={onMove} type="button">↗</button><button aria-label="删除" className="row-action danger-action" onClick={onDelete} type="button"><Trash2 size={14} /></button></div></div>{node.url && <span className="bookmark-url">{hostname(node.url)}</span>}</div>; }
+function NodeRow({ node, expanded, onToggle, onOpen, onEdit, onMove, onDelete }: { node: BookmarkNode & { depth: number }; expanded: boolean; onToggle: () => void; onOpen: () => void; onEdit: () => void; onMove: () => void; onDelete: () => void }) {
+  const folder = isFolder(node);
+  const depth = node.depth;
+  const bookmarkCount = folder ? countBookmarks(node.children ?? []) : 0;
+  const tooltip = folder ? (node.title || '未命名') : `${node.title || '未命名'}\n${node.url || ''}`;
+
+  return (
+    <div
+      className={`bookmark-row ${folder ? 'bookmark-folder-row' : 'bookmark-item-row'}`}
+      style={{ '--depth': depth } as React.CSSProperties}
+    >
+      <div className="bookmark-row-main" title={tooltip}>
+        {folder ? (
+          <button className="folder-toggle" onClick={onToggle} type="button">
+            {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+          </button>
+        ) : (
+          <span className="folder-toggle-spacer" />
+        )}
+        <span className={`node-icon ${folder ? 'folder-color' : ''}`}>
+          {folder ? (
+            <span className="folder-icon-card">
+              {expanded ? <FolderOpen size={15} /> : <Folder size={15} />}
+            </span>
+          ) : (
+            <Favicon url={node.url!} />
+          )}
+        </span>
+        <button
+          className="bookmark-title"
+          onClick={folder ? onToggle : onOpen}
+          type="button"
+        >
+          {node.title || '未命名'}
+        </button>
+        {folder && (
+          <span aria-label={`${bookmarkCount} 个书签`} className="folder-count-badge">
+            {bookmarkCount}
+          </span>
+        )}
+        <div className="row-actions">
+          <button aria-label="编辑" className="row-action" onClick={onEdit} type="button">
+            <Pencil size={13} />
+          </button>
+          <button aria-label="移动" className="row-action" onClick={onMove} type="button">
+            ↗
+          </button>
+          <button aria-label="删除" className="row-action danger-action" onClick={onDelete} type="button">
+            <Trash2 size={13} />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 const faviconMemoryCache = new Map<string, Awaited<ReturnType<typeof loadSiteFavicon>>>();
 function Favicon({ url }: { url: string }) { const cached = faviconMemoryCache.get(url); const [asset, setAsset] = useState<Awaited<ReturnType<typeof loadSiteFavicon>>>(cached ?? null); useEffect(() => { if (cached !== undefined) return; void loadSiteFavicon(url).then((next) => { faviconMemoryCache.set(url, next); setAsset(next); }); }, [url, cached]); if (asset?.kind === 'image') return <img alt="" className="site-favicon" height={16} src={asset.source} width={16} />; if (asset?.kind === 'svg') return <span aria-hidden="true" className="site-favicon-svg" dangerouslySetInnerHTML={{ __html: asset.source }} />; return <Bookmark size={15} />; }
 function Loading() { return <div className="loading-state"><LoaderCircle className="spin" size={24} /><span>正在读取服务器书签库…</span></div>; }
