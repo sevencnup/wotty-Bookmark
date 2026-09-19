@@ -350,7 +350,7 @@ function App() {
           ) : (
             <>
                 {activeSection === 'overview' && <Overview token={session.token} />}
-                {activeSection === 'app-passwords' && <SidebarConnectionPage token={session.token} />}
+                {activeSection === 'app-passwords' && <SidebarConnectionPage onOpenFloccus={() => navigate('floccus')} token={session.token} />}
                 {activeSection === 'categories' && <CategoryManagementPage token={session.token} />}
                 {activeSection === 'library' && <LibraryManagementPage token={session.token} />}
                 {activeSection === 'floccus' && <FloccusGuide token={session.token} loginIdentifier={session.user.loginIdentifier} />}
@@ -828,7 +828,7 @@ function formatBytes(bytes: number) { if (bytes < 1024) return `${bytes} B`; if 
 function formatDate(value: string) { return new Date(value).toLocaleString() }
 function getWebDavUrl(loginIdentifier: string) { return `${window.location.origin}/dav/${encodeURIComponent(loginIdentifier)}/` }
 
-function BookmarkSourceSettings({ token }: { token: string }) {
+function BookmarkSourceSettings({ onOpenFloccus, onSourceModeChange, token }: { onOpenFloccus: () => void; onSourceModeChange: (sourceMode: api.BookmarkSourceMode) => void; token: string }) {
   const [sourceMode, setSourceMode] = useState<api.BookmarkSourceMode>('server')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -837,11 +837,11 @@ function BookmarkSourceSettings({ token }: { token: string }) {
   useEffect(() => {
     let cancelled = false
     void api.getAccountPreferences(token)
-      .then((preferences) => { if (!cancelled) setSourceMode(preferences.sourceMode) })
+      .then((preferences) => { if (!cancelled) { setSourceMode(preferences.sourceMode); onSourceModeChange(preferences.sourceMode) } })
       .catch(() => undefined)
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [token])
+  }, [onSourceModeChange, token])
 
   async function selectSource(next: api.BookmarkSourceMode) {
     setSourceMode(next)
@@ -850,16 +850,18 @@ function BookmarkSourceSettings({ token }: { token: string }) {
     try {
       const preferences = await api.updateAccountPreferences(token, { sourceMode: next })
       setSourceMode(preferences.sourceMode)
+      onSourceModeChange(preferences.sourceMode)
       setNotice('书签来源已保存，重新打开或刷新侧边栏后生效。')
     } catch (requestError) {
       setNotice(requestError instanceof Error ? requestError.message : '书签来源保存失败')
     } finally { setSaving(false) }
   }
 
-  return <section className="panel bookmark-source-settings-panel"><div className="panel-heading"><div><p className="eyebrow">BOOKMARK SOURCE</p><h3>书签来源设置</h3></div><span className="service-status online"><i />{sourceMode === 'browser' ? '浏览器模式' : '服务器模式'}</span></div><p className="account-panel-intro">选择侧边栏使用的书签来源。切换只改变侧边栏读写目标，不会自动删除另一侧的书签。</p><p className="form-hint left">服务器书签模式需要为每个浏览器生成一次性连接码；浏览器原生书签模式不需要服务器连接。</p><div className="bookmark-source-options"><button className={'bookmark-source-option ' + (sourceMode === 'browser' ? 'active' : '')} disabled={loading || saving} onClick={() => void selectSource('browser')} type="button"><span className="bookmark-source-option-icon"><Laptop size={19} /></span><span><strong>浏览器原生书签</strong><small>侧边栏读写当前浏览器书签，手机继续使用浏览器同步。</small></span><span className="bookmark-source-radio" /></button><button className={'bookmark-source-option ' + (sourceMode === 'server' ? 'active' : '')} disabled={loading || saving} onClick={() => void selectSource('server')} type="button"><span className="bookmark-source-option-icon"><HardDrive size={19} /></span><span><strong>独立服务器书签</strong><small>侧边栏读写服务器书签库，不依赖浏览器原生书签。</small></span><span className="bookmark-source-radio" /></button></div>{notice && <p className="form-hint left">{notice}</p>}</section>
+  return <section className="panel bookmark-source-settings-panel"><div className="panel-heading"><div><p className="eyebrow">BOOKMARK SOURCE</p><h3>书签来源设置</h3></div><span className="service-status online"><i />{sourceMode === 'browser' ? '浏览器模式' : '服务器模式'}</span></div><p className="account-panel-intro">选择侧边栏使用的书签来源。切换只改变侧边栏读写目标，不会自动删除另一侧的书签。</p><p className="form-hint left">{sourceMode === 'browser' ? '浏览器模式需要在 Floccus 中配置 WebDAV：侧边栏读写浏览器原生书签，Floccus 负责同步到服务器和手机。' : '服务器模式需要为每个浏览器生成一次性连接码；侧边栏直接读写服务器书签库，不经过 Floccus。'}</p><div className="bookmark-source-options"><button className={'bookmark-source-option ' + (sourceMode === 'browser' ? 'active' : '')} disabled={loading || saving} onClick={() => void selectSource('browser')} type="button"><span className="bookmark-source-option-icon"><Laptop size={19} /></span><span><strong>浏览器原生书签 + Floccus</strong><small>侧边栏读写当前浏览器书签；Floccus 负责同步到服务器和手机。</small></span><span className="bookmark-source-radio" /></button><button className={'bookmark-source-option ' + (sourceMode === 'server' ? 'active' : '')} disabled={loading || saving} onClick={() => void selectSource('server')} type="button"><span className="bookmark-source-option-icon"><HardDrive size={19} /></span><span><strong>独立服务器书签</strong><small>侧边栏直接读写服务器书签库，不依赖 Floccus 同步。</small></span><span className="bookmark-source-radio" /></button></div>{sourceMode === 'browser' && <button className="toolbar-button compact bookmark-source-floccus-button" onClick={onOpenFloccus} type="button"><RefreshCw size={14} />配置 Floccus 同步</button>}{notice && <p className="form-hint left">{notice}</p>}</section>
 }
 
-function SidebarConnectionPage({ token }: { token: string }) {
+function SidebarConnectionPage({ onOpenFloccus, token }: { onOpenFloccus: () => void; token: string }) {
+  const [sourceMode, setSourceMode] = useState<api.BookmarkSourceMode>('server')
   const [sidebarPairing, setSidebarPairing] = useState<api.SidebarPairing | null>(null)
   const [pairings, setPairings] = useState<api.SidebarPairingRecord[]>([])
   const [browserName, setBrowserName] = useState('')
@@ -871,7 +873,7 @@ function SidebarConnectionPage({ token }: { token: string }) {
     setLoadingPairings(true)
     try { setPairings(await api.getSidebarPairings(token)) } catch (requestError) { setPairingError(requestError instanceof Error ? requestError.message : '连接码列表读取失败') } finally { setLoadingPairings(false) }
   }
-  useEffect(() => { void loadPairings() }, [token])
+  useEffect(() => { if (sourceMode === 'server') void loadPairings(); else setLoadingPairings(false) }, [sourceMode, token])
   async function handleSidebarPairing() {
     const name = browserName.trim()
     if (!name) {
@@ -893,7 +895,7 @@ function SidebarConnectionPage({ token }: { token: string }) {
     if (new Date(item.expiresAt).getTime() <= Date.now()) return '已过期'
     return '待连接'
   }
-  return <div className="feature-page bookmark-source-settings-page"><BookmarkSourceSettings token={token} /><section className="panel sidebar-pairing-panel"><div className="panel-heading"><div><p className="eyebrow">SIDEBAR CONNECTION</p><h3>侧边栏连接</h3></div></div><p className="account-panel-intro">为每个浏览器生成一次性连接码。连接后，侧边栏会直接管理服务器书签库，不需要应用密码或 WebDAV 配置。</p>{sidebarPairing ? <div className="secret-box"><strong>“{sidebarPairing.browserName || browserName || '浏览器'}”连接码已生成，请立即使用</strong><div className="config-fields"><ConfigField label="API 地址" value={sidebarPairing.serverUrl} /><ConfigField label="设备码" value={sidebarPairing.deviceCode} /></div><p>有效期至 {new Date(sidebarPairing.expiresAt).toLocaleString()}，且只能使用一次。</p><button className="toolbar-button compact" onClick={() => setSidebarPairing(null)} type="button">生成另一个连接码</button></div> : <><label className="pairing-browser-field">浏览器名称<input autoFocus maxLength={80} onChange={(event) => { setBrowserName(event.target.value); setPairingError('') }} placeholder="例如：Chrome 工作浏览器" value={browserName} /></label><button className="primary-button compact" disabled={pairing || !browserName.trim()} onClick={() => void handleSidebarPairing()} type="button">{pairing ? '生成中…' : '生成侧边栏连接码'}</button>{pairingError && <p className="form-error">{pairingError}</p>}</>}</section><section className="panel pairing-history-panel"><div className="panel-heading"><div><p className="eyebrow">PAIRING HISTORY</p><h3>已创建的连接码</h3></div><button className="toolbar-button compact" disabled={loadingPairings} onClick={() => void loadPairings()} type="button"><RefreshCw size={14} /> 刷新</button></div>{loadingPairings ? <div className="empty-state"><span>…</span><h4>正在读取连接码</h4></div> : pairings.length === 0 ? <div className="empty-state"><span>◇</span><h4>还没有创建连接码</h4><p>为不同浏览器生成的连接码会显示在这里。</p></div> : <div className="pairing-list">{pairings.map((item) => <div className="pairing-row" key={item.id}><div><strong>{item.browserName}</strong><span>创建于 {new Date(item.createdAt).toLocaleString()} · {item.usedAt ? '已完成连接' : `有效期至 ${new Date(item.expiresAt).toLocaleString()}`}</span></div><div className="pairing-row-actions"><span className={`pairing-status ${item.revokedAt ? 'revoked' : item.usedAt ? 'used' : 'pending'}`}>{pairingStatus(item)}</span>{!item.revokedAt && <button className="danger-button compact" disabled={revokingId !== null} onClick={() => void revokePairing(item.id)} type="button">{revokingId === item.id ? '撤销中…' : '撤销授权'}</button>}</div></div>)}</div>}{pairingError && <p className="form-error">{pairingError}</p>}</section></div>
+  return <div className="feature-page bookmark-source-settings-page"><BookmarkSourceSettings onOpenFloccus={onOpenFloccus} onSourceModeChange={setSourceMode} token={token} />{sourceMode === 'browser' ? <section className="panel floccus-source-panel"><div className="panel-heading"><div><p className="eyebrow">BROWSER SYNC</p><h3>Floccus 浏览器同步</h3></div><span className="service-status online"><i />由 Floccus 同步</span></div><p className="account-panel-intro">当前模式下，侧边栏直接操作浏览器原生书签。Floccus 通过 WebDAV 将这份浏览器书签同步到其他浏览器和手机。</p><div className="security-notice account-notice"><span>i</span><p>请先完成 Floccus 配置，再在 Floccus 中执行一次同步。侧边栏不需要服务器书签连接码；连接码只用于独立服务器书签模式。</p></div><button className="primary-button compact" onClick={onOpenFloccus} type="button"><RefreshCw size={14} />配置 Floccus 同步</button></section> : <><section className="panel sidebar-pairing-panel"><div className="panel-heading"><div><p className="eyebrow">SIDEBAR CONNECTION</p><h3>侧边栏连接</h3></div></div><p className="account-panel-intro">为每个浏览器生成一次性连接码。连接后，侧边栏会直接管理服务器书签库，不需要 Floccus 或 WebDAV 配置。</p>{sidebarPairing ? <div className="secret-box"><strong>“{sidebarPairing.browserName || browserName || '浏览器'}”连接码已生成，请立即使用</strong><div className="config-fields"><ConfigField label="API 地址" value={sidebarPairing.serverUrl} /><ConfigField label="设备码" value={sidebarPairing.deviceCode} /></div><p>有效期至 {new Date(sidebarPairing.expiresAt).toLocaleString()}，且只能使用一次。</p><button className="toolbar-button compact" onClick={() => setSidebarPairing(null)} type="button">生成另一个连接码</button></div> : <><label className="pairing-browser-field">浏览器名称<input autoFocus maxLength={80} onChange={(event) => { setBrowserName(event.target.value); setPairingError('') }} placeholder="例如：Chrome 工作浏览器" value={browserName} /></label><button className="primary-button compact" disabled={pairing || !browserName.trim()} onClick={() => void handleSidebarPairing()} type="button">{pairing ? '生成中…' : '生成侧边栏连接码'}</button>{pairingError && <p className="form-error">{pairingError}</p>}</>}</section><section className="panel pairing-history-panel"><div className="panel-heading"><div><p className="eyebrow">PAIRING HISTORY</p><h3>已创建的连接码</h3></div><button className="toolbar-button compact" disabled={loadingPairings} onClick={() => void loadPairings()} type="button"><RefreshCw size={14} /> 刷新</button></div>{loadingPairings ? <div className="empty-state"><span>…</span><h4>正在读取连接码</h4></div> : pairings.length === 0 ? <div className="empty-state"><span>◇</span><h4>还没有创建连接码</h4><p>为不同浏览器生成的连接码会显示在这里。</p></div> : <div className="pairing-list">{pairings.map((item) => <div className="pairing-row" key={item.id}><div><strong>{item.browserName}</strong><span>创建于 {new Date(item.createdAt).toLocaleString()} · {item.usedAt ? '已完成连接' : `有效期至 ${new Date(item.expiresAt).toLocaleString()}`}</span></div><div className="pairing-row-actions"><span className={`pairing-status ${item.revokedAt ? 'revoked' : item.usedAt ? 'used' : 'pending'}`}>{pairingStatus(item)}</span>{!item.revokedAt && <button className="danger-button compact" disabled={revokingId !== null} onClick={() => void revokePairing(item.id)} type="button">{revokingId === item.id ? '撤销中…' : '撤销授权'}</button>}</div></div>)}</div>}{pairingError && <p className="form-error">{pairingError}</p>}</section></>}</div>
 }
 
 function FloccusGuide({ token, loginIdentifier }: { token: string; loginIdentifier: string }) {

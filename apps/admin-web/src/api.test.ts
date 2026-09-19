@@ -159,6 +159,14 @@ describe('admin API contract', () => {
     expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({ language: 'zh-CN' })
   })
 
+  it('updates only the bookmark source without requiring a language field', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(response({ language: 'zh-CN', sourceMode: 'browser' }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(updateAccountPreferences('session-token', { sourceMode: 'browser' })).resolves.toEqual({ language: 'zh-CN', sourceMode: 'browser' })
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ sourceMode: 'browser' })
+  })
+
   it('lists and revokes sidebar pairing codes', async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(response([{ id: 'pairing-1', browserName: 'Edge 家用浏览器', expiresAt: '2026-09-13T15:10:00Z', createdAt: '2026-09-13T15:00:00Z', usedAt: null, revokedAt: null }]))
