@@ -66,8 +66,11 @@ export type SidebarPairing = {
   revokedAt: string | null
 }
 
+export type BookmarkSourceMode = 'browser' | 'server'
+
 export type AccountPreferences = {
   language: 'zh-CN' | 'en'
+  sourceMode: BookmarkSourceMode
 }
 
 export type SidebarPairingRecord = {
@@ -303,7 +306,7 @@ export function getAccountPreferences(token: string) {
   return request<AccountPreferences>('/api/v1/preferences', {}, token)
 }
 
-export function updateAccountPreferences(token: string, preferences: AccountPreferences) {
+export function updateAccountPreferences(token: string, preferences: Partial<AccountPreferences>) {
   return request<AccountPreferences>('/api/v1/preferences', {
     method: 'PUT',
     body: JSON.stringify(preferences),

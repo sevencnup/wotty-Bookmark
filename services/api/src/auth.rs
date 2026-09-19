@@ -75,13 +75,17 @@ pub struct TokenResponse {
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AccountPreferencesResponse {
     pub language: String,
+    pub source_mode: String,
 }
 
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct UpdateAccountPreferencesPayload {
-    pub language: String,
+    pub language: Option<String>,
+    pub source_mode: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -319,17 +323,15 @@ pub async fn get_account_preferences(State(state): State<AppState>, headers: Hea
     let Some(user) = authenticate_session(&state, &headers).await else {
         return error(StatusCode::UNAUTHORIZED, "unauthorized", "请先登录");
     };
-    match sqlx::query_scalar::<_, String>(
-        "SELECT language FROM account_preferences WHERE user_id = $1",
+    match sqlx::query_as::<_, (String, String)>(
+        "SELECT language, source_mode FROM account_preferences WHERE user_id = $1",
     )
     .bind(user.id)
     .fetch_optional(&state.db)
     .await
     {
-        Ok(language) => Json(AccountPreferencesResponse {
-            language: language.unwrap_or_else(|| "zh-CN".to_owned()),
-        })
-        .into_response(),
+        Ok(Some((language, source_mode))) => Json(AccountPreferencesResponse { language, source_mode }).into_response(),
+        Ok(None) => Json(AccountPreferencesResponse { language: "zh-CN".to_owned(), source_mode: "server".to_owned() }).into_response(),
         Err(db_error) => {
             tracing::error!(?db_error, user_id = %user.id, "read account preferences failed");
             error(
@@ -353,24 +355,45 @@ pub async fn update_account_preferences(
     let Some(user) = authenticate_admin_session(&state, &headers).await else {
         return error(StatusCode::UNAUTHORIZED, "unauthorized", "请先登录");
     };
-    if !matches!(payload.language.as_str(), "zh-CN" | "en") {
-        return error(
-            StatusCode::BAD_REQUEST,
-            "invalid_language",
-            "仅支持 zh-CN 或 en 界面语言",
-        );
+    if payload.language.is_none() && payload.source_mode.is_none() {
+        return error(StatusCode::BAD_REQUEST, "invalid_preferences", "至少需要更新一项偏好");
     }
-    let language = payload.language;
+    if let Some(language) = &payload.language {
+        if !matches!(language.as_str(), "zh-CN" | "en") {
+            return error(StatusCode::BAD_REQUEST, "invalid_language", "仅支持 zh-CN 或 en 界面语言");
+        }
+    }
+    if let Some(source_mode) = &payload.source_mode {
+        if !matches!(source_mode.as_str(), "browser" | "server") {
+            return error(StatusCode::BAD_REQUEST, "invalid_source_mode", "仅支持 browser 或 server 书签来源");
+        }
+    }
+    let (current_language, current_source_mode) = match sqlx::query_as::<_, (String, String)>(
+        "SELECT language, source_mode FROM account_preferences WHERE user_id = $1",
+    )
+    .bind(user.id)
+    .fetch_optional(&state.db)
+    .await {
+        Ok(Some(values)) => values,
+        Ok(None) => ("zh-CN".to_owned(), "server".to_owned()),
+        Err(db_error) => {
+            tracing::error!(?db_error, user_id = %user.id, "read account preferences before update failed");
+            return error(StatusCode::INTERNAL_SERVER_ERROR, "preferences_read_failed", "偏好设置读取失败");
+        }
+    };
+    let language = payload.language.unwrap_or(current_language);
+    let source_mode = payload.source_mode.unwrap_or(current_source_mode);
     let result = sqlx::query(
-        "INSERT INTO account_preferences (user_id, language) VALUES ($1, $2)
-         ON CONFLICT(user_id) DO UPDATE SET language = excluded.language, updated_at = CURRENT_TIMESTAMP",
+        "INSERT INTO account_preferences (user_id, language, source_mode) VALUES ($1, $2, $3)
+         ON CONFLICT(user_id) DO UPDATE SET language = excluded.language, source_mode = excluded.source_mode, updated_at = CURRENT_TIMESTAMP",
     )
     .bind(user.id)
     .bind(&language)
+    .bind(&source_mode)
     .execute(&state.db)
     .await;
     match result {
-        Ok(_) => Json(AccountPreferencesResponse { language }).into_response(),
+        Ok(_) => Json(AccountPreferencesResponse { language, source_mode }).into_response(),
         Err(db_error) => {
             tracing::error!(?db_error, user_id = %user.id, "update account preferences failed");
             error(
@@ -1284,12 +1307,14 @@ mod tests {
         let admin_headers = bearer_headers("admin-token");
         let default_response = get_account_preferences(State(state.clone()), admin_headers.clone()).await;
         assert_eq!(default_response.status(), StatusCode::OK);
-        assert_eq!(response_json(default_response).await["language"], "zh-CN");
+        let default_json = response_json(default_response).await;
+        assert_eq!(default_json["language"], "zh-CN");
+        assert_eq!(default_json["sourceMode"], "server");
 
         let invalid_response = update_account_preferences(
             State(state.clone()),
             admin_headers.clone(),
-            Json(UpdateAccountPreferencesPayload { language: "fr".to_owned() }),
+            Json(UpdateAccountPreferencesPayload { language: Some("fr".to_owned()), source_mode: None }),
         )
         .await;
         assert_eq!(invalid_response.status(), StatusCode::BAD_REQUEST);
@@ -1297,11 +1322,13 @@ mod tests {
         let update_response = update_account_preferences(
             State(state.clone()),
             admin_headers.clone(),
-            Json(UpdateAccountPreferencesPayload { language: "en".to_owned() }),
+            Json(UpdateAccountPreferencesPayload { language: Some("en".to_owned()), source_mode: None }),
         )
         .await;
         assert_eq!(update_response.status(), StatusCode::OK);
-        assert_eq!(response_json(update_response).await["language"], "en");
+        let update_json = response_json(update_response).await;
+        assert_eq!(update_json["language"], "en");
+        assert_eq!(update_json["sourceMode"], "server");
 
         let other_response = get_account_preferences(State(state.clone()), bearer_headers("other-token")).await;
         assert_eq!(response_json(other_response).await["language"], "zh-CN");
@@ -1322,7 +1349,7 @@ mod tests {
         let sidebar_write = update_account_preferences(
             State(state),
             sidebar_headers,
-            Json(UpdateAccountPreferencesPayload { language: "zh-CN".to_owned() }),
+            Json(UpdateAccountPreferencesPayload { language: Some("zh-CN".to_owned()), source_mode: None }),
         )
         .await;
         assert_eq!(sidebar_write.status(), StatusCode::UNAUTHORIZED);

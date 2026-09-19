@@ -144,12 +144,12 @@ describe('admin API contract', () => {
 
   it('reads and updates the account-wide interface language with the session token', async () => {
     const fetchMock = vi.fn()
-      .mockResolvedValueOnce(response({ language: 'en' }))
-      .mockResolvedValueOnce(response({ language: 'zh-CN' }))
+      .mockResolvedValueOnce(response({ language: 'en', sourceMode: 'server' }))
+      .mockResolvedValueOnce(response({ language: 'zh-CN', sourceMode: 'server' }))
     vi.stubGlobal('fetch', fetchMock)
 
-    await expect(getAccountPreferences('session-token')).resolves.toEqual({ language: 'en' })
-    await expect(updateAccountPreferences('session-token', { language: 'zh-CN' })).resolves.toEqual({ language: 'zh-CN' })
+    await expect(getAccountPreferences('session-token')).resolves.toEqual({ language: 'en', sourceMode: 'server' })
+    await expect(updateAccountPreferences('session-token', { language: 'zh-CN' })).resolves.toEqual({ language: 'zh-CN', sourceMode: 'server' })
 
     expect(fetchMock.mock.calls.map(([path, init]) => [path, init?.method ?? 'GET'])).toEqual([
       ['/api/v1/preferences', 'GET'],

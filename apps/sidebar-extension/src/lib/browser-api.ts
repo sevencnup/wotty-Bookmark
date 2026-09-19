@@ -7,6 +7,14 @@ export interface BookmarkNode {
   children?: BookmarkNode[];
 }
 
+interface BrowserBookmarkApi {
+  getTree(): Promise<BookmarkNode[]>;
+  create(details: { parentId: string; title: string; url?: string }): Promise<BookmarkNode>;
+  update(id: string, changes: { title?: string; url?: string }): Promise<BookmarkNode>;
+  move(id: string, destination: { parentId?: string; index?: number }): Promise<BookmarkNode>;
+  removeTree(id: string): Promise<void>;
+}
+
 interface BookmarkListener {
   addListener(listener: (...args: any[]) => void): void;
   removeListener(listener: (...args: any[]) => void): void;
@@ -19,8 +27,8 @@ interface TabsApi {
 }
 
 interface BrowserGlobals {
-  browser?: { tabs?: TabsApi };
-  chrome?: { tabs?: TabsApi };
+  browser?: { tabs?: TabsApi; bookmarks?: BrowserBookmarkApi };
+  chrome?: { tabs?: TabsApi; bookmarks?: BrowserBookmarkApi };
 }
 
 function getGlobals(): BrowserGlobals {
@@ -58,4 +66,9 @@ export async function openBookmark(url: string): Promise<void> {
 export function getTabsApi(): TabsApi | undefined {
   const globals = getGlobals();
   return globals.browser?.tabs ?? globals.chrome?.tabs;
+}
+
+export function getBookmarksApi(): BrowserBookmarkApi | undefined {
+  const globals = getGlobals();
+  return globals.browser?.bookmarks ?? globals.chrome?.bookmarks;
 }

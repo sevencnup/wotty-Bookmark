@@ -8,6 +8,7 @@ describe('extension manifest icon assets', () => {
 
     expect(config).toContain("name: 'wotty bookmark sidebar'");
     expect(config).toContain("short_name: 'Bookmarks'");
+    expect(config).toContain("'bookmarks'");
     expect(config).toMatch(/default_icon:\s*\{[\s\S]*16:\s*'logo\.png'[\s\S]*128:\s*'logo\.png'/);
     expect(config).toMatch(/icons:\s*\{[\s\S]*16:\s*'logo\.png'[\s\S]*128:\s*'logo\.png'/);
     expect(config).not.toMatch(/default_icon:[\s\S]*?logo\.webp/);

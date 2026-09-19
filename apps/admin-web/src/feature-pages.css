@@ -51,6 +51,18 @@
 .revoked-badge { color: var(--danger); background: var(--danger-soft); }
 .device-card > .danger-button { margin-left: auto; }
 .settings-panel { padding: 0 28px; }
+.bookmark-source-settings-page { gap: 16px; }
+.bookmark-source-settings-panel { display: grid; gap: 16px; }
+.bookmark-source-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.bookmark-source-option { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; min-height: 92px; padding: 14px; border: 1px solid var(--line); border-radius: var(--radius-md); color: var(--ink); background: var(--surface-subtle); text-align: left; transition: border-color var(--duration) var(--ease), background var(--duration) var(--ease), box-shadow var(--duration) var(--ease); }
+.bookmark-source-option:hover:not(:disabled), .bookmark-source-option.active { border-color: var(--primary-border); background: var(--primary-soft); box-shadow: var(--shadow-xs); }
+.bookmark-source-option:disabled { cursor: wait; opacity: .72; }
+.bookmark-source-option-icon { display: grid; place-items: center; width: 38px; height: 38px; border-radius: var(--radius-md); color: var(--primary); background: var(--paper); }
+.bookmark-source-option > span:nth-child(2) { display: grid; gap: 4px; min-width: 0; }
+.bookmark-source-option strong { color: var(--ink); font-size: 13px; }
+.bookmark-source-option small { color: var(--muted); font-size: 11px; line-height: 1.5; }
+.bookmark-source-radio { width: 16px; height: 16px; border: 2px solid var(--line-strong); border-radius: 50%; background: var(--paper); }
+.bookmark-source-option.active .bookmark-source-radio { border-color: var(--primary); box-shadow: inset 0 0 0 4px var(--paper); background: var(--primary); }
 .preference-row { display: flex; align-items: center; justify-content: space-between; gap: 24px; min-height: 76px; padding: 16px 0; border-bottom: 1px solid var(--soft-line); cursor: pointer; }
 .preference-row:last-child { border-bottom: 0; }
 .preference-row > span { display: grid; gap: 4px; }
@@ -186,6 +198,8 @@ html.reduce-motion *, html.reduce-motion *::before, html.reduce-motion *::after 
 }
 
 @media (max-width: 680px) {
+  .bookmark-source-options { grid-template-columns: 1fr; }
+
   .backup-hero-panel { align-items: flex-start; flex-direction: column; }
   .backup-hero-panel .service-status { align-self: flex-start; }
   .backup-save-row { align-items: flex-start; flex-direction: column; }

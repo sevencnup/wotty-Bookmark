@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createLibraryBookmark, getLibrary, moveLibraryNode } from './library';
-import { loadSidebarLocale, refreshSidebarLocale } from './preferences';
+import { loadSidebarLocale, loadSidebarSourceMode, refreshSidebarLocale, refreshSidebarPreferences } from './preferences';
 
 const storage = new Map<string, unknown>();
 
@@ -47,7 +47,7 @@ describe('server library client', () => {
   });
 
   it('loads and caches the account language using the sidebar bearer token', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(response({ language: 'en' }));
+    const fetchMock = vi.fn().mockResolvedValue(response({ language: 'en', sourceMode: 'server' }));
     vi.stubGlobal('fetch', fetchMock);
 
     await expect(loadSidebarLocale()).resolves.toBe('zh-CN');
@@ -58,5 +58,14 @@ describe('server library client', () => {
       'https://bookmarks.example.com/api/v1/preferences',
       { headers: { authorization: 'Bearer sidebar-token' } },
     );
+  });
+
+  it('defaults to server mode and caches the account bookmark source', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(response({ language: 'zh-CN', sourceMode: 'browser' }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(loadSidebarSourceMode()).resolves.toBe('server');
+    await expect(refreshSidebarPreferences(connection)).resolves.toEqual({ language: 'zh-CN', sourceMode: 'browser' });
+    await expect(loadSidebarSourceMode()).resolves.toBe('browser');
   });
 });
