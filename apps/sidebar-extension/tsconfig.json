@@ -6,5 +6,5 @@
     "noEmit": true,
     "jsx": "react-jsx"
   },
-  "include": [".wxt/tsconfig.json", "src", "entrypoints", "wxt.config.ts"]
+  "include": [".wxt/tsconfig.json", ".wxt/wxt.d.ts", "src", "entrypoints", "wxt.config.ts"]
 }

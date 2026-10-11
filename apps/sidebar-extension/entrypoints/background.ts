@@ -1,17 +1,25 @@
 import { browser } from 'wxt/browser';
 import { defineBackground } from 'wxt/utils/define-background';
 
+const TOGGLE_FLOATING_SIDEBAR_MESSAGE = 'wotty-bookmark:toggle-floating-sidebar';
+const TOGGLE_FLOATING_SIDEBAR_COMMAND = 'open-sidebar-for-debug';
+
+async function toggleFloatingSidebar(tabId: number | undefined) {
+  if (tabId == null) return;
+
+  try {
+    await browser.tabs.sendMessage(tabId, { type: TOGGLE_FLOATING_SIDEBAR_MESSAGE });
+  } catch {
+    // Browser-internal pages and tabs that have not loaded the content script cannot host the overlay.
+  }
+}
+
 export default defineBackground(() => {
-  void browser.sidePanel?.setPanelBehavior({ openPanelOnActionClick: true });
+  browser.action.onClicked.addListener((tab) => {
+    void toggleFloatingSidebar(tab.id);
+  });
 
   browser.commands.onCommand.addListener((command, tab) => {
-    if (command !== 'open-sidebar-for-debug' || tab?.id == null) {
-      return;
-    }
-
-    // An extension command is a user gesture, which is required by
-    // chrome.sidePanel.open. Invoke it synchronously inside the command
-    // handler so Chrome preserves that gesture.
-    void browser.sidePanel?.open({ tabId: tab.id });
+    if (command === TOGGLE_FLOATING_SIDEBAR_COMMAND) void toggleFloatingSidebar(tab?.id);
   });
 });

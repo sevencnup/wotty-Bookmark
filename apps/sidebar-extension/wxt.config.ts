@@ -9,15 +9,13 @@ export default defineConfig({
     },
   },
   webExt: {
-    // WXT's Chromium runner otherwise starts at about:blank. This static page
-    // is served by the dev server and gives the Side Panel a real tab context.
+    // Give the injected floating sidebar a normal page context during development.
     startUrls: ['http://localhost:56992/sidebar-debug.html'],
   },
   vite: () => ({
     server: {
-      // The Side Panel runs at chrome-extension://<id>. WXT's dev page imports
-      // its modules from localhost, so those module responses must allow the
-      // extension origin.
+      // The floating extension iframe runs at chrome-extension://<id> and
+      // loads development modules from localhost, so CORS must allow it.
       cors: true,
     },
   }),
@@ -25,11 +23,17 @@ export default defineConfig({
     name: 'wotty bookmark sidebar',
     short_name: 'Bookmarks',
     description: 'A private sidebar for your self-hosted bookmark library.',
-    version: '0.1.14',
+    version: '0.1.15',
     permissions: ['tabs', 'storage', 'bookmarks'],
     host_permissions: ['http://*/*', 'https://*/*'],
+    web_accessible_resources: [
+      {
+        resources: ['sidebar-frame.html', 'chunks/*.js', 'assets/*.js', 'assets/*.css', 'logo.png', 'logo.webp'],
+        matches: ['http://*/*', 'https://*/*'],
+      },
+    ],
     action: {
-      default_title: '打开服务器书签库',
+      default_title: '切换悬浮书签侧栏',
       default_icon: {
         16: 'logo.png',
         32: 'logo.png',
@@ -42,7 +46,7 @@ export default defineConfig({
         suggested_key: {
           default: 'Ctrl+Shift+Y',
         },
-        description: '打开书签侧边栏',
+        description: '切换悬浮书签侧栏',
       },
     },
     icons: {
@@ -58,9 +62,6 @@ export default defineConfig({
           required: ['none'],
         },
       },
-    },
-    side_panel: {
-      default_path: 'sidepanel.html',
     },
   },
 });

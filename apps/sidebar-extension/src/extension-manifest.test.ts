@@ -25,11 +25,11 @@ describe('extension manifest icon assets', () => {
     expect(subtitleStyles).not.toContain('text-transform: uppercase');
   });
 
-  it('uses the English extension name for the Side Panel page title', () => {
-    const sidepanel = readFileSync(resolve(import.meta.dirname, '..', 'entrypoints', 'sidepanel', 'index.html'), 'utf8');
+  it('uses the English extension name for the embedded sidebar page title', () => {
+    const sidebarFrame = readFileSync(resolve(import.meta.dirname, '..', 'entrypoints', 'sidebar-frame', 'index.html'), 'utf8');
 
-    expect(sidepanel).toContain('<title>wotty bookmark sidebar</title>');
-    expect(sidepanel).not.toContain('<title>书签</title>');
+    expect(sidebarFrame).toContain('<title>wotty bookmark sidebar</title>');
+    expect(sidebarFrame).not.toContain('<title>书签</title>');
   });
 
   it('enables CORS for development modules loaded by the extension page', () => {
@@ -44,18 +44,24 @@ describe('extension manifest icon assets', () => {
     expect(config).not.toMatch(/webExt:\s*\{[\s\S]*?disabled:\s*true/);
   });
 
-  it('opens a real debug page and registers the Side Panel shortcut', () => {
+  it('opens a real debug page and registers the floating sidebar shortcut', () => {
     const config = readFileSync(resolve(import.meta.dirname, '..', 'wxt.config.ts'), 'utf8');
 
     expect(config).toMatch(/webExt:\s*\{[\s\S]*?startUrls:\s*\[\s*'http:\/\/localhost:56992\/sidebar-debug\.html'\s*\]/);
     expect(config).toMatch(/commands:\s*\{[\s\S]*?'open-sidebar-for-debug':[\s\S]*?default:\s*'Ctrl\+Shift\+Y'/);
   });
 
-  it('opens the Side Panel from the registered command user gesture', () => {
+  it('routes toolbar and keyboard toggles to the floating sidebar content script', () => {
     const background = readFileSync(resolve(import.meta.dirname, '..', 'entrypoints', 'background.ts'), 'utf8');
 
+    expect(background).toContain('browser.action.onClicked.addListener');
     expect(background).toContain('browser.commands.onCommand.addListener');
-    expect(background).toContain("command !== 'open-sidebar-for-debug'");
-    expect(background).toContain('browser.sidePanel?.open({ tabId: tab.id })');
+    expect(background).toContain("command === TOGGLE_FLOATING_SIDEBAR_COMMAND");
+    expect(background).toContain('browser.tabs.sendMessage');
+    expect(background).not.toContain('browser.sidePanel');
+
+    const contentScript = readFileSync(resolve(import.meta.dirname, '..', 'entrypoints', 'floating-sidebar.content.ts'), 'utf8');
+    expect(contentScript).toContain("matches: ['http://*/*', 'https://*/*']");
+    expect(contentScript).toContain('TOGGLE_FLOATING_SIDEBAR_MESSAGE');
   });
 });
