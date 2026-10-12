@@ -2,7 +2,7 @@ import { browser } from 'wxt/browser';
 import { defineContentScript } from 'wxt/utils/define-content-script';
 
 const HOST_ID = 'wotty-bookmark-floating-sidebar';
-const HOST_BUILD = '0.1.62';
+const HOST_BUILD = '0.1.63';
 const TOGGLE_FLOATING_SIDEBAR_MESSAGE = 'wotty-bookmark:toggle-floating-sidebar';
 const SIDEBAR_ACTIVITY_MESSAGE = 'wotty-bookmark:sidebar-activity';
 const SIDEBAR_READY_MESSAGE = 'wotty-bookmark:sidebar-ready';
@@ -47,14 +47,16 @@ const styles = `
   border-left: 1px solid #dbe4f0;
   background: #f8fafc;
   box-shadow: -14px 0 36px rgba(15, 23, 42, 0.2);
+  clip-path: inset(0 0 0 calc(100% - 1px));
   pointer-events: none;
-  transform: translateX(calc(100% + 40px));
-  transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
+  transform: translateZ(0);
+  transition: clip-path 220ms cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: clip-path;
 }
 
 :host([data-open='true']) .panel {
+  clip-path: inset(0);
   pointer-events: auto;
-  transform: translateX(0);
 }
 
 .panel iframe {
@@ -63,6 +65,8 @@ const styles = `
   height: 100%;
   border: 0;
   background: #f8fafc;
+  transform: translateZ(0);
+  will-change: transform;
 }
 
 .frame-placeholder {
@@ -181,11 +185,18 @@ const styles = `
   box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.42), 0 4px 12px rgba(15, 23, 42, 0.26);
   backdrop-filter: blur(10px);
   cursor: pointer;
+  opacity: 0;
   pointer-events: auto;
   touch-action: none;
   user-select: none;
+  visibility: hidden;
   transform: translateY(-50%);
-  transition: right 220ms cubic-bezier(0.16, 1, 0.3, 1), transform 160ms ease, background 160ms ease, box-shadow 160ms ease;
+  transition: right 220ms cubic-bezier(0.16, 1, 0.3, 1), transform 160ms ease, background 160ms ease, box-shadow 160ms ease, opacity 120ms ease;
+}
+
+:host([data-toggle-ready='true']) .edge-toggle {
+  opacity: 1;
+  visibility: visible;
 }
 
 .edge-toggle:hover {
@@ -287,6 +298,10 @@ export default defineContentScript({
 
     let isOpen = false;
     let frameReady = false;
+    let pendingOpen = false;
+    let hasOpenedOnce = false;
+    let openPreparationFrame: number | undefined;
+    let isPreparingOpen = false;
     let frameReadyTimer: number | undefined;
     let frameLoadAttempt = 0;
     const frameUrl = browser.runtime.getURL('/sidebar-frame.html');
@@ -349,12 +364,13 @@ export default defineContentScript({
       if (typeof savedWidth === 'number' && Number.isFinite(savedWidth)) preferredSidebarWidth = savedWidth;
       applySidebarWidth();
     }).catch(() => undefined);
-    applyTogglePosition();
     void browser.storage.local.get(FLOATING_TOGGLE_POSITION_KEY).then((values) => {
       const savedPosition = values[FLOATING_TOGGLE_POSITION_KEY];
       if (typeof savedPosition === 'number' && Number.isFinite(savedPosition)) preferredTogglePosition = savedPosition;
       applyTogglePosition();
-    }).catch(() => undefined);
+    }).catch(() => applyTogglePosition()).finally(() => {
+      window.requestAnimationFrame(() => { host.dataset.toggleReady = 'true'; });
+    });
 
     const resetAutoCloseTimer = () => {
       window.clearTimeout(autoCloseTimer);
@@ -378,7 +394,51 @@ export default defineContentScript({
       else if (returnFocus) toggle.focus({ preventScroll: true });
     };
 
-    const toggleOpen = () => setOpen(!isOpen);
+    const cancelOpenPreparation = () => {
+      if (openPreparationFrame !== undefined) window.cancelAnimationFrame(openPreparationFrame);
+      openPreparationFrame = undefined;
+      isPreparingOpen = false;
+      delete host.dataset.preparingOpen;
+    };
+
+    const openAfterPrepaint = () => {
+      if (hasOpenedOnce) {
+        setOpen(true);
+        return;
+      }
+      if (isPreparingOpen) return;
+      isPreparingOpen = true;
+      host.dataset.preparingOpen = 'true';
+      openPreparationFrame = window.requestAnimationFrame(() => {
+        openPreparationFrame = window.requestAnimationFrame(() => {
+          openPreparationFrame = undefined;
+          isPreparingOpen = false;
+          delete host.dataset.preparingOpen;
+          hasOpenedOnce = true;
+          setOpen(true);
+        });
+      });
+    };
+
+    const toggleOpen = () => {
+      if (isOpen) {
+        pendingOpen = false;
+        setOpen(false);
+        return;
+      }
+      if (isPreparingOpen) {
+        cancelOpenPreparation();
+        return;
+      }
+      if (!frameReady) {
+        pendingOpen = !pendingOpen;
+        toggle.setAttribute('aria-expanded', 'false');
+        toggle.setAttribute('aria-label', pendingOpen ? '正在准备书签侧栏；再次点击取消' : '展开书签侧栏；可上下拖动调整位置');
+        toggle.title = pendingOpen ? '正在准备书签侧栏；再次点击取消' : '展开书签侧栏；可上下拖动调整位置';
+        return;
+      }
+      openAfterPrepaint();
+    };
     const onRuntimeMessage = (message: unknown) => {
       if (typeof message === 'object' && message !== null && 'type' in message && message.type === TOGGLE_FLOATING_SIDEBAR_MESSAGE) {
         toggleOpen();
@@ -392,6 +452,10 @@ export default defineContentScript({
         window.clearTimeout(frameReadyTimer);
         panel.dataset.frameReady = 'true';
         delete panel.dataset.frameError;
+        if (pendingOpen) {
+          pendingOpen = false;
+          openAfterPrepaint();
+        }
         return;
       }
       if (event.data.type === SIDEBAR_ACTIVITY_MESSAGE) {
@@ -404,7 +468,13 @@ export default defineContentScript({
       delete panel.dataset.frameError;
       window.clearTimeout(frameReadyTimer);
       frameReadyTimer = window.setTimeout(() => {
-        if (!frameReady) panel.dataset.frameError = 'true';
+        if (!frameReady) {
+          panel.dataset.frameError = 'true';
+          if (pendingOpen) {
+            pendingOpen = false;
+            setOpen(true);
+          }
+        }
       }, 8_000);
       frame.src = `${frameUrl}?load=${++frameLoadAttempt}`;
     };
@@ -489,7 +559,7 @@ export default defineContentScript({
       applySidebarWidth();
       applyTogglePosition();
     };
-    if (wasOpen) setOpen(true, false);
+    if (wasOpen) pendingOpen = true;
     const activityEvents = ['pointerdown', 'pointermove', 'keydown', 'wheel', 'touchstart', 'input', 'change', 'scroll'] as const;
     activityEvents.forEach((type) => window.addEventListener(type, onPageActivity, { capture: true, passive: true }));
 
@@ -511,6 +581,7 @@ export default defineContentScript({
     context.onInvalidated(() => {
       window.clearTimeout(autoCloseTimer);
       window.clearTimeout(frameReadyTimer);
+      cancelOpenPreparation();
       activityEvents.forEach((type) => window.removeEventListener(type, onPageActivity, true));
       toggle.removeEventListener('pointerdown', onTogglePointerDown);
       toggle.removeEventListener('pointermove', onTogglePointerMove);

@@ -1,5 +1,4 @@
-import { StrictMode } from 'react';
-import { useLayoutEffect } from 'react';
+import { StrictMode, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from '../../src/App';
 import '../../src/styles.css';
@@ -10,8 +9,11 @@ const ACTIVITY_REPORT_INTERVAL_MS = 200;
 let lastActivityReportAt = 0;
 
 function SidebarReadySignal() {
-  useLayoutEffect(() => {
-    window.parent.postMessage({ type: SIDEBAR_READY_MESSAGE }, '*');
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      window.parent.postMessage({ type: SIDEBAR_READY_MESSAGE }, '*');
+    });
+    return () => window.cancelAnimationFrame(frame);
   }, []);
   return null;
 }
@@ -29,7 +31,7 @@ const reportSidebarActivity = () => {
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <SidebarReadySignal />
     <App />
+    <SidebarReadySignal />
   </StrictMode>,
 );
