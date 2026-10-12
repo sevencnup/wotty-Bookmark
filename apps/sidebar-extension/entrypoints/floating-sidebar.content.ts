@@ -61,30 +61,28 @@ const styles = `
 .edge-toggle {
   position: absolute;
   top: 50%;
-  right: 0;
+  right: 6px;
   display: grid;
-  width: 32px;
-  height: 58px;
+  width: 42px;
+  height: 42px;
   place-items: center;
   padding: 0;
-  border: 1px solid rgba(37, 99, 235, 0.42);
-  border-right: 0;
-  border-radius: 9px 0 0 9px;
-  color: #1d4ed8;
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.17);
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  color: #ffffff;
+  background: #2563eb;
+  box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.38), 0 5px 18px rgba(15, 23, 42, 0.3);
   backdrop-filter: blur(10px);
   cursor: pointer;
   pointer-events: auto;
   transform: translateY(-50%);
-  transition: right 220ms cubic-bezier(0.16, 1, 0.3, 1), background 160ms ease, box-shadow 160ms ease;
+  transition: right 220ms cubic-bezier(0.16, 1, 0.3, 1), transform 160ms ease, background 160ms ease, box-shadow 160ms ease;
 }
 
 .edge-toggle:hover {
-  border-color: rgba(37, 99, 235, 0.68);
-  color: #1e40af;
-  background: #eff6ff;
-  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.22);
+  background: #1d4ed8;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.28), 0 7px 22px rgba(15, 23, 42, 0.34);
+  transform: translateY(-50%) scale(1.06);
 }
 
 .edge-toggle:focus-visible {
@@ -93,10 +91,11 @@ const styles = `
 }
 
 :host([data-open='true']) .edge-toggle {
-  right: var(--wotty-sidebar-width);
+  right: 6px;
+  border-color: #ffffff;
   color: #1d4ed8;
   background: #fff;
-  box-shadow: -3px 4px 14px rgba(15, 23, 42, 0.14);
+  box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.3), 0 5px 16px rgba(15, 23, 42, 0.2);
 }
 
 .edge-toggle svg {
@@ -106,14 +105,11 @@ const styles = `
   stroke: currentColor;
   stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-width: 2.2;
-  transition: transform 180ms ease;
+  stroke-width: 2;
 }
 
-:host([data-open='true']) .edge-toggle svg { transform: rotate(180deg); }
-
 @media (prefers-reduced-motion: reduce) {
-  .panel, .edge-toggle, .edge-toggle svg { transition: none; }
+  .panel, .edge-toggle { transition: none; }
 }
 `;
 
@@ -149,7 +145,7 @@ export default defineContentScript({
     toggle.setAttribute('aria-expanded', 'false');
     toggle.setAttribute('aria-label', '展开书签侧栏');
     toggle.title = '展开书签侧栏';
-    toggle.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.5 5-7 7 7 7" /></svg>';
+    toggle.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7.5 3.75h9A1.75 1.75 0 0 1 18.25 5.5V21l-6.25-4-6.25 4V5.5A1.75 1.75 0 0 1 7.5 3.75Z" /></svg>';
 
     shadow.append(style, panel, toggle);
     document.documentElement.append(host);
