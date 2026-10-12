@@ -3,6 +3,8 @@ import { defineContentScript } from 'wxt/utils/define-content-script';
 
 const HOST_ID = 'wotty-bookmark-floating-sidebar';
 const TOGGLE_FLOATING_SIDEBAR_MESSAGE = 'wotty-bookmark:toggle-floating-sidebar';
+const SIDEBAR_ACTIVITY_MESSAGE = 'wotty-bookmark:sidebar-activity';
+const AUTO_CLOSE_DELAY_MS = 5_000;
 
 const styles = `
 :host {
@@ -17,7 +19,7 @@ const styles = `
   padding: 0 !important;
   border: 0 !important;
   pointer-events: none !important;
-  --wotty-sidebar-width: min(390px, calc(100vw - 24px));
+  --wotty-sidebar-width: min(390px, calc(100vw - 48px));
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -61,16 +63,17 @@ const styles = `
   top: 50%;
   right: 0;
   display: grid;
-  width: 38px;
-  height: 66px;
+  width: 32px;
+  height: 58px;
   place-items: center;
   padding: 0;
-  border: 1px solid #1d4ed8;
+  border: 1px solid rgba(37, 99, 235, 0.42);
   border-right: 0;
-  border-radius: 10px 0 0 10px;
-  color: #fff;
-  background: linear-gradient(180deg, #3b82f6 0%, #1d4ed8 100%);
-  box-shadow: 0 5px 18px rgba(15, 23, 42, 0.24);
+  border-radius: 9px 0 0 9px;
+  color: #1d4ed8;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.17);
+  backdrop-filter: blur(10px);
   cursor: pointer;
   pointer-events: auto;
   transform: translateY(-50%);
@@ -78,8 +81,10 @@ const styles = `
 }
 
 .edge-toggle:hover {
-  background: linear-gradient(180deg, #2563eb 0%, #1e40af 100%);
-  box-shadow: 0 7px 22px rgba(15, 23, 42, 0.3);
+  border-color: rgba(37, 99, 235, 0.68);
+  color: #1e40af;
+  background: #eff6ff;
+  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.22);
 }
 
 .edge-toggle:focus-visible {
@@ -91,7 +96,7 @@ const styles = `
   right: var(--wotty-sidebar-width);
   color: #1d4ed8;
   background: #fff;
-  box-shadow: -4px 5px 16px rgba(15, 23, 42, 0.16);
+  box-shadow: -3px 4px 14px rgba(15, 23, 42, 0.14);
 }
 
 .edge-toggle svg {
@@ -151,9 +156,17 @@ export default defineContentScript({
 
     let isOpen = false;
     let frameLoaded = false;
+    let autoCloseTimer: number | undefined;
 
-    const setOpen = (open: boolean) => {
+    const resetAutoCloseTimer = () => {
+      window.clearTimeout(autoCloseTimer);
+      if (!isOpen) return;
+      autoCloseTimer = window.setTimeout(() => setOpen(false), AUTO_CLOSE_DELAY_MS);
+    };
+
+    const setOpen = (open: boolean, returnFocus = true) => {
       isOpen = open;
+      window.clearTimeout(autoCloseTimer);
       host.dataset.open = String(open);
       toggle.setAttribute('aria-expanded', String(open));
       toggle.setAttribute('aria-label', open ? '收起书签侧栏' : '展开书签侧栏');
@@ -166,7 +179,8 @@ export default defineContentScript({
         frame.src = browser.runtime.getURL('/sidebar-frame.html');
       }
 
-      if (!open) toggle.focus({ preventScroll: true });
+      if (open) resetAutoCloseTimer();
+      else if (returnFocus) toggle.focus({ preventScroll: true });
     };
 
     const toggleOpen = () => setOpen(!isOpen);
@@ -175,10 +189,25 @@ export default defineContentScript({
         toggleOpen();
       }
     };
+    const onSidebarActivity = (event: MessageEvent<unknown>) => {
+      if (event.source !== frame.contentWindow) return;
+      if (typeof event.data === 'object' && event.data !== null && 'type' in event.data && event.data.type === SIDEBAR_ACTIVITY_MESSAGE) {
+        resetAutoCloseTimer();
+      }
+    };
+    const onPageActivity = (event: Event) => {
+      if (event.composedPath().includes(host)) resetAutoCloseTimer();
+    };
+    const activityEvents = ['pointerdown', 'pointermove', 'keydown', 'wheel', 'touchstart', 'input', 'change', 'scroll'] as const;
+    activityEvents.forEach((type) => window.addEventListener(type, onPageActivity, { capture: true, passive: true }));
 
     toggle.addEventListener('click', toggleOpen);
     browser.runtime.onMessage.addListener(onRuntimeMessage);
+    window.addEventListener('message', onSidebarActivity);
     context.onInvalidated(() => {
+      window.clearTimeout(autoCloseTimer);
+      activityEvents.forEach((type) => window.removeEventListener(type, onPageActivity, true));
+      window.removeEventListener('message', onSidebarActivity);
       browser.runtime.onMessage.removeListener(onRuntimeMessage);
       host.remove();
     });
