@@ -469,10 +469,9 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 
 .quick-save-heading {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 5px;
   min-width: 0;
-  margin-bottom: 2px;
   color: var(--brand-primary);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
   font-size: 11px;
@@ -481,7 +480,7 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   text-transform: uppercase;
 }
 
-.quick-save-heading > span { flex: 0 0 auto; }
+.quick-save-heading > span:first-child { flex: 0 0 auto; }
 
 .quick-save-heading strong {
   overflow: hidden;
@@ -490,6 +489,19 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   font-weight: 600;
   letter-spacing: 0;
   line-height: 1.35;
+  text-overflow: ellipsis;
+  text-transform: none;
+  white-space: nowrap;
+}
+
+.quick-save-host {
+  overflow: hidden;
+  flex: 0 1 auto;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 400;
+  letter-spacing: 0;
   text-overflow: ellipsis;
   text-transform: none;
   white-space: nowrap;
