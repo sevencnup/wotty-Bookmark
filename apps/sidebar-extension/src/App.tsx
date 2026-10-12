@@ -412,7 +412,7 @@ function NodeRow({ node, expanded, selected, onSelect, onToggle, onOpen, onEdit,
             {bookmarkCount}
           </span>
         )}
-        <div className={`row-actions ${folder ? '' : 'bookmark-row-actions'}`}>
+        <div className={`row-actions ${folder ? 'folder-row-actions' : 'bookmark-row-actions'}`}>
           <button aria-label="编辑" className="row-action" onClick={onEdit} type="button">
             <Pencil size={13} />
           </button>

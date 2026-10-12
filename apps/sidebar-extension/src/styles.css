@@ -890,6 +890,31 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 
 .bookmark-item-row.is-selected .bookmark-row-actions { background: #e7efff; }
 
+.bookmark-folder-row .folder-row-actions {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  z-index: 2;
+  display: none;
+  padding-left: 6px;
+  border-radius: var(--radius-xs);
+  background: #edf2f8;
+  transform: translateY(-50%);
+}
+
+.bookmark-folder-row:hover .folder-row-actions,
+.bookmark-folder-row:focus-within .folder-row-actions {
+  display: flex;
+  opacity: 1;
+}
+
+.bookmark-folder-row:hover .bookmark-row-main,
+.bookmark-folder-row:focus-within .bookmark-row-main {
+  padding-right: 72px;
+}
+
+.bookmark-folder-row.is-selected .folder-row-actions { background: #e7efff; }
+
 .bookmark-row:hover .row-actions,
 .search-result:hover .result-actions { opacity: 1; }
 
@@ -921,10 +946,13 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 }
 
 @media (hover: none) {
-  .bookmark-item-row .bookmark-row-actions {
+  .bookmark-item-row .bookmark-row-actions,
+  .bookmark-folder-row .folder-row-actions {
     display: flex;
     opacity: 1;
   }
+
+  .bookmark-folder-row .bookmark-row-main { padding-right: 72px; }
 }
 
 .drag-help {
