@@ -45,19 +45,18 @@ const styles = `
   border-left: 1px solid #dbe4f0;
   background: #f8fafc;
   box-shadow: -14px 0 36px rgba(15, 23, 42, 0.2);
-  opacity: 0;
+  opacity: 1;
   pointer-events: none;
   transform: translateX(100%);
   visibility: hidden;
-  transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1), opacity 160ms ease, visibility 0s linear 220ms;
+  transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1), visibility 0s linear 220ms;
 }
 
 :host([data-open='true']) .panel {
-  opacity: 1;
   pointer-events: auto;
   transform: translateX(0);
   visibility: visible;
-  transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1), opacity 160ms ease, visibility 0s;
+  transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1), visibility 0s;
 }
 
 .panel iframe {
