@@ -68,6 +68,56 @@ const styles = `
   background: #f8fafc;
 }
 
+.frame-placeholder {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 10px;
+  background: #f8fafc;
+  color: #475569;
+  font: 13px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.frame-placeholder-spinner {
+  width: 22px;
+  height: 22px;
+  border: 2px solid #bfdbfe;
+  border-top-color: #2563eb;
+  border-radius: 50%;
+  animation: wotty-sidebar-spin 700ms linear infinite;
+}
+
+.frame-placeholder-error {
+  display: none;
+  max-width: 260px;
+  padding: 0 18px;
+  text-align: center;
+}
+
+.frame-placeholder-retry {
+  display: block;
+  margin: 12px auto 0;
+  padding: 7px 12px;
+  border: 1px solid #bfdbfe;
+  border-radius: 7px;
+  background: #ffffff;
+  color: #1d4ed8;
+  cursor: pointer;
+}
+
+.panel[data-frame-error='true'] .frame-placeholder-spinner,
+.panel[data-frame-error='true'] .frame-placeholder-message {
+  display: none;
+}
+
+.panel[data-frame-error='true'] .frame-placeholder-error { display: block; }
+.panel[data-frame-ready='true'] .frame-placeholder { display: none; }
+
+@keyframes wotty-sidebar-spin { to { transform: rotate(360deg); } }
+
 .resize-handle {
   position: absolute;
   top: 0;
@@ -201,8 +251,13 @@ export default defineContentScript({
     frame.title = '书签侧栏';
     frame.setAttribute('loading', 'eager');
     frame.inert = true;
-    frame.src = browser.runtime.getURL('/sidebar-frame.html');
     panel.append(frame);
+
+    const framePlaceholder = document.createElement('div');
+    framePlaceholder.className = 'frame-placeholder';
+    framePlaceholder.setAttribute('role', 'status');
+    framePlaceholder.innerHTML = '<span class="frame-placeholder-spinner" aria-hidden="true"></span><span class="frame-placeholder-message">正在加载书签侧栏…</span><span class="frame-placeholder-error">侧栏暂时无法加载。<button class="frame-placeholder-retry" type="button">重新加载</button></span>';
+    panel.append(framePlaceholder);
 
     const resizeHandle = document.createElement('div');
     resizeHandle.className = 'resize-handle';
@@ -230,7 +285,9 @@ export default defineContentScript({
 
     let isOpen = false;
     let frameReady = false;
-    let pendingOpen = false;
+    let frameReadyTimer: number | undefined;
+    let frameLoadAttempt = 0;
+    const frameUrl = browser.runtime.getURL('/sidebar-frame.html');
     let autoCloseTimer: number | undefined;
     let preferredSidebarWidth = DEFAULT_SIDEBAR_WIDTH;
     let resizePointerId: number | undefined;
@@ -319,14 +376,7 @@ export default defineContentScript({
       else if (returnFocus) toggle.focus({ preventScroll: true });
     };
 
-    const toggleOpen = () => {
-      if (!isOpen && !frameReady) {
-        pendingOpen = !pendingOpen;
-        toggle.setAttribute('aria-expanded', String(pendingOpen));
-        return;
-      }
-      setOpen(!isOpen);
-    };
+    const toggleOpen = () => setOpen(!isOpen);
     const onRuntimeMessage = (message: unknown) => {
       if (typeof message === 'object' && message !== null && 'type' in message && message.type === TOGGLE_FLOATING_SIDEBAR_MESSAGE) {
         toggleOpen();
@@ -337,16 +387,28 @@ export default defineContentScript({
       if (typeof event.data !== 'object' || event.data === null || !('type' in event.data)) return;
       if (event.data.type === SIDEBAR_READY_MESSAGE) {
         frameReady = true;
-        if (pendingOpen) {
-          pendingOpen = false;
-          setOpen(true);
-        }
+        window.clearTimeout(frameReadyTimer);
+        panel.dataset.frameReady = 'true';
+        delete panel.dataset.frameError;
         return;
       }
       if (event.data.type === SIDEBAR_ACTIVITY_MESSAGE) {
         resetAutoCloseTimer();
       }
     };
+    const startFrameLoad = () => {
+      frameReady = false;
+      delete panel.dataset.frameReady;
+      delete panel.dataset.frameError;
+      window.clearTimeout(frameReadyTimer);
+      frameReadyTimer = window.setTimeout(() => {
+        if (!frameReady) panel.dataset.frameError = 'true';
+      }, 8_000);
+      frame.src = `${frameUrl}?load=${++frameLoadAttempt}`;
+    };
+    framePlaceholder.addEventListener('click', (event) => {
+      if ((event.target as HTMLElement).closest('.frame-placeholder-retry')) startFrameLoad();
+    });
     const onPageActivity = (event: Event) => {
       if (event.composedPath().includes(host)) resetAutoCloseTimer();
     };
@@ -441,9 +503,11 @@ export default defineContentScript({
     resizeHandle.addEventListener('dblclick', onResizeDoubleClick);
     browser.runtime.onMessage.addListener(onRuntimeMessage);
     window.addEventListener('message', onSidebarActivity);
+    startFrameLoad();
     window.addEventListener('resize', onViewportResize);
     context.onInvalidated(() => {
       window.clearTimeout(autoCloseTimer);
+      window.clearTimeout(frameReadyTimer);
       activityEvents.forEach((type) => window.removeEventListener(type, onPageActivity, true));
       toggle.removeEventListener('pointerdown', onTogglePointerDown);
       toggle.removeEventListener('pointermove', onTogglePointerMove);
