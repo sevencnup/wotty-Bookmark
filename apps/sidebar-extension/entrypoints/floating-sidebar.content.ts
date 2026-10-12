@@ -2,7 +2,7 @@ import { browser } from 'wxt/browser';
 import { defineContentScript } from 'wxt/utils/define-content-script';
 
 const HOST_ID = 'wotty-bookmark-floating-sidebar';
-const HOST_BUILD = '0.1.63';
+const HOST_BUILD = '0.1.66';
 const TOGGLE_FLOATING_SIDEBAR_MESSAGE = 'wotty-bookmark:toggle-floating-sidebar';
 const SIDEBAR_ACTIVITY_MESSAGE = 'wotty-bookmark:sidebar-activity';
 const SIDEBAR_READY_MESSAGE = 'wotty-bookmark:sidebar-ready';
@@ -15,6 +15,7 @@ const SIDEBAR_EDGE_RESERVE = 44;
 const DEFAULT_TOGGLE_POSITION = 0.5;
 const TOGGLE_HEIGHT = 34;
 const TOGGLE_EDGE_INSET = 8;
+const OVERLAY_SCROLLBAR_RESERVE = 14;
 const TOGGLE_DRAG_THRESHOLD = 4;
 
 const styles = `
@@ -32,6 +33,7 @@ const styles = `
   pointer-events: none !important;
   --wotty-sidebar-width: min(390px, calc(100vw - 44px));
   --wotty-toggle-top: 50%;
+  --wotty-scrollbar-width: 0px;
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -173,7 +175,7 @@ const styles = `
 .edge-toggle {
   position: absolute;
   top: var(--wotty-toggle-top);
-  right: 5px;
+  right: calc(5px + var(--wotty-scrollbar-width));
   display: grid;
   width: 34px;
   height: 34px;
@@ -211,7 +213,7 @@ const styles = `
 }
 
 :host([data-open='true']) .edge-toggle {
-  right: 5px;
+  right: calc(5px + var(--wotty-scrollbar-width));
   background: #eff6ff;
   box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.46), 0 4px 12px rgba(15, 23, 42, 0.24);
 }
@@ -313,6 +315,7 @@ export default defineContentScript({
     let toggleStartClientY = 0;
     let isPositioningToggle = false;
     let suppressToggleClick = false;
+    let scrollbarMeasureFrame: number | undefined;
 
     const getSidebarWidthBounds = () => {
       const max = Math.max(1, window.innerWidth - SIDEBAR_EDGE_RESERVE);
@@ -329,6 +332,20 @@ export default defineContentScript({
       resizeHandle.setAttribute('aria-valuemin', String(min));
       resizeHandle.setAttribute('aria-valuemax', String(max));
       resizeHandle.setAttribute('aria-valuenow', String(width));
+    };
+    const applyScrollbarInset = () => {
+      const root = document.documentElement;
+      const layoutScrollbarWidth = Math.max(0, window.innerWidth - root.clientWidth);
+      const hasVerticalScrollbar = root.scrollHeight > root.clientHeight;
+      const scrollbarWidth = layoutScrollbarWidth || (hasVerticalScrollbar ? OVERLAY_SCROLLBAR_RESERVE : 0);
+      host.style.setProperty('--wotty-scrollbar-width', `${scrollbarWidth}px`);
+    };
+    const scheduleScrollbarInset = () => {
+      if (scrollbarMeasureFrame !== undefined) return;
+      scrollbarMeasureFrame = window.requestAnimationFrame(() => {
+        scrollbarMeasureFrame = undefined;
+        applyScrollbarInset();
+      });
     };
     const saveSidebarWidth = () => {
       void browser.storage.local.set({ [FLOATING_SIDEBAR_WIDTH_KEY]: preferredSidebarWidth }).catch(() => undefined);
@@ -359,6 +376,7 @@ export default defineContentScript({
     };
 
     applySidebarWidth();
+    applyScrollbarInset();
     void browser.storage.local.get(FLOATING_SIDEBAR_WIDTH_KEY).then((values) => {
       const savedWidth = values[FLOATING_SIDEBAR_WIDTH_KEY];
       if (typeof savedWidth === 'number' && Number.isFinite(savedWidth)) preferredSidebarWidth = savedWidth;
@@ -558,7 +576,17 @@ export default defineContentScript({
     const onViewportResize = () => {
       applySidebarWidth();
       applyTogglePosition();
+      applyScrollbarInset();
     };
+    const scrollbarResizeObserver = typeof ResizeObserver === 'undefined'
+      ? undefined
+      : new ResizeObserver(scheduleScrollbarInset);
+    scrollbarResizeObserver?.observe(document.documentElement);
+    if (document.body) scrollbarResizeObserver?.observe(document.body);
+    const scrollbarMutationObserver = typeof MutationObserver === 'undefined'
+      ? undefined
+      : new MutationObserver(scheduleScrollbarInset);
+    if (document.body) scrollbarMutationObserver?.observe(document.body, { childList: true, subtree: true });
     if (wasOpen) pendingOpen = true;
     const activityEvents = ['pointerdown', 'pointermove', 'keydown', 'wheel', 'touchstart', 'input', 'change', 'scroll'] as const;
     activityEvents.forEach((type) => window.addEventListener(type, onPageActivity, { capture: true, passive: true }));
@@ -596,6 +624,9 @@ export default defineContentScript({
       resizeHandle.removeEventListener('dblclick', onResizeDoubleClick);
       window.removeEventListener('message', onSidebarActivity);
       window.removeEventListener('resize', onViewportResize);
+      scrollbarResizeObserver?.disconnect();
+      scrollbarMutationObserver?.disconnect();
+      if (scrollbarMeasureFrame !== undefined) window.cancelAnimationFrame(scrollbarMeasureFrame);
       browser.runtime.onMessage.removeListener(onRuntimeMessage);
       host.remove();
     });
