@@ -218,6 +218,8 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 }
 
 .auxiliary-toolbar {
+  position: relative;
+  z-index: 10;
   display: flow-root;
   max-height: 300px;
   overflow: visible;
@@ -1243,7 +1245,7 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   margin-top: 6px;
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
-  background: var(--paper);
+  background-color: #ffffff;
   box-shadow: var(--shadow-sm);
   overflow: hidden;
   animation: fadeIn 0.12s ease-out;
