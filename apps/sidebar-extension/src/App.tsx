@@ -264,21 +264,25 @@ function App() {
       <div className={`server-library-banner ${isBrowserSource ? 'is-browser-source' : ''}`}>{isBrowserSource ? <Globe size={15} /> : <Server size={15} />}<span><strong>{isBrowserSource ? '只保存到浏览器' : '只保存到服务器'}</strong> · {isBrowserSource ? '读写当前浏览器书签，Floccus 负责同步到服务器和手机' : '不读取或写入浏览器原生书签'}</span></div>
       <div className="search-shell"><Search size={16} /><input aria-label={`搜索${sourceLabel}书签`} disabled={needsServerConnection} onChange={(event) => setQuery(event.target.value)} placeholder={`搜索${sourceLabel}书签或网址`} type="search" value={query} />{query && <button className="icon-button" onClick={() => setQuery('')} type="button"><X size={14} /></button>}</div>
       <section className={`quick-save-card ${!activeTab || needsServerConnection ? 'is-disabled' : ''}`}>
-        <div className="quick-save-icon"><Globe size={17} /></div>
-        <div className="quick-save-copy">
-          <span className="eyebrow">收藏当前页 · {isBrowserSource ? 'browser' : 'server'}</span>
-          <strong {...(!activeTab ? { 'data-i18n-force': '' } : {})}>{activeTab?.title ?? '当前页面不可收藏'}</strong>
-          <span>{activeTab ? hostname(activeTab.url) : '请在普通网页中打开侧边栏'}</span>
+        <div className="quick-save-summary">
+          <div className="quick-save-icon"><Globe size={17} /></div>
+          <div className="quick-save-copy">
+            <span className="eyebrow">收藏当前页 · {isBrowserSource ? 'browser' : 'server'}</span>
+            <strong {...(!activeTab ? { 'data-i18n-force': '' } : {})}>{activeTab?.title ?? '当前页面不可收藏'}</strong>
+            <span>{activeTab ? hostname(activeTab.url) : '请在普通网页中打开侧边栏'}</span>
+          </div>
         </div>
-        <FolderPickerDropdown
-          ariaLabel="收藏到文件夹"
-          compact
-          disabled={!activeTab || needsServerConnection || currentSaved || busy}
-          onChange={setQuickSaveFolder}
-          options={folderOptions}
-          value={quickSaveFolder}
-        />
-        <button className={`save-current-button ${currentSaved ? 'is-saved' : ''}`} disabled={!activeTab || needsServerConnection || currentSaved || busy} onClick={() => activeTab && void perform((active) => createLibraryBookmark(active, { title: activeTab.title, url: activeTab.url, parentId: quickSaveFolder || null }), () => createBrowserBookmark({ title: activeTab.title, url: activeTab.url, parentId: quickSaveFolder || null }))} type="button">{currentSaved ? <Check size={15} /> : '收藏'}</button>
+        <div className="quick-save-actions">
+          <FolderPickerDropdown
+            ariaLabel="收藏到文件夹"
+            compact
+            disabled={!activeTab || needsServerConnection || currentSaved || busy}
+            onChange={setQuickSaveFolder}
+            options={folderOptions}
+            value={quickSaveFolder}
+          />
+          <button className={`save-current-button ${currentSaved ? 'is-saved' : ''}`} disabled={!activeTab || needsServerConnection || currentSaved || busy} onClick={() => activeTab && void perform((active) => createLibraryBookmark(active, { title: activeTab.title, url: activeTab.url, parentId: quickSaveFolder || null }), () => createBrowserBookmark({ title: activeTab.title, url: activeTab.url, parentId: quickSaveFolder || null }))} type="button">{currentSaved ? <Check size={15} /> : '收藏'}</button>
+        </div>
       </section>
       </div>
       <div className="section-heading"><div><h1>我的{sourceLabel}书签</h1></div><div className="heading-actions"><button className="new-bookmark-button" disabled={needsServerConnection} onClick={() => setModal({ type: 'create', kind: 'folder' })} type="button"><Folder size={15} />文件夹</button><button className="new-bookmark-button primary" disabled={needsServerConnection} onClick={() => setModal({ type: 'create', kind: 'bookmark' })} type="button"><Plus size={15} />新增</button></div></div>
