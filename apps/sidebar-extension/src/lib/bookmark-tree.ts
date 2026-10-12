@@ -2,6 +2,7 @@ import type { BookmarkNode } from './browser-api';
 
 export interface FlatBookmarkNode extends BookmarkNode {
   depth: number;
+  continuationDepths: number[];
 }
 
 export interface SearchResult {
@@ -27,13 +28,17 @@ export function flattenVisibleNodes(
   nodes: BookmarkNode[],
   expanded: ReadonlySet<string>,
   depth = 0,
+  continuationDepths: number[] = [],
 ): FlatBookmarkNode[] {
   const flattened: FlatBookmarkNode[] = [];
 
-  for (const node of nodes) {
-    flattened.push({ ...node, depth });
+  for (const [index, node] of nodes.entries()) {
+    const nodeContinuationDepths = index < nodes.length - 1
+      ? [...continuationDepths, depth]
+      : continuationDepths;
+    flattened.push({ ...node, depth, continuationDepths: nodeContinuationDepths });
     if (isFolder(node) && expanded.has(node.id)) {
-      flattened.push(...flattenVisibleNodes(node.children ?? [], expanded, depth + 1));
+      flattened.push(...flattenVisibleNodes(node.children ?? [], expanded, depth + 1, nodeContinuationDepths));
     }
   }
 

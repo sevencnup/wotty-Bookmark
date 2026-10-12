@@ -655,6 +655,33 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   transition: background var(--duration) var(--ease);
 }
 
+.tree-guides {
+  position: absolute;
+  inset: -1px 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.tree-guide-vertical,
+.tree-guide-branch {
+  position: absolute;
+  background: #d7e0ec;
+}
+
+.tree-guide-vertical {
+  top: 0;
+  bottom: 0;
+  left: calc(12px + var(--guide-depth) * 14px);
+  width: 1px;
+}
+
+.tree-guide-branch {
+  top: 18px;
+  left: calc(12px + (var(--depth) - 1) * 14px);
+  width: 14px;
+  height: 1px;
+}
+
 .bookmark-row:hover {
   background: #f1f5f9;
 }
@@ -666,12 +693,21 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   margin: 0 0 2px 0;
   border: 0;
   border-radius: var(--radius-sm);
-  background: transparent;
+  background: #f3f7fc;
   box-shadow: none;
 }
 
+.bookmark-folder-row.depth-0 {
+  background: #edf4ff;
+  box-shadow: inset 2px 0 #8ab5f8;
+}
+
+.bookmark-folder-row.depth-2 {
+  background: rgba(255, 255, 255, 0.62);
+}
+
 .bookmark-folder-row:hover {
-  background: #f1f5f9;
+  background: #e8f0fb;
 }
 
 .bookmark-item-row {
@@ -705,6 +741,8 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 }
 
 .bookmark-row-main {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
   gap: 7px;
@@ -780,8 +818,8 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 
 .bookmark-folder-row .bookmark-title {
   color: var(--ink);
-  font-size: 12.5px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 650;
 }
 
 .folder-count-badge {
@@ -790,11 +828,12 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   align-items: center;
   justify-content: center;
   min-width: 16px;
-  height: 16px;
-  padding: 0 4px;
+  height: 18px;
+  padding: 0 5px;
   border-radius: var(--radius-full);
-  color: var(--soft-muted);
-  background: rgba(0, 0, 0, 0.05);
+  border: 1px solid #dbe6f3;
+  color: #4b6380;
+  background: #eaf1fa;
   font-size: 10.5px;
   font-variant-numeric: tabular-nums;
   font-weight: 500;

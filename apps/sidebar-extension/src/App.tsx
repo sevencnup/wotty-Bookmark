@@ -4,6 +4,7 @@ import { getActiveTab, getTabsApi, openBookmark } from './lib/browser-api';
 import type { BookmarkNode } from './lib/browser-api';
 import { createBrowserBookmark, createBrowserFolder, deleteBrowserNode, getBrowserLibrary, moveBrowserNode, updateBrowserNode } from './lib/browser-library';
 import { collectFolders, countBookmarks, countFolders, findNode, flattenVisibleNodes, getFolderOptions, isFolder, searchBookmarks } from './lib/bookmark-tree';
+import type { FlatBookmarkNode } from './lib/bookmark-tree';
 import { clearBackendConnection, connectToBackend, loadBackendConnection } from './lib/backend';
 import type { BackendConnection } from './lib/backend';
 import { createLibraryBookmark, createLibraryFolder, deleteLibraryNode, getLibrary, moveLibraryNode, updateLibraryNode } from './lib/library';
@@ -297,7 +298,7 @@ function App() {
   </main></SidebarUiLocalization>;
 }
 
-function VirtualBookmarkList({ visible, expanded, scrollTop, viewportHeight, onToggle, onEdit, onMove, onDelete }: { visible: Array<BookmarkNode & { depth: number }>; expanded: Set<string>; scrollTop: number; viewportHeight: number; onToggle: (nodeId: string) => void; onEdit: (nodeId: string) => void; onMove: (nodeId: string) => void; onDelete: (nodeId: string) => void }) {
+function VirtualBookmarkList({ visible, expanded, scrollTop, viewportHeight, onToggle, onEdit, onMove, onDelete }: { visible: FlatBookmarkNode[]; expanded: Set<string>; scrollTop: number; viewportHeight: number; onToggle: (nodeId: string) => void; onEdit: (nodeId: string) => void; onMove: (nodeId: string) => void; onDelete: (nodeId: string) => void }) {
   const itemHeights = useMemo(() => visible.map((node) => (isFolder(node) ? FOLDER_ROW_HEIGHT : BOOKMARK_ROW_HEIGHT)), [visible]);
   const win = getVariableVirtualWindow(itemHeights, scrollTop, viewportHeight, 8);
   const slice = visible.slice(win.start, win.end);
@@ -353,7 +354,7 @@ function VirtualSearchList({ results, scrollTop, viewportHeight, onEdit, onMove,
   );
 }
 
-function NodeRow({ node, expanded, onToggle, onOpen, onEdit, onMove, onDelete }: { node: BookmarkNode & { depth: number }; expanded: boolean; onToggle: () => void; onOpen: () => void; onEdit: () => void; onMove: () => void; onDelete: () => void }) {
+function NodeRow({ node, expanded, onToggle, onOpen, onEdit, onMove, onDelete }: { node: FlatBookmarkNode; expanded: boolean; onToggle: () => void; onOpen: () => void; onEdit: () => void; onMove: () => void; onDelete: () => void }) {
   const folder = isFolder(node);
   const depth = node.depth;
   const bookmarkCount = folder ? countBookmarks(node.children ?? []) : 0;
@@ -361,9 +362,15 @@ function NodeRow({ node, expanded, onToggle, onOpen, onEdit, onMove, onDelete }:
 
   return (
     <div
-      className={`bookmark-row ${folder ? 'bookmark-folder-row' : 'bookmark-item-row'}`}
+      className={`bookmark-row ${folder ? `bookmark-folder-row depth-${Math.min(depth, 2)}` : 'bookmark-item-row'}`}
       style={{ '--depth': depth } as React.CSSProperties}
     >
+      <span aria-hidden="true" className="tree-guides">
+        {node.continuationDepths.map((guideDepth) => (
+          <span className="tree-guide-vertical" key={guideDepth} style={{ '--guide-depth': guideDepth } as React.CSSProperties} />
+        ))}
+        {depth > 0 && <span className="tree-guide-branch" />}
+      </span>
       <div className="bookmark-row-main" title={tooltip}>
         {folder ? (
           <button className="folder-toggle" onClick={onToggle} type="button">
