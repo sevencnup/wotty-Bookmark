@@ -4,6 +4,8 @@ import type { SidebarLocale } from './lib/preferences';
 
 const englishText: Record<string, string> = {
   '书签库': 'Bookmark library',
+  '本地缓存': 'Local cache',
+  '正在显示上次保存的云端书签，后台正在获取最新数据': 'Showing cached cloud bookmarks while fetching the latest data',
   '本地': 'Local',
   '云端': 'Cloud',
   '切换到本地书签': 'Switch to local bookmarks',

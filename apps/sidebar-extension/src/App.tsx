@@ -9,6 +9,7 @@ import { clearBackendConnection, connectToBackend, loadBackendConnection } from 
 import type { BackendConnection } from './lib/backend';
 import { createLibraryBookmark, createLibraryFolder, deleteLibraryNode, getLibrary, moveLibraryNode, updateLibraryNode } from './lib/library';
 import type { LibraryFolder, LibraryTree } from './lib/library';
+import { loadCachedLibrary, saveCachedLibrary } from './lib/library-cache';
 import { loadSiteFavicon } from './lib/site-favicon';
 import { loadSidebarLocale, loadSidebarSourceMode, loadSidebarSourceModeOverride, refreshSidebarPreferences, saveSidebarSourceModeOverride } from './lib/preferences';
 import type { SidebarLocale, SidebarSourceMode } from './lib/preferences';
@@ -20,7 +21,7 @@ import { SidebarUiLocalization } from './sidebar-i18n';
 
 type Modal = { type: 'connect' } | { type: 'create'; kind: 'bookmark' | 'folder'; parentId?: string } | { type: 'edit' | 'move' | 'delete'; nodeId: string } | null;
 type Editor = { kind: 'bookmark' | 'folder'; title: string; url: string; parentId: string };
-type RefreshOptions = { silent?: boolean };
+type RefreshOptions = { silent?: boolean; force?: boolean };
 const AUTO_REFRESH_INTERVAL_MS = 10_000;
 const LANGUAGE_REFRESH_INTERVAL_MS = 10 * 60_000;
 const FOLDER_ROW_HEIGHT = 34;
@@ -86,10 +87,13 @@ function App() {
   const [quickSaveFolder, setQuickSaveFolder] = useState('');
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
+  const [isShowingCachedLibrary, setIsShowingCachedLibrary] = useState(false);
+  const [isCachedLibraryReadOnly, setIsCachedLibraryReadOnly] = useState(false);
   const [compactToolbar, setCompactToolbar] = useState(false);
   const [scrollTop, setScrollTop] = useState(0);
   const [viewportHeight, setViewportHeight] = useState(600);
-  const refreshInFlightRef = useRef(false);
+  const refreshInFlightRef = useRef<{ id: number; key: string } | null>(null);
+  const refreshSequenceRef = useRef(0);
   const knownFoldersRef = useRef<Set<string>>(new Set());
   const expandedFoldersInitializedRef = useRef(false);
   const workspaceRef = useRef<HTMLElement>(null);
@@ -115,20 +119,58 @@ function App() {
     };
   }, [handleScroll]);
 
-  const refresh = useCallback(async (current = connection, { silent = false }: RefreshOptions = {}, requestedMode = sourceMode) => {
-    if (requestedMode === 'server' && !current) { setTree(null); setLoading(false); setLastSyncedAt(null); return; }
-    if (refreshInFlightRef.current) return;
-    refreshInFlightRef.current = true;
+  const restoreCachedServerLibrary = async (current: BackendConnection) => {
+    const restoreSequence = refreshSequenceRef.current;
+    try {
+      const cached = await loadCachedLibrary(current);
+      if (!cached) return false;
+      if (refreshSequenceRef.current !== restoreSequence) return false;
+      setTree(cached.tree);
+      setLastSyncedAt(new Date(cached.savedAt));
+      setIsShowingCachedLibrary(true);
+      setIsCachedLibraryReadOnly(true);
+      setLoading(false);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const refresh = useCallback(async (current = connection, { silent = false, force = false }: RefreshOptions = {}, requestedMode = sourceMode) => {
+    if (requestedMode === 'server' && !current) {
+      refreshSequenceRef.current += 1;
+      refreshInFlightRef.current = null;
+      setTree(null);
+      setLoading(false);
+      setLastSyncedAt(null);
+      setIsShowingCachedLibrary(false);
+      setIsCachedLibraryReadOnly(false);
+      return;
+    }
+    const requestKey = requestedMode === 'browser'
+      ? 'browser'
+      : `server:${current!.serverUrl.replace(/\/+$/, '').toLowerCase()}:${current!.loginIdentifier.toLowerCase()}`;
+    if (!force && refreshInFlightRef.current?.key === requestKey) return;
+    const requestId = ++refreshSequenceRef.current;
+    refreshInFlightRef.current = { id: requestId, key: requestKey };
     if (!silent) setLoading(true);
     setError(null);
     try {
-      setTree(requestedMode === 'browser' ? await getBrowserLibrary() : await getLibrary(current!));
+      const nextTree = requestedMode === 'browser' ? await getBrowserLibrary() : await getLibrary(current!);
+      if (refreshInFlightRef.current?.id !== requestId) return;
+      setTree(nextTree);
       setLastSyncedAt(new Date());
+      setIsShowingCachedLibrary(false);
+      setIsCachedLibraryReadOnly(false);
+      if (requestedMode === 'server') void saveCachedLibrary(current!, nextTree).catch(() => undefined);
     } catch (reason) {
+      if (refreshInFlightRef.current?.id !== requestId) return;
       setError(reason instanceof Error ? reason.message : requestedMode === 'browser' ? '无法读取浏览器书签' : '无法读取服务器书签库');
     } finally {
-      refreshInFlightRef.current = false;
-      if (!silent) setLoading(false);
+      if (refreshInFlightRef.current?.id === requestId) {
+        refreshInFlightRef.current = null;
+        if (!silent) setLoading(false);
+      }
     }
   }, [connection, sourceMode]);
 
@@ -148,7 +190,10 @@ function App() {
       setLocale(localLocale);
       setSourceMode(localSourceMode);
       setConnection(value);
-      const initialLoad = refresh(value, {}, localSourceMode);
+      const cachedLibraryRestored = value && localSourceMode === 'server'
+        ? await restoreCachedServerLibrary(value)
+        : false;
+      const initialLoad = refresh(value, { silent: cachedLibraryRestored }, localSourceMode);
       let activeSourceMode = localSourceMode;
       if (value && localSourceMode === 'server') {
         try {
@@ -235,15 +280,19 @@ function App() {
   }, [folderOptions, quickSaveFolder]);
 
   const perform = useCallback(async (serverOperation: (active: BackendConnection) => Promise<unknown>, browserOperation: () => Promise<unknown>) => {
+    if (sourceMode === 'server' && isCachedLibraryReadOnly) {
+      setError('当前显示的是本地缓存，刷新成功后才能编辑云端书签');
+      return;
+    }
     if (sourceMode === 'server' && !connection) { setModal({ type: 'connect' }); return; }
     setBusy(true); setError(null);
     try {
       if (sourceMode === 'browser') await browserOperation();
       else await serverOperation(connection!);
-      await refresh(connection, {}, sourceMode);
+      await refresh(connection, { force: true }, sourceMode);
       setModal(null);
     } catch (reason) { setError(reason instanceof Error ? reason.message : '操作失败，请重试'); } finally { setBusy(false); }
-  }, [connection, refresh, sourceMode]);
+  }, [connection, isCachedLibraryReadOnly, refresh, sourceMode]);
 
   const submitEditor = (value: Editor) => perform(async (active) => {
     const node = modal && 'nodeId' in modal ? findNode(nodes, modal.nodeId) : undefined;
@@ -280,6 +329,8 @@ function App() {
       if (nextMode === 'server') setModal({ type: 'connect' });
       return;
     }
+    refreshSequenceRef.current += 1;
+    refreshInFlightRef.current = null;
     try {
       await saveSidebarSourceModeOverride(nextMode);
       setError(null);
@@ -287,12 +338,19 @@ function App() {
       setQuickSaveFolder('');
       setSelectedNodeId(null);
       setTree(null);
+      setLastSyncedAt(null);
+      setIsShowingCachedLibrary(false);
+      setIsCachedLibraryReadOnly(false);
       setExpanded(new Set());
       knownFoldersRef.current = new Set();
       expandedFoldersInitializedRef.current = false;
       setSourceMode(nextMode);
       if (nextMode === 'server' && !connection) setModal({ type: 'connect' });
-      await refresh(connection, {}, nextMode);
+      setLoading(true);
+      const cachedLibraryRestored = nextMode === 'server' && connection
+        ? await restoreCachedServerLibrary(connection)
+        : false;
+      await refresh(connection, { silent: cachedLibraryRestored }, nextMode);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : '保存书签来源失败');
     }
@@ -328,12 +386,12 @@ function App() {
       </section>
       </div>
       <div className="section-heading"><div><h1>我的{sourceLabel}书签</h1></div><div className="heading-actions"><button className="new-bookmark-button" disabled={needsServerConnection} onClick={() => setModal({ type: 'create', kind: 'folder' })} type="button"><Folder size={15} />文件夹</button><button className="new-bookmark-button primary" disabled={needsServerConnection} onClick={() => setModal({ type: 'create', kind: 'bookmark' })} type="button"><Plus size={15} />新增</button></div></div>
-      <div className={`library-meta ${compactToolbar ? 'is-compact-meta' : ''}`}><span>{countBookmarks(nodes)} 个书签</span><span className="meta-separator">·</span><span>{countFolders(nodes)} 个文件夹</span><span className="sync-time" title={isBrowserSource ? '当前读取浏览器原生书签' : '侧边栏每 10 秒自动同步一次，重新聚焦时会立即同步'}>{isBrowserSource ? '浏览器书签' : formatSyncTime(lastSyncedAt)}</span><span className="meta-spacer" /><button className="refresh-button" disabled={needsServerConnection || loading} onClick={() => void refresh()} type="button"><RefreshCw className={loading ? 'spin' : ''} size={13} />刷新</button></div>
+      <div className={`library-meta ${compactToolbar ? 'is-compact-meta' : ''}`}><span>{countBookmarks(nodes)} 个书签</span><span className="meta-separator">·</span><span>{countFolders(nodes)} 个文件夹</span><span className={`sync-time ${isShowingCachedLibrary ? 'is-cached' : ''}`} title={isBrowserSource ? '当前读取浏览器原生书签' : isShowingCachedLibrary ? '正在显示上次保存的云端书签，后台正在获取最新数据' : '侧边栏每 10 秒自动同步一次，重新聚焦时会立即同步'}>{isBrowserSource ? '浏览器书签' : isShowingCachedLibrary ? `本地缓存 · ${formatSyncTime(lastSyncedAt)}` : formatSyncTime(lastSyncedAt)}</span><span className="meta-spacer" /><button className="refresh-button" disabled={needsServerConnection || loading} onClick={() => void refresh()} type="button"><RefreshCw className={loading ? 'spin' : ''} size={13} />刷新</button></div>
       {needsServerConnection ? <Disconnected onConnect={() => setModal({ type: 'connect' })} /> : error && !tree ? <Failure message={error} onRetry={() => void refresh()} /> : loading ? <Loading sourceMode={sourceMode} /> : query.trim() ? <VirtualSearchList onDelete={(nodeId) => setModal({ type: 'delete', nodeId })} onEdit={(nodeId) => setModal({ type: 'edit', nodeId })} results={results} scrollTop={scrollTop} sourceMode={sourceMode} viewportHeight={viewportHeight} /> : visible.length ? <VirtualBookmarkList expanded={expanded} onDelete={(nodeId) => setModal({ type: 'delete', nodeId })} onEdit={(nodeId) => setModal({ type: 'edit', nodeId })} onMove={(nodeId) => setModal({ type: 'move', nodeId })} onSelect={setSelectedNodeId} onToggle={(nodeId) => setExpanded((current) => { const next = new Set(current); if (next.has(nodeId)) next.delete(nodeId); else next.add(nodeId); return next; })} scrollTop={scrollTop} selectedNodeId={selectedNodeId} viewportHeight={viewportHeight} visible={visible} /> : <Empty onCreate={() => setModal({ type: 'create', kind: 'bookmark' })} sourceMode={sourceMode} />}{error && tree && <p className="inline-error">{error}</p>}
     </section>
     <button aria-label="回到顶部" className="back-to-top-button" onClick={() => scrollToTop(workspaceRef.current)} title="回到顶部" type="button"><ArrowUp size={16} /></button>
     <footer className="app-footer" />
-    {modal?.type === 'connect' && <ConnectionModal busy={busy} connection={connection} onClose={() => setModal(null)} onConnect={(serverUrl, code) => { setBusy(true); setError(null); void connectToBackend(serverUrl, code).then(async (next) => { setConnection(next); let nextMode = sourceMode; try { const preferences = await refreshSidebarPreferences(next); setLocale(preferences.language); const override = await loadSidebarSourceModeOverride(); nextMode = override ?? preferences.sourceMode; setSourceMode(nextMode); } catch { /* 使用当前缓存模式，连接仍可继续 */ } await refresh(next, {}, nextMode); setModal(null); }).catch((reason: unknown) => setError(reason instanceof Error ? reason.message : '连接失败')).finally(() => setBusy(false)); }} onDisconnect={() => { setBusy(true); void clearBackendConnection().then(() => { setConnection(null); setTree(null); setModal(null); }).finally(() => setBusy(false)); }} />}
+    {modal?.type === 'connect' && <ConnectionModal busy={busy} connection={connection} onClose={() => setModal(null)} onConnect={(serverUrl, code) => { setBusy(true); setError(null); void connectToBackend(serverUrl, code).then(async (next) => { setConnection(next); let nextMode = sourceMode; try { const preferences = await refreshSidebarPreferences(next); setLocale(preferences.language); const override = await loadSidebarSourceModeOverride(); nextMode = override ?? preferences.sourceMode; setSourceMode(nextMode); } catch { /* 使用当前缓存模式，连接仍可继续 */ } const cachedLibraryRestored = nextMode === 'server' ? await restoreCachedServerLibrary(next) : false; await refresh(next, { silent: cachedLibraryRestored }, nextMode); setModal(null); }).catch((reason: unknown) => setError(reason instanceof Error ? reason.message : '连接失败')).finally(() => setBusy(false)); }} onDisconnect={() => { setBusy(true); void clearBackendConnection().then(() => { setConnection(null); setTree(null); setIsShowingCachedLibrary(false); setIsCachedLibraryReadOnly(false); setLastSyncedAt(null); setModal(null); }).finally(() => setBusy(false)); }} />}
     {modal?.type === 'create' && <EditorModal busy={busy} initial={{ kind: modal.kind, parentId: modal.parentId ?? '' }} nodes={nodes} onClose={() => setModal(null)} onSubmit={submitEditor} sourceMode={sourceMode} />}
     {modal?.type === 'edit' && <EditorModal busy={busy} node={findNode(nodes, modal.nodeId)} nodes={nodes} onClose={() => setModal(null)} onSubmit={submitEditor} sourceMode={sourceMode} />}
     {modal?.type === 'move' && <MoveModal busy={busy} node={findNode(nodes, modal.nodeId)} nodes={nodes} onClose={() => setModal(null)} onSubmit={(parentId) => perform((active) => moveLibraryNode(active, modal.nodeId, parentId || null), () => moveBrowserNode(modal.nodeId, parentId || null))} sourceMode={sourceMode} />}
