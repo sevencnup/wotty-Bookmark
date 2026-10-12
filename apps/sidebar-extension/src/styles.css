@@ -96,8 +96,8 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 
 .theme-settings-button {
   display: inline-flex;
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   align-items: center;
   justify-content: center;
   padding: 0;
@@ -141,8 +141,8 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   align-items: center;
   justify-content: center;
   gap: 4px;
-  min-width: 54px;
-  padding: 5px 8px;
+  min-width: 48px;
+  padding: 4px 6px;
   border: 0;
   border-radius: var(--radius-full);
   color: var(--muted);
@@ -179,8 +179,8 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   padding: 0;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
@@ -192,7 +192,7 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 
 @media (max-width: 340px) {
   .topbar-actions { gap: 4px; }
-  .theme-settings-button, .compact-toolbar-button { width: 26px; height: 26px; }
+  .theme-settings-button, .compact-toolbar-button { width: 24px; height: 24px; }
 }
 
 .compact-toolbar-button:hover,
@@ -487,11 +487,11 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   min-width: 0;
 }
 
-.quick-save-summary { gap: 10px; }
+.quick-save-summary { gap: 0; }
 
 .quick-save-actions {
   gap: 8px;
-  padding-left: 42px;
+  padding-left: 0;
 }
 
 .quick-save-card.is-disabled {
@@ -499,19 +499,6 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   opacity: 0.75;
   border-top-color: var(--line);
   background: transparent;
-}
-
-.quick-save-icon {
-  display: grid;
-  flex: 0 0 auto;
-  place-items: center;
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-sm);
-  color: var(--brand-primary);
-  background: #ffffff;
-  border: 1px solid var(--brand-primary-border);
-  box-shadow: 0 1px 4px var(--brand-primary-glow);
 }
 
 .quick-save-copy {
@@ -587,7 +574,7 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   align-items: center;
   gap: 4px;
   flex: 0 0 auto;
-  padding: 6px 10px;
+  padding: 4px 7px;
   border: 0;
   border-radius: var(--radius-sm);
   color: #ffffff;
@@ -609,7 +596,7 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   gap: 4px;
   flex: 1 1 auto;
   min-width: 0;
-  padding: 5px 7px;
+  padding: 4px 6px;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   color: var(--muted);
@@ -680,7 +667,7 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 .section-heading h1 {
   margin: 2px 0 0;
   color: var(--ink);
-  font-size: 17px;
+  font-size: 14px;
   font-weight: 700;
   letter-spacing: -0.02em;
 }
@@ -689,7 +676,7 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 5px 9px;
+  padding: 4px 7px;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   color: var(--ink-secondary);
@@ -1502,10 +1489,10 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 .app-theme--dark .topbar { box-shadow: 0 1px 3px #0003; }
 .app-theme--dark .source-mode-switch, .app-theme--dark .type-switch { background: #191d23; }
 .app-theme--dark .new-bookmark-button.primary, .app-theme--dark .primary-button, .app-theme--dark .save-current-button { color: #101720; }
-.app-theme--dark .source-mode-option.is-active, .app-theme--dark .theme-settings-mark, .app-theme--dark .quick-save-icon { color: var(--brand-primary); background: #283546; }
+.app-theme--dark .source-mode-option.is-active, .app-theme--dark .theme-settings-mark { color: var(--brand-primary); background: #283546; }
 .app-theme--dark .source-mode-option:hover { color: var(--ink); background: #303741; }
 .app-theme--dark .source-mode-option.is-active { background: #283546; }
-.app-theme--dark .theme-settings-button, .app-theme--dark .compact-toolbar-button, .app-theme--dark .back-to-top-button, .app-theme--dark .quick-save-icon, .app-theme--dark .modal-close, .app-theme--dark .secondary-button { border-color: var(--line); color: var(--ink-secondary); background: var(--paper); }
+.app-theme--dark .theme-settings-button, .app-theme--dark .compact-toolbar-button, .app-theme--dark .back-to-top-button, .app-theme--dark .modal-close, .app-theme--dark .secondary-button { border-color: var(--line); color: var(--ink-secondary); background: var(--paper); }
 .app-theme--dark .operation-toast { border-color: var(--danger-border); color: var(--danger); background: var(--paper); }
 .app-theme--dark .bookmark-item-row:hover, .app-theme--dark .bookmark-folder-row:hover, .app-theme--dark .search-result:hover { background: #222832; }
 .app-theme--dark .bookmark-row.is-selected { background: #283546; }
@@ -1514,7 +1501,6 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 .app-theme--dark .bookmark-item-row .bookmark-row-actions, .app-theme--dark .bookmark-folder-row .folder-row-actions { background: #303741; }
 .app-theme--dark .bookmark-item-row.is-selected .bookmark-row-actions, .app-theme--dark .bookmark-folder-row.is-selected .folder-row-actions { background: #283546; }
 .app-theme--dark .quick-access-module { border-color: #415a7c; background: linear-gradient(135deg, #283546 0%, #232831 85%); }
-.app-theme--dark .quick-save-icon { border-color: #415a7c; }
 .app-theme--dark .save-current-button.is-saved { color: var(--ink); background: #434b56; }
 .app-theme--dark .modal-backdrop { background: #080b11b8; }
 .app-theme--dark .modal-card { border-color: var(--line); background: var(--paper); }
@@ -1528,7 +1514,7 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 .app-theme--dark .folder-picker-trigger, .app-theme--dark .folder-picker-dropdown, .app-theme--dark .folder-picker-search, .app-theme--dark .folder-picker.is-open .folder-picker-trigger, .app-theme--dark .folder-picker-trigger:hover:not(:disabled), .app-theme--dark .folder-picker.is-open .folder-picker-search { border-color: var(--line); color: var(--ink); background: var(--paper); }
 .app-theme--dark .theme-settings-panel, .app-theme--dark .theme-settings-header, .app-theme--dark .theme-background-row, .app-theme--dark .theme-settings-close, .app-theme--dark .theme-remove-button, .app-theme--dark .theme-upload-button, .app-theme--dark .theme-color-row input { border-color: var(--line); color: var(--ink); background: var(--paper); }
 .app-theme--dark .theme-settings-header { border-bottom-color: var(--line); }
-.app-theme--dark .quick-save-icon, .app-theme--dark .theme-settings-mark { border-color: var(--brand-primary-border); }
+.app-theme--dark .theme-settings-mark { border-color: var(--brand-primary-border); }
 .app-theme--dark .empty-state button:hover, .app-theme--dark .error-state button:hover { background: var(--brand-primary-soft); }
 .app-theme--dark .state-icon.warning { color: #f3c477; background: #393225; }
 .app-theme--dark .delete-icon { color: var(--danger); background: var(--danger-soft); }
@@ -1548,7 +1534,7 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 .app-theme--custom .new-bookmark-button.primary, .app-theme--custom .primary-button, .app-theme--custom .save-current-button { color: #fff; }
 .app-theme--custom .source-mode-switch { background: rgb(255 255 255 / var(--sidebar-theme-surface-opacity)); backdrop-filter: blur(8px); }
 .app-theme--custom .source-mode-option { color: var(--sidebar-theme-text-color); }
-.app-theme--custom .source-mode-option.is-active, .app-theme--custom .quick-save-icon { color: var(--brand-primary); background: rgb(255 255 255 / .8); }
+.app-theme--custom .source-mode-option.is-active { color: var(--brand-primary); background: rgb(255 255 255 / .8); }
 .app-theme--custom .new-bookmark-button, .app-theme--custom .secondary-button, .app-theme--custom .modal-close { color: var(--sidebar-theme-text-color); background: rgb(255 255 255 / var(--sidebar-theme-surface-opacity)); }
 .app-theme--custom .field-label input, .app-theme--custom .folder-picker-dropdown, .app-theme--custom .connection-status-card, .app-theme--custom .modal-card { color: var(--sidebar-theme-text-color); background: rgb(255 255 255 / var(--sidebar-theme-surface-opacity)); backdrop-filter: blur(14px); }
 .app-theme--custom .modal-header, .app-theme--custom .folder-picker-search { background: rgb(255 255 255 / var(--sidebar-theme-surface-opacity)); }
@@ -2086,4 +2072,13 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   color: var(--ink-secondary);
   font-size: 12px;
   line-height: 1.6;
+}
+
+/* One predictable reading size; buttons and the two main headings have clear roles. */
+.app-shell :where(*) { font-size: 12px !important; }
+.app-shell button { font-size: 11px !important; }
+.app-shell .brand-title,
+.app-shell .section-heading h1 { font-size: 14px !important; }
+.app-shell button:not(.theme-settings-button):not(.compact-toolbar-button):not(.icon-button):not(.row-action):not(.back-to-top-button):not(.theme-settings-close):not(.theme-remove-button):not(.bookmark-title):not(.theme-option) {
+  padding-block: 4px !important;
 }

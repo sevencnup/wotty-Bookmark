@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowUp, Bookmark, Check, ChevronDown, ChevronRight, Cloud, Folder, FolderOpen, Globe, Laptop, LayoutPanelTop, LoaderCircle, LogIn, PanelTopOpen, Pencil, Plus, RefreshCw, Search, Server, Settings2, Trash2, X } from 'lucide-react';
+import { ArrowUp, Bookmark, Check, ChevronDown, ChevronRight, Cloud, Folder, FolderOpen, Laptop, LayoutPanelTop, LoaderCircle, LogIn, PanelTopOpen, Pencil, Plus, RefreshCw, Search, Server, Settings2, Trash2, X } from 'lucide-react';
 import { getActiveTab, getTabsApi, openBookmark } from './lib/browser-api';
 import type { BookmarkNode } from './lib/browser-api';
 import { createBrowserBookmark, createBrowserFolder, deleteBrowserNode, getBrowserLibrary, moveBrowserNode, updateBrowserNode } from './lib/browser-library';
@@ -459,7 +459,6 @@ function App() {
       <div className="search-shell"><Search size={16} /><input aria-label={`搜索${sourceLabel}书签`} disabled={needsServerConnection} onChange={(event) => setQuery(event.target.value)} placeholder={`搜索${sourceLabel}书签或网址`} type="search" value={query} />{query && <button className="icon-button" onClick={() => setQuery('')} type="button"><X size={14} /></button>}</div>
       <section className={`quick-save-card ${!activeTab || needsServerConnection ? 'is-disabled' : ''}`}>
         <div className="quick-save-summary">
-          <div className="quick-save-icon"><Globe size={17} /></div>
           <div className="quick-save-copy">
             <div className="quick-save-heading"><span>收藏</span><strong title={activeTab?.title} {...(!activeTab ? { 'data-i18n-force': '' } : {})}>{activeTab?.title ?? '当前页面不可收藏'}</strong><span className="quick-save-host" title={activeTab ? hostname(activeTab.url) : undefined}>{activeTab ? hostname(activeTab.url) : '请在普通网页中打开侧边栏'}</span></div>
           </div>
