@@ -14,6 +14,7 @@ import { loadSiteFavicon } from './lib/site-favicon';
 import { loadSidebarLocale, loadSidebarSourceMode, loadSidebarSourceModeOverride, refreshSidebarPreferences, saveSidebarSourceModeOverride } from './lib/preferences';
 import type { SidebarLocale, SidebarSourceMode } from './lib/preferences';
 import { loadCompactToolbar, saveCompactToolbar } from './lib/layout-preferences';
+import { loadFolderExpansionSnapshots, saveFolderExpansionSnapshot, type FolderExpansionSnapshot } from './lib/folder-expansion-preferences';
 import { DEFAULT_SIDEBAR_THEME_PREFERENCES, loadSidebarThemePreferences, saveSidebarThemePreferences } from './lib/theme-preferences';
 import type { SidebarThemePreferences } from './lib/theme-preferences';
 import { getVariableVirtualWindow, getVirtualWindow } from './lib/virtual-list';
@@ -86,6 +87,12 @@ function App() {
   const [busy, setBusy] = useState(false);
   const [query, setQuery] = useState('');
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const folderExpansionSnapshotsRef = useRef<Record<SidebarSourceMode, FolderExpansionSnapshot>>({
+    browser: { knownFolderIds: [], expandedFolderIds: [] },
+    server: { knownFolderIds: [], expandedFolderIds: [] },
+  });
+  const [folderExpansionPreferencesLoaded, setFolderExpansionPreferencesLoaded] = useState(false);
+  const [folderExpansionReady, setFolderExpansionReady] = useState(false);
   const [activeTab, setActiveTab] = useState<{ title: string; url: string } | null>(null);
   const [quickSaveFolder, setQuickSaveFolder] = useState('');
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
@@ -102,6 +109,7 @@ function App() {
   const refreshSequenceRef = useRef(0);
   const knownFoldersRef = useRef<Set<string>>(new Set());
   const expandedFoldersInitializedRef = useRef(false);
+  const folderExpansionSourceRef = useRef<SidebarSourceMode | null>(null);
   const workspaceRef = useRef<HTMLElement>(null);
 
   const handleScroll = useCallback(() => {
@@ -113,6 +121,9 @@ function App() {
   }, []);
   useEffect(() => {
     void loadCompactToolbar().then(setCompactToolbar).catch(() => undefined);
+    void loadFolderExpansionSnapshots().then((snapshots) => {
+      folderExpansionSnapshotsRef.current = snapshots;
+    }).catch(() => undefined).finally(() => setFolderExpansionPreferencesLoaded(true));
     void loadSidebarThemePreferences().then((preferences) => {
       setThemePreferences(preferences);
       setThemePreferencesLoaded(true);
@@ -282,20 +293,79 @@ function App() {
   const results = useMemo(() => searchBookmarks(nodes, query), [nodes, query]);
   const currentSaved = Boolean(activeTab && tree?.bookmarks.some((item) => item.url === activeTab.url));
   useEffect(() => {
+    expandedFoldersInitializedRef.current = false;
+    folderExpansionSourceRef.current = null;
+    setFolderExpansionReady(false);
+    knownFoldersRef.current = new Set();
+  }, [sourceMode]);
+  useEffect(() => {
+    if (!tree && expandedFoldersInitializedRef.current) {
+      expandedFoldersInitializedRef.current = false;
+      folderExpansionSourceRef.current = null;
+      setFolderExpansionReady(false);
+      knownFoldersRef.current = new Set();
+    }
+  }, [tree]);
+  useEffect(() => {
+    if (!folderExpansionPreferencesLoaded || !tree || expandedFoldersInitializedRef.current) return;
+    const snapshot = folderExpansionSnapshotsRef.current[sourceMode];
+    const previouslyKnownFolders = new Set(snapshot.knownFolderIds);
+    const next = new Set(snapshot.expandedFolderIds.filter((folderId) => folders.has(folderId)));
+    for (const folderId of folders) {
+      // Keep the existing initial-open behavior for folders seen for the first time.
+      if (!previouslyKnownFolders.has(folderId)) next.add(folderId);
+    }
+    const nextSnapshot = {
+      knownFolderIds: [...new Set([...snapshot.knownFolderIds, ...folders])],
+      expandedFolderIds: [...next],
+    };
+    folderExpansionSnapshotsRef.current = { ...folderExpansionSnapshotsRef.current, [sourceMode]: nextSnapshot };
+    void saveFolderExpansionSnapshot(sourceMode, nextSnapshot).catch(() => undefined);
+    knownFoldersRef.current = new Set(folders);
+    expandedFoldersInitializedRef.current = true;
+    folderExpansionSourceRef.current = sourceMode;
+    setExpanded(next);
+    setFolderExpansionReady(true);
+  }, [folderExpansionPreferencesLoaded, folders, sourceMode, tree]);
+  useEffect(() => {
+    if (!folderExpansionReady || !expandedFoldersInitializedRef.current || folderExpansionSourceRef.current !== sourceMode) return;
     const previouslyKnownFolders = knownFoldersRef.current;
-    const isInitialFolderLoad = !expandedFoldersInitializedRef.current;
+    const nextKnownFolders = new Set(folders);
+    const newFolderIds = [...folders].filter((folderId) => !previouslyKnownFolders.has(folderId));
+    const removedFolders = [...previouslyKnownFolders].some((folderId) => !nextKnownFolders.has(folderId));
+    knownFoldersRef.current = nextKnownFolders;
+    if (!newFolderIds.length && !removedFolders) return;
     setExpanded((current) => {
-      const next = isInitialFolderLoad
-        ? new Set<string>()
-        : new Set([...current].filter((folderId) => folders.has(folderId)));
-      for (const folderId of folders) {
-        if (isInitialFolderLoad || !previouslyKnownFolders.has(folderId)) next.add(folderId);
+      const next = new Set([...current].filter((folderId) => nextKnownFolders.has(folderId)));
+      for (const folderId of newFolderIds) next.add(folderId);
+      return next;
+    });
+  }, [folderExpansionReady, folders, sourceMode]);
+  useEffect(() => {
+    if (!folderExpansionReady || !expandedFoldersInitializedRef.current || folderExpansionSourceRef.current !== sourceMode) return;
+    const snapshot = {
+      knownFolderIds: [...folders],
+      expandedFolderIds: [...expanded].filter((folderId) => folders.has(folderId)),
+    };
+    folderExpansionSnapshotsRef.current = { ...folderExpansionSnapshotsRef.current, [sourceMode]: snapshot };
+    void saveFolderExpansionSnapshot(sourceMode, snapshot).catch(() => undefined);
+  }, [expanded, folderExpansionReady, folders, sourceMode]);
+  const handleFolderToggle = useCallback((nodeId: string) => {
+    setExpanded((current) => {
+      const next = new Set(current);
+      if (next.has(nodeId)) next.delete(nodeId);
+      else next.add(nodeId);
+      if (folderExpansionSourceRef.current === sourceMode && expandedFoldersInitializedRef.current) {
+        const snapshot = {
+          knownFolderIds: [...folders],
+          expandedFolderIds: [...next].filter((folderId) => folders.has(folderId)),
+        };
+        folderExpansionSnapshotsRef.current = { ...folderExpansionSnapshotsRef.current, [sourceMode]: snapshot };
+        void saveFolderExpansionSnapshot(sourceMode, snapshot).catch(() => undefined);
       }
       return next;
     });
-    expandedFoldersInitializedRef.current = true;
-    knownFoldersRef.current = new Set(folders);
-  }, [folders]);
+  }, [folders, sourceMode]);
   useEffect(() => {
     if (quickSaveFolder && !folderOptions.some((folder) => folder.id === quickSaveFolder)) setQuickSaveFolder('');
   }, [folderOptions, quickSaveFolder]);
@@ -406,9 +476,9 @@ function App() {
         </div>
       </section>
       </div>
-      <div className="section-heading"><div><h1>我的{sourceLabel}书签</h1></div><div className="heading-actions"><button className="new-bookmark-button" disabled={needsServerConnection} onClick={() => setModal({ type: 'create', kind: 'folder' })} type="button"><Folder size={15} />文件夹</button><button className="new-bookmark-button primary" disabled={needsServerConnection} onClick={() => setModal({ type: 'create', kind: 'bookmark' })} type="button"><Plus size={15} />新增</button></div></div>
+      <div className="section-heading"><div><h1>{isBrowserSource ? '我的本地书签' : '服务器书签'}</h1></div><div className="heading-actions"><button className="new-bookmark-button" disabled={needsServerConnection} onClick={() => setModal({ type: 'create', kind: 'folder' })} type="button"><Folder size={15} />文件夹</button><button className="new-bookmark-button primary" disabled={needsServerConnection} onClick={() => setModal({ type: 'create', kind: 'bookmark' })} type="button"><Plus size={15} />新增</button></div></div>
       <div className={`library-meta ${compactToolbar ? 'is-compact-meta' : ''}`}><span>{countBookmarks(nodes)} 个书签</span><span className="meta-separator">·</span><span>{countFolders(nodes)} 个文件夹</span><span className={`sync-time ${isShowingCachedLibrary ? 'is-cached' : ''}`} title={isBrowserSource ? '当前读取浏览器原生书签' : isShowingCachedLibrary ? '正在显示上次保存的云端书签，后台正在获取最新数据' : '侧边栏每 10 秒自动同步一次，重新聚焦时会立即同步'}>{isBrowserSource ? '浏览器书签' : isShowingCachedLibrary ? `本地缓存 · ${formatSyncTime(lastSyncedAt)}` : formatSyncTime(lastSyncedAt)}</span><span className="meta-spacer" /><button className="refresh-button" disabled={needsServerConnection || loading} onClick={() => void refresh()} type="button"><RefreshCw className={loading ? 'spin' : ''} size={13} />刷新</button></div>
-      {needsServerConnection ? <Disconnected onConnect={() => setModal({ type: 'connect' })} /> : error && !tree ? <Failure message={error} onRetry={() => void refresh()} /> : loading ? <Loading sourceMode={sourceMode} /> : query.trim() ? <VirtualSearchList onDelete={(nodeId) => setModal({ type: 'delete', nodeId })} onEdit={(nodeId) => setModal({ type: 'edit', nodeId })} results={results} scrollTop={scrollTop} sourceMode={sourceMode} viewportHeight={viewportHeight} /> : visible.length ? <VirtualBookmarkList expanded={expanded} onDelete={(nodeId) => setModal({ type: 'delete', nodeId })} onEdit={(nodeId) => setModal({ type: 'edit', nodeId })} onMove={(nodeId) => setModal({ type: 'move', nodeId })} onSelect={setSelectedNodeId} onToggle={(nodeId) => setExpanded((current) => { const next = new Set(current); if (next.has(nodeId)) next.delete(nodeId); else next.add(nodeId); return next; })} scrollTop={scrollTop} selectedNodeId={selectedNodeId} viewportHeight={viewportHeight} visible={visible} /> : <Empty onCreate={() => setModal({ type: 'create', kind: 'bookmark' })} sourceMode={sourceMode} />}{error && tree && <p className="inline-error">{error}</p>}
+      {needsServerConnection ? <Disconnected onConnect={() => setModal({ type: 'connect' })} /> : error && !tree ? <Failure message={error} onRetry={() => void refresh()} /> : loading ? <Loading sourceMode={sourceMode} /> : query.trim() ? <VirtualSearchList onDelete={(nodeId) => setModal({ type: 'delete', nodeId })} onEdit={(nodeId) => setModal({ type: 'edit', nodeId })} results={results} scrollTop={scrollTop} sourceMode={sourceMode} viewportHeight={viewportHeight} /> : visible.length ? <VirtualBookmarkList expanded={expanded} onDelete={(nodeId) => setModal({ type: 'delete', nodeId })} onEdit={(nodeId) => setModal({ type: 'edit', nodeId })} onMove={(nodeId) => setModal({ type: 'move', nodeId })} onSelect={setSelectedNodeId} onToggle={handleFolderToggle} scrollTop={scrollTop} selectedNodeId={selectedNodeId} viewportHeight={viewportHeight} visible={visible} /> : <Empty onCreate={() => setModal({ type: 'create', kind: 'bookmark' })} sourceMode={sourceMode} />}{error && tree && <p className="inline-error">{error}</p>}
     </section>
     <button aria-label="回到顶部" className="back-to-top-button" onClick={() => scrollToTop(workspaceRef.current)} title="回到顶部" type="button"><ArrowUp size={16} /></button>
     <footer className="app-footer" />
