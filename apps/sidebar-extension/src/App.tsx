@@ -287,7 +287,7 @@ function App() {
       </div>
       <div className="section-heading"><div><h1>我的{sourceLabel}书签</h1></div><div className="heading-actions"><button className="new-bookmark-button" disabled={needsServerConnection} onClick={() => setModal({ type: 'create', kind: 'folder' })} type="button"><Folder size={15} />文件夹</button><button className="new-bookmark-button primary" disabled={needsServerConnection} onClick={() => setModal({ type: 'create', kind: 'bookmark' })} type="button"><Plus size={15} />新增</button></div></div>
       <div className={`library-meta ${compactToolbar ? 'is-compact-meta' : ''}`}><span>{countBookmarks(nodes)} 个书签</span><span className="meta-separator">·</span><span>{countFolders(nodes)} 个文件夹</span><span className="sync-time" title={isBrowserSource ? '当前读取浏览器原生书签' : '侧边栏每 10 秒自动同步一次，重新聚焦时会立即同步'}>{isBrowserSource ? '浏览器书签' : formatSyncTime(lastSyncedAt)}</span><span className="meta-spacer" /><button className="refresh-button" disabled={needsServerConnection || loading} onClick={() => void refresh()} type="button"><RefreshCw className={loading ? 'spin' : ''} size={13} />刷新</button></div>
-      {needsServerConnection ? <Disconnected onConnect={() => setModal({ type: 'connect' })} /> : error && !tree ? <Failure message={error} onRetry={() => void refresh()} /> : loading ? <Loading sourceMode={sourceMode} /> : query.trim() ? <VirtualSearchList onDelete={(nodeId) => setModal({ type: 'delete', nodeId })} onEdit={(nodeId) => setModal({ type: 'edit', nodeId })} onMove={(nodeId) => setModal({ type: 'move', nodeId })} results={results} scrollTop={scrollTop} sourceMode={sourceMode} viewportHeight={viewportHeight} /> : visible.length ? <VirtualBookmarkList expanded={expanded} onDelete={(nodeId) => setModal({ type: 'delete', nodeId })} onEdit={(nodeId) => setModal({ type: 'edit', nodeId })} onMove={(nodeId) => setModal({ type: 'move', nodeId })} onSelect={setSelectedNodeId} onToggle={(nodeId) => setExpanded((current) => { const next = new Set(current); if (next.has(nodeId)) next.delete(nodeId); else next.add(nodeId); return next; })} scrollTop={scrollTop} selectedNodeId={selectedNodeId} viewportHeight={viewportHeight} visible={visible} /> : <Empty onCreate={() => setModal({ type: 'create', kind: 'bookmark' })} sourceMode={sourceMode} />}{error && tree && <p className="inline-error">{error}</p>}
+      {needsServerConnection ? <Disconnected onConnect={() => setModal({ type: 'connect' })} /> : error && !tree ? <Failure message={error} onRetry={() => void refresh()} /> : loading ? <Loading sourceMode={sourceMode} /> : query.trim() ? <VirtualSearchList onDelete={(nodeId) => setModal({ type: 'delete', nodeId })} onEdit={(nodeId) => setModal({ type: 'edit', nodeId })} results={results} scrollTop={scrollTop} sourceMode={sourceMode} viewportHeight={viewportHeight} /> : visible.length ? <VirtualBookmarkList expanded={expanded} onDelete={(nodeId) => setModal({ type: 'delete', nodeId })} onEdit={(nodeId) => setModal({ type: 'edit', nodeId })} onMove={(nodeId) => setModal({ type: 'move', nodeId })} onSelect={setSelectedNodeId} onToggle={(nodeId) => setExpanded((current) => { const next = new Set(current); if (next.has(nodeId)) next.delete(nodeId); else next.add(nodeId); return next; })} scrollTop={scrollTop} selectedNodeId={selectedNodeId} viewportHeight={viewportHeight} visible={visible} /> : <Empty onCreate={() => setModal({ type: 'create', kind: 'bookmark' })} sourceMode={sourceMode} />}{error && tree && <p className="inline-error">{error}</p>}
     </section>
     <button aria-label="回到顶部" className="back-to-top-button" onClick={() => scrollToTop(workspaceRef.current)} title="回到顶部" type="button"><ArrowUp size={16} /></button>
     <footer className="app-footer" />
@@ -326,7 +326,7 @@ function VirtualBookmarkList({ visible, expanded, selectedNodeId, scrollTop, vie
   );
 }
 
-function VirtualSearchList({ results, scrollTop, viewportHeight, onEdit, onMove, onDelete, sourceMode }: { results: ReturnType<typeof searchBookmarks>; scrollTop: number; viewportHeight: number; onEdit: (id: string) => void; onMove: (id: string) => void; onDelete: (id: string) => void; sourceMode: SidebarSourceMode }) {
+function VirtualSearchList({ results, scrollTop, viewportHeight, onEdit, onDelete, sourceMode }: { results: ReturnType<typeof searchBookmarks>; scrollTop: number; viewportHeight: number; onEdit: (id: string) => void; onDelete: (id: string) => void; sourceMode: SidebarSourceMode }) {
   if (!results.length) {
     return <div className="no-results"><strong>没有匹配的{sourceMode === 'browser' ? '浏览器' : '服务器'}书签</strong><span>换一个关键词试试。</span></div>;
   }
@@ -348,7 +348,6 @@ function VirtualSearchList({ results, scrollTop, viewportHeight, onEdit, onMove,
           </button>
           <div className="result-actions">
             <button className="row-action" onClick={() => onEdit(node.id)} type="button"><Pencil size={14} /></button>
-            <button className="row-action" onClick={() => onMove(node.id)} type="button">↗</button>
             <button className="row-action danger-action" onClick={() => onDelete(node.id)} type="button"><Trash2 size={14} /></button>
           </div>
         </div>
@@ -397,13 +396,11 @@ function NodeRow({ node, expanded, selected, onSelect, onToggle, onOpen, onEdit,
             {bookmarkCount}
           </span>
         )}
-        <div className="row-actions">
+        <div className={`row-actions ${folder ? '' : 'bookmark-row-actions'}`}>
           <button aria-label="编辑" className="row-action" onClick={onEdit} type="button">
             <Pencil size={13} />
           </button>
-          <button aria-label="移动" className="row-action" onClick={onMove} type="button">
-            ↗
-          </button>
+          {folder && <button aria-label="移动" className="row-action" onClick={onMove} type="button">↗</button>}
           <button aria-label="删除" className="row-action danger-action" onClick={onDelete} type="button">
             <Trash2 size={13} />
           </button>
