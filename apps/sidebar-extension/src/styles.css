@@ -611,28 +611,6 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   line-height: 1.4;
 }
 
-/* ── 服务器书签库边界 ─────────────────────────────────────── */
-.server-library-banner {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  margin: 10px 0;
-  padding: 8px 10px;
-  border: 1px solid #bfdbfe;
-  border-radius: var(--radius-sm);
-  color: #1e40af;
-  background: #eff6ff;
-  font-size: 11.5px;
-  line-height: 1.45;
-}
-
-.server-library-banner strong { color: #1e3a8a; }
-.server-library-banner.is-browser-source {
-  border-color: #bbf7d0;
-  color: #166534;
-  background: #f0fdf4;
-}
-.server-library-banner.is-browser-source strong { color: #14532d; }
 .heading-actions { display: flex; align-items: center; gap: 6px; }
 .new-bookmark-button.primary { border-color: var(--brand-primary); color: #fff; background: var(--brand-primary); }
 .new-bookmark-button.primary:hover { color: #fff; background: var(--brand-primary-hover); }
