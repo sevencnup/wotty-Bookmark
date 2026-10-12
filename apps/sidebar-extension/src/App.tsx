@@ -443,7 +443,6 @@ function NodeRow({ node, expanded, selected, onSelect, onToggle, onOpen, onEdit,
           <button aria-label="编辑" className="row-action" onClick={onEdit} type="button">
             <Pencil size={13} />
           </button>
-          {folder && <button aria-label="移动" className="row-action" onClick={onMove} type="button">↗</button>}
           <button aria-label="删除" className="row-action danger-action" onClick={onDelete} type="button">
             <Trash2 size={13} />
           </button>

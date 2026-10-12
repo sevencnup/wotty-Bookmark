@@ -23,7 +23,7 @@ export default defineConfig({
     name: 'wotty bookmark sidebar',
     short_name: 'Bookmarks',
     description: 'A private sidebar for your self-hosted bookmark library.',
-    version: '0.1.50',
+    version: '0.1.51',
     permissions: ['tabs', 'storage', 'bookmarks', 'scripting'],
     host_permissions: ['http://*/*', 'https://*/*'],
     web_accessible_resources: [
