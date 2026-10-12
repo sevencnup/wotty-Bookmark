@@ -7,6 +7,7 @@ export type SidebarSourceMode = 'browser' | 'server';
 const SIDEBAR_LOCALE_KEY = 'bookmark-vault.sidebar-locale.v1';
 const DEFAULT_LOCALE: SidebarLocale = 'zh-CN';
 const SIDEBAR_SOURCE_MODE_KEY = 'bookmark-vault.sidebar-source-mode.v1';
+const SIDEBAR_SOURCE_MODE_OVERRIDE_KEY = 'bookmark-vault.sidebar-source-mode-override.v1';
 const DEFAULT_SOURCE_MODE: SidebarSourceMode = 'server';
 
 function isSidebarLocale(value: unknown): value is SidebarLocale {
@@ -31,6 +32,16 @@ export async function saveSidebarLocale(locale: SidebarLocale): Promise<void> {
 export async function loadSidebarSourceMode(): Promise<SidebarSourceMode> {
   const values = await browser.storage.local.get(SIDEBAR_SOURCE_MODE_KEY);
   return isSidebarSourceMode(values[SIDEBAR_SOURCE_MODE_KEY]) ? values[SIDEBAR_SOURCE_MODE_KEY] : DEFAULT_SOURCE_MODE;
+}
+
+export async function loadSidebarSourceModeOverride(): Promise<SidebarSourceMode | null> {
+  const values = await browser.storage.local.get(SIDEBAR_SOURCE_MODE_OVERRIDE_KEY);
+  const value = values[SIDEBAR_SOURCE_MODE_OVERRIDE_KEY];
+  return isSidebarSourceMode(value) ? value : null;
+}
+
+export async function saveSidebarSourceModeOverride(sourceMode: SidebarSourceMode): Promise<void> {
+  await browser.storage.local.set({ [SIDEBAR_SOURCE_MODE_OVERRIDE_KEY]: sourceMode });
 }
 
 async function saveSidebarSourceMode(sourceMode: SidebarSourceMode): Promise<void> {

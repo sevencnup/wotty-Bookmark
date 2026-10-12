@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowUp, Bookmark, Check, ChevronDown, ChevronRight, Folder, FolderOpen, Globe, LayoutPanelTop, LoaderCircle, LogIn, PanelTopOpen, Pencil, Plus, RefreshCw, Search, Server, Trash2, X } from 'lucide-react';
+import { ArrowUp, Bookmark, Check, ChevronDown, ChevronRight, Cloud, Folder, FolderOpen, Globe, Laptop, LayoutPanelTop, LoaderCircle, LogIn, PanelTopOpen, Pencil, Plus, RefreshCw, Search, Server, Trash2, X } from 'lucide-react';
 import { getActiveTab, getTabsApi, openBookmark } from './lib/browser-api';
 import type { BookmarkNode } from './lib/browser-api';
 import { createBrowserBookmark, createBrowserFolder, deleteBrowserNode, getBrowserLibrary, moveBrowserNode, updateBrowserNode } from './lib/browser-library';
@@ -10,7 +10,7 @@ import type { BackendConnection } from './lib/backend';
 import { createLibraryBookmark, createLibraryFolder, deleteLibraryNode, getLibrary, moveLibraryNode, updateLibraryNode } from './lib/library';
 import type { LibraryFolder, LibraryTree } from './lib/library';
 import { loadSiteFavicon } from './lib/site-favicon';
-import { loadSidebarLocale, loadSidebarSourceMode, refreshSidebarPreferences } from './lib/preferences';
+import { loadSidebarLocale, loadSidebarSourceMode, loadSidebarSourceModeOverride, refreshSidebarPreferences, saveSidebarSourceModeOverride } from './lib/preferences';
 import type { SidebarLocale, SidebarSourceMode } from './lib/preferences';
 import { loadCompactToolbar, saveCompactToolbar } from './lib/layout-preferences';
 import { getVariableVirtualWindow, getVirtualWindow } from './lib/virtual-list';
@@ -138,22 +138,24 @@ function App() {
       // Restore cached state and start the first library request before the
       // account preference check returns. In the normal case both sources
       // match, so the library becomes usable without waiting on a second API call.
-      const [localLocale, localSourceMode, value] = await Promise.all([
+      const [localLocale, cachedSourceMode, sourceModeOverride, value] = await Promise.all([
         loadSidebarLocale().catch(() => 'zh-CN' as SidebarLocale),
         loadSidebarSourceMode().catch(() => 'server' as SidebarSourceMode),
+        loadSidebarSourceModeOverride().catch(() => null),
         loadBackendConnection(),
       ]);
+      const localSourceMode = sourceModeOverride ?? cachedSourceMode;
       setLocale(localLocale);
       setSourceMode(localSourceMode);
       setConnection(value);
       const initialLoad = refresh(value, {}, localSourceMode);
       let activeSourceMode = localSourceMode;
-      if (value) {
+      if (value && localSourceMode === 'server') {
         try {
           const preferences = await refreshSidebarPreferences(value);
           setLocale(preferences.language);
-          setSourceMode(preferences.sourceMode);
-          activeSourceMode = preferences.sourceMode;
+          activeSourceMode = sourceModeOverride ?? preferences.sourceMode;
+          setSourceMode(activeSourceMode);
         } catch {
           // Keep the cached preference when the API is temporarily unavailable.
         }
@@ -183,13 +185,15 @@ function App() {
     };
   }, [connection, refresh, sourceMode]);
   useEffect(() => {
-    if (!connection) return;
+    if (!connection || sourceMode !== 'server') return;
     const syncLanguageIfVisible = () => {
       if (document.visibilityState === 'hidden') return;
       void refreshSidebarPreferences(connection).then(async (preferences) => {
         setLocale(preferences.language);
-        setSourceMode(preferences.sourceMode);
-        await refresh(connection, { silent: true }, preferences.sourceMode);
+        const override = await loadSidebarSourceModeOverride().catch(() => null);
+        const preferredMode = override ?? preferences.sourceMode;
+        setSourceMode(preferredMode);
+        await refresh(connection, { silent: true }, preferredMode);
       }).catch(() => undefined);
     };
     const handleVisibilityChange = () => {
@@ -203,7 +207,7 @@ function App() {
       window.removeEventListener('focus', syncLanguageIfVisible);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [connection, refresh]);
+  }, [connection, refresh, sourceMode]);
 
   const nodes = useMemo(() => tree ? toNodes(tree) : [], [tree]);
   const folders = useMemo(() => collectFolders(nodes), [nodes]);
@@ -271,12 +275,35 @@ function App() {
     });
   };
 
+  const selectSourceMode = async (nextMode: SidebarSourceMode) => {
+    if (sourceMode === nextMode) {
+      if (nextMode === 'server') setModal({ type: 'connect' });
+      return;
+    }
+    try {
+      await saveSidebarSourceModeOverride(nextMode);
+      setError(null);
+      setQuery('');
+      setQuickSaveFolder('');
+      setSelectedNodeId(null);
+      setTree(null);
+      setExpanded(new Set());
+      knownFoldersRef.current = new Set();
+      expandedFoldersInitializedRef.current = false;
+      setSourceMode(nextMode);
+      if (nextMode === 'server' && !connection) setModal({ type: 'connect' });
+      await refresh(connection, {}, nextMode);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : '保存书签来源失败');
+    }
+  };
+
   const isBrowserSource = sourceMode === 'browser';
   const needsServerConnection = !isBrowserSource && !connection;
   const sourceLabel = isBrowserSource ? '浏览器' : '服务器';
 
   return <SidebarUiLocalization locale={locale}><main className={`app-shell self-hosted-library ${compactToolbar ? 'is-compact-toolbar' : ''}`}>
-    <header className="topbar"><div className="brand-lockup"><div className="brand-mark"><img alt="WOTTY BOOKMARK" className="brand-logo-img" src="/logo.webp" /></div><div><div className="brand-title">书签库</div><div className="brand-subtitle">wotty · server library</div></div></div><div className="topbar-actions"><button aria-label={compactToolbar ? '展开工具区' : '收起工具区'} aria-pressed={compactToolbar} className="compact-toolbar-button" onClick={toggleCompactToolbar} title={compactToolbar ? '展开工具区' : '收起工具区'} type="button">{compactToolbar ? <PanelTopOpen size={15} /> : <LayoutPanelTop size={15} />}</button><button aria-label={isBrowserSource ? '浏览器模式' : connection ? '服务器已连接' : '连接服务器'} className={`sync-status ${isBrowserSource || connection ? 'is-connected' : 'is-disconnected'}`} disabled={isBrowserSource} onClick={() => setModal({ type: 'connect' })} type="button"><span className="status-dot" />{isBrowserSource ? '浏览器模式' : connection ? '服务器已连接' : '连接服务器'}{isBrowserSource ? <Globe size={13} /> : <Server size={13} />}</button></div></header>
+    <header className="topbar"><div className="brand-lockup"><div className="brand-mark"><img alt="WOTTY BOOKMARK" className="brand-logo-img" src="/logo.webp" /></div><div><div className="brand-title">书签库</div><div className="brand-subtitle">wotty · bookmark library</div></div></div><div className="topbar-actions"><div aria-label="书签来源" className="source-mode-switch" role="group"><button aria-pressed={isBrowserSource} className={`source-mode-option ${isBrowserSource ? 'is-active' : ''}`} disabled={loading || busy} onClick={() => void selectSourceMode('browser')} title="切换到本地书签" type="button"><Laptop size={13} /><span>本地</span></button><button aria-pressed={!isBrowserSource} className={`source-mode-option ${!isBrowserSource ? 'is-active' : ''} ${connection ? 'has-connection' : ''}`} disabled={loading || busy} onClick={() => void selectSourceMode('server')} title={connection ? '云端书签设置' : '切换到云端书签'} type="button"><Cloud size={13} /><span>云端</span>{connection && <i aria-label="已连接" className="source-mode-status-dot" />}</button></div><button aria-label={compactToolbar ? '展开工具区' : '收起工具区'} aria-pressed={compactToolbar} className="compact-toolbar-button" onClick={toggleCompactToolbar} title={compactToolbar ? '展开工具区' : '收起工具区'} type="button">{compactToolbar ? <PanelTopOpen size={15} /> : <LayoutPanelTop size={15} />}</button></div></header>
     <section className="workspace" ref={workspaceRef}>
       <div className="auxiliary-toolbar">
       <div className="search-shell"><Search size={16} /><input aria-label={`搜索${sourceLabel}书签`} disabled={needsServerConnection} onChange={(event) => setQuery(event.target.value)} placeholder={`搜索${sourceLabel}书签或网址`} type="search" value={query} />{query && <button className="icon-button" onClick={() => setQuery('')} type="button"><X size={14} /></button>}</div>
@@ -307,7 +334,7 @@ function App() {
     </section>
     <button aria-label="回到顶部" className="back-to-top-button" onClick={() => scrollToTop(workspaceRef.current)} title="回到顶部" type="button"><ArrowUp size={16} /></button>
     <footer className="app-footer" />
-    {modal?.type === 'connect' && <ConnectionModal busy={busy} connection={connection} onClose={() => setModal(null)} onConnect={(serverUrl, code) => { setBusy(true); setError(null); void connectToBackend(serverUrl, code).then(async (next) => { setConnection(next); let nextMode = sourceMode; try { const preferences = await refreshSidebarPreferences(next); setLocale(preferences.language); setSourceMode(preferences.sourceMode); nextMode = preferences.sourceMode; } catch { /* 使用当前缓存模式，连接仍可继续 */ } await refresh(next, {}, nextMode); setModal(null); }).catch((reason: unknown) => setError(reason instanceof Error ? reason.message : '连接失败')).finally(() => setBusy(false)); }} onDisconnect={() => { setBusy(true); void clearBackendConnection().then(() => { setConnection(null); setTree(null); setModal(null); }).finally(() => setBusy(false)); }} />}
+    {modal?.type === 'connect' && <ConnectionModal busy={busy} connection={connection} onClose={() => setModal(null)} onConnect={(serverUrl, code) => { setBusy(true); setError(null); void connectToBackend(serverUrl, code).then(async (next) => { setConnection(next); let nextMode = sourceMode; try { const preferences = await refreshSidebarPreferences(next); setLocale(preferences.language); const override = await loadSidebarSourceModeOverride(); nextMode = override ?? preferences.sourceMode; setSourceMode(nextMode); } catch { /* 使用当前缓存模式，连接仍可继续 */ } await refresh(next, {}, nextMode); setModal(null); }).catch((reason: unknown) => setError(reason instanceof Error ? reason.message : '连接失败')).finally(() => setBusy(false)); }} onDisconnect={() => { setBusy(true); void clearBackendConnection().then(() => { setConnection(null); setTree(null); setModal(null); }).finally(() => setBusy(false)); }} />}
     {modal?.type === 'create' && <EditorModal busy={busy} initial={{ kind: modal.kind, parentId: modal.parentId ?? '' }} nodes={nodes} onClose={() => setModal(null)} onSubmit={submitEditor} sourceMode={sourceMode} />}
     {modal?.type === 'edit' && <EditorModal busy={busy} node={findNode(nodes, modal.nodeId)} nodes={nodes} onClose={() => setModal(null)} onSubmit={submitEditor} sourceMode={sourceMode} />}
     {modal?.type === 'move' && <MoveModal busy={busy} node={findNode(nodes, modal.nodeId)} nodes={nodes} onClose={() => setModal(null)} onSubmit={(parentId) => perform((active) => moveLibraryNode(active, modal.nodeId, parentId || null), () => moveBrowserNode(modal.nodeId, parentId || null))} sourceMode={sourceMode} />}

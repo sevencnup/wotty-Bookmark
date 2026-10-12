@@ -4,6 +4,12 @@ import type { SidebarLocale } from './lib/preferences';
 
 const englishText: Record<string, string> = {
   '书签库': 'Bookmark library',
+  '本地': 'Local',
+  '云端': 'Cloud',
+  '切换到本地书签': 'Switch to local bookmarks',
+  '切换到云端书签': 'Switch to cloud bookmarks',
+  '云端书签设置': 'Cloud bookmark settings',
+  '已连接': 'Connected',
   '服务器已连接': 'Server connected',
   '连接服务器': 'Connect server',
   '收起工具区': 'Collapse tools',
