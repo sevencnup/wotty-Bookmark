@@ -3,6 +3,7 @@ import {
   ArchiveRestore,
   Bookmark,
   CalendarClock,
+  Check,
   ChevronDown,
   ChevronRight,
   CircleHelp,
@@ -11,17 +12,22 @@ import {
   ExternalLink,
   FileArchive,
   Fingerprint,
+  ImageUp,
   Laptop,
   LoaderCircle,
+  Moon,
+  Palette,
   RefreshCw,
   ShieldCheck,
+  Sun,
   Trash2,
   Upload,
+  X,
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import * as api from './api'
 import { translate, type Locale } from './i18n'
-import { confirmDangerousAction, savePreferences, shouldConfirmDangerousActions, type Preferences } from './preferences'
+import { confirmDangerousAction, optimizeAdminThemeBackground, savePreferences, shouldConfirmDangerousActions, type AdminTheme, type Preferences } from './preferences'
 import { browserBookmarksHtmlToXbel } from './browser-bookmarks'
 
 type Navigate = (section: string) => void
@@ -132,8 +138,34 @@ export function DevicesPage({ token, navigate, onSessionRevoked }: PageProps & {
 
 export function PreferencesPage({ preferences, onChange }: { preferences: Preferences; onChange: (next: Preferences) => void }) {
   const t = (key: Parameters<typeof translate>[1]) => translate(preferences.language, key)
+  const themeText = {
+    heading: t('themeBackground'), local: t('themeSavedLocally'), light: t('themeLight'), lightDescription: t('themeLightDescription'),
+    dark: t('themeDark'), darkDescription: t('themeDarkDescription'), warm: t('themeWarm'), warmDescription: t('themeWarmDescription'),
+    custom: t('themeCustom'), customDescription: preferences.themeBackgroundImage ? t('themeBackgroundSet') : t('themeCustomDescription'),
+    background: t('themeBackgroundImage'), uploadHint: t('themeUploadHint'), processing: t('themeProcessing'), replace: t('themeReplace'),
+    upload: t('themeUpload'), remove: t('themeRemove'), transparency: t('themeTransparency'), textColor: t('themeTextColor'),
+  }
+  const themeInputRef = useRef<HTMLInputElement>(null)
+  const [themeProcessing, setThemeProcessing] = useState(false)
+  const [themeError, setThemeError] = useState('')
   function update(patch: Partial<Preferences>) { const next = { ...preferences, ...patch }; onChange(next); savePreferences(next) }
-  return <div className="feature-page"><section className="panel settings-panel"><PreferenceSelect label={t('language')} description={t('languageDescription')} value={preferences.language} onChange={(value) => update({ language: value as Locale })} options={[['zh-CN', t('languageChinese')], ['en', t('languageEnglish')]]} /><PreferenceSelect label={t('interfaceDensity')} description={t('interfaceDensityDescription')} value={preferences.density} onChange={(value) => update({ density: value as Preferences['density'] })} options={[['comfortable', t('densityComfortable')], ['compact', t('densityCompact')]]} /><PreferenceSelect label={t('defaultPage')} description={t('defaultPageDescription')} value={preferences.defaultSection} onChange={(value) => update({ defaultSection: value })} options={[['overview', t('navOverview')], ['storage', t('navStorage')], ['categories', t('navCategories')], ['devices', t('navDevices')], ['import-export', t('navImportExport')], ['help', t('navHelp')]]} /><PreferenceToggle label={t('reduceMotion')} description={t('reduceMotionDescription')} checked={preferences.reduceMotion} onChange={(checked) => update({ reduceMotion: checked })} /><PreferenceToggle label={t('confirmDangerousActions')} description={t('confirmDangerousActionsDescription')} checked={preferences.confirmDangerousActions} onChange={(checked) => update({ confirmDangerousActions: checked })} /></section><section className="panel security-notice"><span><ShieldCheck size={14} /></span><p>{t('preferencesSecurityNote')}</p></section></div>
+  const themes: { id: AdminTheme; label: string; description: string; icon: typeof Sun }[] = [
+    { id: 'light', label: themeText.light, description: themeText.lightDescription, icon: Sun },
+    { id: 'dark', label: themeText.dark, description: themeText.darkDescription, icon: Moon },
+    { id: 'warm', label: themeText.warm, description: themeText.warmDescription, icon: Palette },
+    { id: 'custom', label: themeText.custom, description: themeText.customDescription, icon: ImageUp },
+  ]
+  async function handleThemeImage(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.currentTarget.files?.[0]
+    event.currentTarget.value = ''
+    if (!file) return
+    setThemeProcessing(true)
+    setThemeError('')
+    try { update({ theme: 'custom', themeBackgroundImage: await optimizeAdminThemeBackground(file) }) }
+    catch (reason) { setThemeError(reason instanceof Error ? reason.message : '背景图片处理失败') }
+    finally { setThemeProcessing(false) }
+  }
+  return <div className="feature-page"><section className="panel settings-panel"><div className="admin-theme-settings"><div className="admin-theme-heading"><span><Palette size={16} /></span><div><strong>{themeText.heading}</strong><small>{themeText.local}</small></div></div><div aria-label={themeText.heading} className="admin-theme-options" role="radiogroup">{themes.map(({ id, label, description, icon: Icon }) => <button aria-checked={preferences.theme === id} className={`admin-theme-option admin-theme-option--${id} ${preferences.theme === id ? 'is-active' : ''}`} key={id} onClick={() => { setThemeError(''); if (id === 'custom' && !preferences.themeBackgroundImage) themeInputRef.current?.click(); else update({ theme: id }) }} role="radio" type="button"><span className="admin-theme-preview" style={id === 'custom' && preferences.themeBackgroundImage ? { backgroundImage: `url("${preferences.themeBackgroundImage}")` } : undefined}><Icon size={16} />{preferences.theme === id && <i><Check size={11} /></i>}</span><strong>{label}</strong><small>{description}</small></button>)}</div><div className="admin-theme-background-row"><span><strong>{themeText.background}</strong><small>{themeText.uploadHint}</small></span><button className="toolbar-button compact" disabled={themeProcessing} onClick={() => themeInputRef.current?.click()} type="button"><ImageUp size={14} />{themeProcessing ? themeText.processing : preferences.themeBackgroundImage ? themeText.replace : themeText.upload}</button>{preferences.themeBackgroundImage && <button aria-label={themeText.remove} className="admin-theme-remove" onClick={() => update({ theme: 'light', themeBackgroundImage: null })} title={themeText.remove} type="button"><X size={15} /></button>}<input accept="image/*" hidden onChange={(event) => void handleThemeImage(event)} ref={themeInputRef} type="file" /></div>{preferences.themeBackgroundImage && <><label className="admin-theme-slider"><span>{themeText.transparency}</span><output>{preferences.themeSurfaceTransparency}%</output><input max="100" min="0" onChange={(event) => update({ theme: 'custom', themeSurfaceTransparency: Number(event.currentTarget.value) })} type="range" value={preferences.themeSurfaceTransparency} /></label><label className="admin-theme-color"><span>{themeText.textColor}</span><input aria-label={themeText.textColor} onChange={(event) => update({ theme: 'custom', themeTextColor: event.currentTarget.value.toUpperCase() })} type="color" value={preferences.themeTextColor} /><output>{preferences.themeTextColor}</output></label></>}{themeError && <p className="admin-theme-error" role="alert">{themeError}</p>}</div><PreferenceSelect label={t('language')} description={t('languageDescription')} value={preferences.language} onChange={(value) => update({ language: value as Locale })} options={[['zh-CN', t('languageChinese')], ['en', t('languageEnglish')]]} /><PreferenceSelect label={t('interfaceDensity')} description={t('interfaceDensityDescription')} value={preferences.density} onChange={(value) => update({ density: value as Preferences['density'] })} options={[['comfortable', t('densityComfortable')], ['compact', t('densityCompact')]]} /><PreferenceSelect label={t('defaultPage')} description={t('defaultPageDescription')} value={preferences.defaultSection} onChange={(value) => update({ defaultSection: value })} options={[['overview', t('navOverview')], ['storage', t('navStorage')], ['categories', t('navCategories')], ['devices', t('navDevices')], ['import-export', t('navImportExport')], ['help', t('navHelp')]]} /><PreferenceToggle label={t('reduceMotion')} description={t('reduceMotionDescription')} checked={preferences.reduceMotion} onChange={(checked) => update({ reduceMotion: checked })} /><PreferenceToggle label={t('confirmDangerousActions')} description={t('confirmDangerousActionsDescription')} checked={preferences.confirmDangerousActions} onChange={(checked) => update({ confirmDangerousActions: checked })} /></section><section className="panel security-notice"><span><ShieldCheck size={14} /></span><p>{t('preferencesSecurityNote')}</p></section></div>
 }
 
 export function BackupPage({ token }: { token: string }) {

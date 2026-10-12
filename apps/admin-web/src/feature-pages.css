@@ -723,3 +723,517 @@ html.reduce-motion *, html.reduce-motion *::before, html.reduce-motion *::after 
     height: auto;
   }
 }
+
+/* Themes shared with the browser sidebar. */
+:root[data-admin-theme='dark'] {
+  color-scheme: dark;
+  --ink: #e3e7ec;
+  --ink-secondary: #c1c9d3;
+  --muted: #a6afba;
+  --soft-muted: #929daa;
+  --faint: #596270;
+  --line: #3b4350;
+  --soft-line: #333944;
+  --canvas: #16191e;
+  --paper: #232831;
+  --paper-elevated: #292f39;
+  --surface-subtle: #191d23;
+  --primary: #8db6ff;
+  --primary-hover: #b0cdff;
+  --primary-active: #c7dbff;
+  --primary-soft: #283546;
+  --primary-border: #415a7c;
+  --primary-glow: rgba(141, 182, 255, .18);
+  --success: #6fd2a8;
+  --success-soft: #20352f;
+  --success-border: #356552;
+  --warning: #f2bd6c;
+  --warning-soft: #393225;
+  --warning-border: #665234;
+  --danger: #ff9c94;
+  --danger-hover: #ffc0ba;
+  --danger-soft: #392829;
+  --danger-border: #694642;
+  --purple: #c4a7ff;
+  --purple-soft: #332b43;
+  --purple-border: #554572;
+  --shadow-xs: 0 1px 2px #0004;
+  --shadow-sm: 0 2px 5px #0005;
+  --shadow-md: 0 8px 22px #0006;
+  --shadow-lg: 0 14px 32px #0007;
+  --shadow-xl: 0 24px 56px #0008;
+}
+
+:root[data-admin-theme='warm'] {
+  color-scheme: light;
+  --ink: #352c24;
+  --ink-secondary: #55483a;
+  --muted: #756858;
+  --soft-muted: #827361;
+  --faint: #d8cbbb;
+  --line: #e8ddcf;
+  --soft-line: #eee3d7;
+  --canvas: #f3ebdf;
+  --paper: #fcf7ef;
+  --paper-elevated: #fffaf2;
+  --surface-subtle: #f5ede4;
+  --primary: #9a6a36;
+  --primary-hover: #80552b;
+  --primary-active: #68431f;
+  --primary-soft: #f4eadd;
+  --primary-border: #dfc7a9;
+  --primary-glow: rgba(154, 106, 54, .16);
+  --success: #387a5b;
+  --success-soft: #e7f2e9;
+  --success-border: #b6d4bd;
+  --warning: #a56a24;
+  --warning-soft: #f8eedc;
+  --warning-border: #e5c999;
+  --danger: #b44c43;
+  --danger-hover: #963d36;
+  --danger-soft: #f8e9e4;
+  --danger-border: #e8c4b9;
+  --purple: #755a9b;
+  --purple-soft: #f0eaf6;
+  --purple-border: #d4c5e3;
+}
+
+html[data-admin-theme='dark'] body,
+html[data-admin-theme='warm'] body {
+  background: var(--canvas);
+  color: var(--ink);
+}
+
+html[data-admin-theme='dark'] .app-shell,
+html[data-admin-theme='warm'] .app-shell {
+  background: var(--canvas);
+}
+
+html[data-admin-theme='dark'] .sidebar,
+html[data-admin-theme='dark'] .workspace-header,
+html[data-admin-theme='dark'] .panel,
+html[data-admin-theme='dark'] .stat-card,
+html[data-admin-theme='dark'] .bookmark-table-shell,
+html[data-admin-theme='dark'] .category-bookmark-list,
+html[data-admin-theme='dark'] .category-tree-panel,
+html[data-admin-theme='dark'] .category-bookmarks-panel,
+html[data-admin-theme='dark'] .organization-root-card,
+html[data-admin-theme='dark'] .organization-folder-row,
+html[data-admin-theme='dark'] .device-card,
+html[data-admin-theme='dark'] .faq-item,
+html[data-admin-theme='dark'] .help-topics,
+html[data-admin-theme='dark'] .admin-modal,
+html[data-admin-theme='dark'] .auth-card {
+  border-color: var(--line) !important;
+  color: var(--ink);
+  background-color: var(--paper) !important;
+}
+
+html[data-admin-theme='dark'] .nav-group-label,
+html[data-admin-theme='dark'] .workspace-header p,
+html[data-admin-theme='dark'] .workspace-service-status small,
+html[data-admin-theme='dark'] .nav-item,
+html[data-admin-theme='dark'] .muted,
+html[data-admin-theme='dark'] .workspace-note { color: var(--muted); }
+html[data-admin-theme='dark'] .nav-item:hover { border-color: var(--line); color: var(--ink); background: #303741; }
+html[data-admin-theme='dark'] .nav-item.active { border-color: var(--primary-border); color: var(--primary); background: var(--primary-soft); box-shadow: none; }
+html[data-admin-theme='dark'] .sidebar-footer,
+html[data-admin-theme='dark'] .sidebar { border-color: var(--line); }
+html[data-admin-theme='dark'] .nav-item,
+html[data-admin-theme='dark'] .workspace-header h1,
+html[data-admin-theme='dark'] .panel h3,
+html[data-admin-theme='dark'] .panel h4,
+html[data-admin-theme='dark'] .preference-row strong,
+html[data-admin-theme='dark'] .stat-value strong,
+html[data-admin-theme='dark'] .bookmark-name strong,
+html[data-admin-theme='dark'] .category-bookmark-info strong,
+html[data-admin-theme='dark'] .faq-item strong,
+html[data-admin-theme='dark'] .device-title strong,
+html[data-admin-theme='dark'] .auth-card h1 { color: var(--ink); }
+html[data-admin-theme='dark'] .hero-card { border-color: var(--line); background: linear-gradient(135deg, #283546, #232831) !important; }
+html[data-admin-theme='dark'] .hero-card h2,
+html[data-admin-theme='dark'] .hero-card p { color: var(--ink); }
+html[data-admin-theme='dark'] .hero-symbol,
+html[data-admin-theme='dark'] .stat-icon,
+html[data-admin-theme='dark'] .steps li > .step-badge,
+html[data-admin-theme='dark'] .steps li > span { border-color: var(--line); color: var(--primary); background: var(--surface-subtle); }
+html[data-admin-theme='dark'] .bookmark-table-head,
+html[data-admin-theme='dark'] .category-list-header,
+html[data-admin-theme='dark'] .organization-tree { border-color: var(--line); color: var(--muted); background-color: var(--surface-subtle) !important; }
+html[data-admin-theme='dark'] .bookmark-row,
+html[data-admin-theme='dark'] .category-bookmark-row { border-color: var(--soft-line); color: var(--ink-secondary); }
+html[data-admin-theme='dark'] .bookmark-row:hover,
+html[data-admin-theme='dark'] .category-bookmark-row:hover,
+html[data-admin-theme='dark'] .category-bookmark-row.selected,
+html[data-admin-theme='dark'] .category-root-row:hover,
+html[data-admin-theme='dark'] .organization-folder-row:hover { background-color: #2d333d !important; }
+html[data-admin-theme='dark'] .bookmark-row.selected,
+html[data-admin-theme='dark'] .category-root-row.active,
+html[data-admin-theme='dark'] .organization-folder-row.active { background-color: var(--primary-soft) !important; }
+html[data-admin-theme='dark'] .bookmark-search,
+html[data-admin-theme='dark'] .help-search,
+html[data-admin-theme='dark'] .auth-card input,
+html[data-admin-theme='dark'] .password-create input,
+html[data-admin-theme='dark'] .preference-row select,
+html[data-admin-theme='dark'] .bookmark-bulk-bar select,
+html[data-admin-theme='dark'] .category-bulk-bar select,
+html[data-admin-theme='dark'] .backup-input-row input,
+html[data-admin-theme='dark'] .config-field-value,
+html[data-admin-theme='dark'] .secret-box code { border-color: var(--line); color: var(--ink); background: var(--surface-subtle) !important; }
+html[data-admin-theme='dark'] .ghost-button,
+html[data-admin-theme='dark'] .toolbar-button,
+html[data-admin-theme='dark'] .browser-link-btn,
+html[data-admin-theme='dark'] .icon-button,
+html[data-admin-theme='dark'] .copy-btn,
+html[data-admin-theme='dark'] .tree-action-button,
+html[data-admin-theme='dark'] .tree-control-button { border-color: var(--line); color: var(--ink-secondary); background: var(--paper); }
+html[data-admin-theme='dark'] .ghost-button:hover:not(:disabled),
+html[data-admin-theme='dark'] .toolbar-button:hover:not(:disabled),
+html[data-admin-theme='dark'] .browser-link-btn:hover,
+html[data-admin-theme='dark'] .copy-btn:hover { border-color: var(--primary-border); color: var(--primary); background: var(--primary-soft); }
+html[data-admin-theme='dark'] .security-notice { border-color: var(--warning-border); color: var(--ink-secondary); background: var(--warning-soft); }
+html[data-admin-theme='dark'] .secret-box { border-color: var(--primary-border); color: var(--primary); background: var(--primary-soft); }
+html[data-admin-theme='dark'] .category-management-page .organization-folder-row { box-shadow: var(--shadow-xs); }
+html[data-admin-theme='dark'] .auth-page { background: var(--canvas); }
+html[data-admin-theme='dark'] .trash-item,
+html[data-admin-theme='dark'] .version-row,
+html[data-admin-theme='dark'] .backup-toggle-row,
+html[data-admin-theme='dark'] .backup-input-row,
+html[data-admin-theme='dark'] .backup-run-row,
+html[data-admin-theme='dark'] .library-bookmark-row,
+html[data-admin-theme='dark'] .library-trash-row,
+html[data-admin-theme='dark'] .library-folder-row,
+html[data-admin-theme='dark'] .password-row,
+html[data-admin-theme='dark'] .pairing-row,
+html[data-admin-theme='dark'] .account-identity-card,
+html[data-admin-theme='dark'] .storage-summary,
+html[data-admin-theme='dark'] .guide-step-card,
+html[data-admin-theme='dark'] .help-topics,
+html[data-admin-theme='dark'] .faq-item,
+html[data-admin-theme='dark'] .library-kind-switch,
+html[data-admin-theme='dark'] .library-kind-switch button.active,
+html[data-admin-theme='dark'] .panel-link,
+html[data-admin-theme='dark'] .about-hero,
+html[data-admin-theme='dark'] .about-note,
+html[data-admin-theme='dark'] .file-picker,
+html[data-admin-theme='dark'] .current-badge,
+html[data-admin-theme='dark'] .library-bookmark-folder { border-color: var(--line); color: var(--ink-secondary); background: var(--surface-subtle); }
+html[data-admin-theme='dark'] .trash-item:hover,
+html[data-admin-theme='dark'] .device-card:hover,
+html[data-admin-theme='dark'] .version-row:hover,
+html[data-admin-theme='dark'] .library-bookmark-row:hover,
+html[data-admin-theme='dark'] .library-trash-row:hover,
+html[data-admin-theme='dark'] .library-folder-row:hover,
+html[data-admin-theme='dark'] .panel-link:hover { border-color: var(--primary-border); background: #303741; }
+html[data-admin-theme='dark'] .device-card.current,
+html[data-admin-theme='dark'] .pairing-browser-field,
+html[data-admin-theme='dark'] .pairing-browser-field input,
+html[data-admin-theme='dark'] .pairing-history-panel,
+html[data-admin-theme='dark'] .account-identity-card,
+html[data-admin-theme='dark'] .account-notice,
+html[data-admin-theme='dark'] .secret-box,
+html[data-admin-theme='dark'] .pairing-status.pending,
+html[data-admin-theme='dark'] .pairing-status.used,
+html[data-admin-theme='dark'] .pairing-status.revoked { background: var(--primary-soft); }
+html[data-admin-theme='dark'] .backup-hero-panel,
+html[data-admin-theme='dark'] .about-hero { border-color: var(--line); background: linear-gradient(135deg, #283546, #232831); }
+html[data-admin-theme='dark'] .transfer-card h3,
+html[data-admin-theme='dark'] .architecture-list strong,
+html[data-admin-theme='dark'] .storage-summary-content > strong,
+html[data-admin-theme='dark'] .library-bookmark-row strong,
+html[data-admin-theme='dark'] .library-trash-row strong,
+html[data-admin-theme='dark'] .library-folder-row strong,
+html[data-admin-theme='dark'] .backup-toggle-row strong,
+html[data-admin-theme='dark'] .backup-input-row strong,
+html[data-admin-theme='dark'] .account-identity-card strong { color: var(--ink); }
+html[data-admin-theme='dark'] .current-badge { color: var(--primary); background: var(--primary-soft); }
+html[data-admin-theme='dark'] .service-status.online { color: var(--success); background: var(--success-soft); }
+html[data-admin-theme='dark'] .service-status.offline { color: var(--danger); background: var(--danger-soft); }
+html[data-admin-theme='dark'] .modal-backdrop { background: #080b11b8; }
+html[data-admin-theme='dark'] .explorer-modal-backdrop { background: #080b11b8; }
+html[data-admin-theme='dark'] .admin-modal input,
+html[data-admin-theme='dark'] .explorer-context-menu { border-color: var(--line); color: var(--ink); background: var(--paper); }
+html[data-admin-theme='dark'] .category-management-page .organization-folder-row { background: rgb(35 40 49 / .96); }
+html[data-admin-theme='dark'] .category-management-page .organization-folder-row:hover { background: #303741; }
+html[data-admin-theme='dark'] .category-management-page .organization-root-card { background: var(--paper); }
+html[data-admin-theme='dark'] .category-management-page .organization-tree { background-image: linear-gradient(rgb(72 82 98 / .28) 1px, transparent 1px), linear-gradient(90deg, rgb(72 82 98 / .28) 1px, transparent 1px); }
+html[data-admin-theme='dark'] .category-management-page .category-bookmarks-panel .category-bookmark-list,
+html[data-admin-theme='dark'] .category-management-page .category-tree-panel .organization-tree { border-color: var(--line) !important; background-color: var(--surface-subtle) !important; }
+html[data-admin-theme='dark'] .category-management-page .category-list-header { border-color: var(--line) !important; color: var(--muted) !important; background: #1c2026 !important; }
+html[data-admin-theme='dark'] .category-management-page .category-bookmark-row { border-color: var(--soft-line) !important; color: var(--ink-secondary) !important; }
+html[data-admin-theme='dark'] .category-management-page .category-bookmark-row:hover,
+html[data-admin-theme='dark'] .category-management-page .category-bookmark-row.selected { background: #2d333d !important; }
+html[data-admin-theme='dark'] .category-management-page .explorer-card,
+html[data-admin-theme='dark'] .category-management-page .explorer-list-row { border-color: var(--line) !important; color: var(--ink-secondary) !important; background: var(--paper) !important; }
+html[data-admin-theme='dark'] .category-management-page .explorer-card:hover,
+html[data-admin-theme='dark'] .category-management-page .explorer-list-row:hover { background: #303741 !important; }
+html[data-admin-theme='dark'] .category-management-page .explorer-card.selected,
+html[data-admin-theme='dark'] .category-management-page .explorer-list-row.selected { border-color: var(--primary-border) !important; background: var(--primary-soft) !important; }
+html[data-admin-theme='dark'] .account-identity-card,
+html[data-admin-theme='dark'] .storage-summary,
+html[data-admin-theme='dark'] .pairing-history-panel,
+html[data-admin-theme='dark'] .library-folder-list,
+html[data-admin-theme='dark'] .library-trash-list,
+html[data-admin-theme='dark'] .help-topics,
+html[data-admin-theme='dark'] .faq-list { color: var(--ink-secondary); background-color: transparent; }
+html[data-admin-theme='dark'] .library-bookmark-host,
+html[data-admin-theme='dark'] .library-bookmark-folder,
+html[data-admin-theme='dark'] .library-trash-row small { color: var(--muted); }
+html[data-admin-theme='dark'] .library-bookmark-folder { background: #303741; }
+html[data-admin-theme='dark'] .pairing-browser-field input,
+html[data-admin-theme='dark'] .admin-modal input { border-color: var(--line); color: var(--ink); background: var(--surface-subtle); }
+html[data-admin-theme='dark'] .help-topics button:hover,
+html[data-admin-theme='dark'] .help-topics button.active,
+html[data-admin-theme='dark'] .faq-item.open { color: var(--primary); background: var(--primary-soft); }
+
+html[data-admin-theme='warm'] .sidebar,
+html[data-admin-theme='warm'] .workspace-header,
+html[data-admin-theme='warm'] .panel,
+html[data-admin-theme='warm'] .stat-card,
+html[data-admin-theme='warm'] .bookmark-table-shell,
+html[data-admin-theme='warm'] .category-bookmark-list,
+html[data-admin-theme='warm'] .category-tree-panel,
+html[data-admin-theme='warm'] .category-bookmarks-panel,
+html[data-admin-theme='warm'] .organization-root-card,
+html[data-admin-theme='warm'] .organization-folder-row,
+html[data-admin-theme='warm'] .device-card,
+html[data-admin-theme='warm'] .faq-item,
+html[data-admin-theme='warm'] .admin-modal,
+html[data-admin-theme='warm'] .auth-card { border-color: var(--line) !important; color: var(--ink); background-color: var(--paper) !important; }
+html[data-admin-theme='warm'] .sidebar { background-color: #faf4eb !important; }
+html[data-admin-theme='warm'] .nav-group-label,
+html[data-admin-theme='warm'] .workspace-header p,
+html[data-admin-theme='warm'] .workspace-service-status small,
+html[data-admin-theme='warm'] .nav-item,
+html[data-admin-theme='warm'] .muted,
+html[data-admin-theme='warm'] .workspace-note { color: var(--muted); }
+html[data-admin-theme='warm'] .nav-item:hover,
+html[data-admin-theme='warm'] .bookmark-row:hover,
+html[data-admin-theme='warm'] .category-bookmark-row:hover,
+html[data-admin-theme='warm'] .category-bookmark-row.selected { border-color: var(--line); color: var(--ink); background: #f4eadd; }
+html[data-admin-theme='warm'] .nav-item.active { border-color: var(--primary-border); color: var(--primary); background: var(--primary-soft); box-shadow: none; }
+html[data-admin-theme='warm'] .hero-card { border-color: var(--line); background: linear-gradient(135deg, #f4eadd, #fffbf5) !important; }
+html[data-admin-theme='warm'] .hero-card h2 { color: var(--ink); }
+html[data-admin-theme='warm'] .hero-card p { color: var(--muted); }
+html[data-admin-theme='warm'] .bookmark-table-head,
+html[data-admin-theme='warm'] .category-list-header,
+html[data-admin-theme='warm'] .organization-tree { border-color: var(--line); color: var(--muted); background-color: var(--surface-subtle) !important; }
+html[data-admin-theme='warm'] .bookmark-row,
+html[data-admin-theme='warm'] .category-bookmark-row { border-color: var(--soft-line); color: var(--ink-secondary); }
+html[data-admin-theme='warm'] .bookmark-search,
+html[data-admin-theme='warm'] .help-search,
+html[data-admin-theme='warm'] .auth-card input,
+html[data-admin-theme='warm'] .password-create input,
+html[data-admin-theme='warm'] .preference-row select,
+html[data-admin-theme='warm'] .bookmark-bulk-bar select,
+html[data-admin-theme='warm'] .category-bulk-bar select,
+html[data-admin-theme='warm'] .backup-input-row input,
+html[data-admin-theme='warm'] .config-field-value,
+html[data-admin-theme='warm'] .secret-box code { border-color: var(--line); color: var(--ink); background: var(--paper) !important; }
+html[data-admin-theme='warm'] .security-notice { border-color: var(--warning-border); color: var(--ink-secondary); background: var(--warning-soft); }
+html[data-admin-theme='warm'] .auth-page { background: var(--canvas); }
+html[data-admin-theme='warm'] .trash-item,
+html[data-admin-theme='warm'] .version-row,
+html[data-admin-theme='warm'] .backup-toggle-row,
+html[data-admin-theme='warm'] .backup-input-row,
+html[data-admin-theme='warm'] .backup-run-row,
+html[data-admin-theme='warm'] .library-bookmark-row,
+html[data-admin-theme='warm'] .library-trash-row,
+html[data-admin-theme='warm'] .library-folder-row,
+html[data-admin-theme='warm'] .password-row,
+html[data-admin-theme='warm'] .pairing-row,
+html[data-admin-theme='warm'] .account-identity-card,
+html[data-admin-theme='warm'] .storage-summary,
+html[data-admin-theme='warm'] .guide-step-card,
+html[data-admin-theme='warm'] .help-topics,
+html[data-admin-theme='warm'] .faq-item,
+html[data-admin-theme='warm'] .library-kind-switch,
+html[data-admin-theme='warm'] .library-kind-switch button.active,
+html[data-admin-theme='warm'] .panel-link,
+html[data-admin-theme='warm'] .about-hero,
+html[data-admin-theme='warm'] .about-note,
+html[data-admin-theme='warm'] .file-picker,
+html[data-admin-theme='warm'] .library-bookmark-folder { border-color: var(--line); color: var(--ink-secondary); background: var(--surface-subtle); }
+html[data-admin-theme='warm'] .backup-hero-panel,
+html[data-admin-theme='warm'] .about-hero { border-color: var(--line); background: linear-gradient(135deg, #f4eadd, #fffbf5); }
+html[data-admin-theme='warm'] .current-badge { color: var(--primary); background: var(--primary-soft); }
+html[data-admin-theme='warm'] .category-management-page .organization-tree { background-image: linear-gradient(rgb(216 203 187 / .42) 1px, transparent 1px), linear-gradient(90deg, rgb(216 203 187 / .42) 1px, transparent 1px); }
+html[data-admin-theme='warm'] .category-management-page .category-bookmarks-panel .category-bookmark-list,
+html[data-admin-theme='warm'] .category-management-page .category-tree-panel .organization-tree { border-color: var(--line) !important; background-color: var(--surface-subtle) !important; }
+html[data-admin-theme='warm'] .category-management-page .category-list-header { border-color: var(--line) !important; color: var(--muted) !important; background: #f5ede4 !important; }
+html[data-admin-theme='warm'] .category-management-page .category-bookmark-row { border-color: var(--soft-line) !important; color: var(--ink-secondary) !important; }
+html[data-admin-theme='warm'] .category-management-page .category-bookmark-row:hover,
+html[data-admin-theme='warm'] .category-management-page .category-bookmark-row.selected { background: #f4eadd !important; }
+html[data-admin-theme='warm'] .category-management-page .explorer-card,
+html[data-admin-theme='warm'] .category-management-page .explorer-list-row { border-color: var(--line) !important; color: var(--ink-secondary) !important; background: var(--paper) !important; }
+html[data-admin-theme='warm'] .category-management-page .explorer-card:hover,
+html[data-admin-theme='warm'] .category-management-page .explorer-list-row:hover { background: #f4eadd !important; }
+html[data-admin-theme='warm'] .account-identity-card,
+html[data-admin-theme='warm'] .storage-summary,
+html[data-admin-theme='warm'] .pairing-history-panel,
+html[data-admin-theme='warm'] .library-folder-list,
+html[data-admin-theme='warm'] .library-trash-list,
+html[data-admin-theme='warm'] .help-topics,
+html[data-admin-theme='warm'] .faq-list { color: var(--ink-secondary); background-color: transparent; }
+html[data-admin-theme='warm'] .library-bookmark-host,
+html[data-admin-theme='warm'] .library-bookmark-folder,
+html[data-admin-theme='warm'] .library-trash-row small { color: var(--muted); }
+html[data-admin-theme='warm'] .library-bookmark-folder { background: #eee3d7; }
+html[data-admin-theme='warm'] .help-topics button:hover,
+html[data-admin-theme='warm'] .help-topics button.active,
+html[data-admin-theme='warm'] .faq-item.open { color: var(--primary); background: var(--primary-soft); }
+
+html[data-admin-theme='custom'] body,
+html[data-admin-theme='custom'] .auth-page { background-color: #a7b0b9; background-image: linear-gradient(rgb(255 255 255 / .12), rgb(255 255 255 / .12)), var(--admin-theme-background-image); background-position: center; background-size: cover; }
+html[data-admin-theme='custom'] .app-shell { background: transparent; }
+html[data-admin-theme='custom'] .sidebar,
+html[data-admin-theme='custom'] .workspace-header,
+html[data-admin-theme='custom'] .panel,
+html[data-admin-theme='custom'] .stat-card,
+html[data-admin-theme='custom'] .bookmark-table-shell,
+html[data-admin-theme='custom'] .category-bookmark-list,
+html[data-admin-theme='custom'] .category-tree-panel,
+html[data-admin-theme='custom'] .category-bookmarks-panel,
+html[data-admin-theme='custom'] .organization-root-card,
+html[data-admin-theme='custom'] .organization-folder-row,
+html[data-admin-theme='custom'] .device-card,
+html[data-admin-theme='custom'] .faq-item,
+html[data-admin-theme='custom'] .admin-modal,
+html[data-admin-theme='custom'] .auth-card { border-color: rgb(255 255 255 / .42) !important; color: var(--admin-theme-text-color); background-color: rgb(255 255 255 / var(--admin-theme-surface-opacity)) !important; backdrop-filter: blur(14px); }
+html[data-admin-theme='custom'] .workspace-content { background: transparent; }
+html[data-admin-theme='custom'] .nav-item,
+html[data-admin-theme='custom'] .workspace-header h1,
+html[data-admin-theme='custom'] .panel h3,
+html[data-admin-theme='custom'] .panel h4,
+html[data-admin-theme='custom'] .preference-row strong,
+html[data-admin-theme='custom'] .stat-value strong,
+html[data-admin-theme='custom'] .bookmark-name strong,
+html[data-admin-theme='custom'] .category-bookmark-info strong,
+html[data-admin-theme='custom'] .faq-item strong,
+html[data-admin-theme='custom'] .device-title strong,
+html[data-admin-theme='custom'] .workspace-header p,
+html[data-admin-theme='custom'] .nav-group-label,
+html[data-admin-theme='custom'] .workspace-service-status small,
+html[data-admin-theme='custom'] .muted,
+html[data-admin-theme='custom'] .workspace-note { color: var(--admin-theme-text-color); }
+html[data-admin-theme='custom'] .bookmark-table-head,
+html[data-admin-theme='custom'] .category-list-header,
+html[data-admin-theme='custom'] .organization-tree,
+html[data-admin-theme='custom'] .bookmark-search,
+html[data-admin-theme='custom'] .help-search,
+html[data-admin-theme='custom'] .preference-row select,
+html[data-admin-theme='custom'] .auth-card input { color: var(--admin-theme-text-color); background-color: rgb(255 255 255 / var(--admin-theme-surface-opacity)) !important; }
+html[data-admin-theme='custom'] .nav-item.active { color: var(--primary); background: rgb(255 255 255 / .76); }
+html[data-admin-theme='custom'] .nav-item:hover,
+html[data-admin-theme='custom'] .bookmark-row:hover,
+html[data-admin-theme='custom'] .category-bookmark-row:hover { background: rgb(255 255 255 / .42); }
+html[data-admin-theme='custom'] .admin-theme-settings { color: var(--ink); }
+html[data-admin-theme='custom'] .auth-page { background-color: transparent; }
+html[data-admin-theme='custom'] .trash-item,
+html[data-admin-theme='custom'] .version-row,
+html[data-admin-theme='custom'] .backup-toggle-row,
+html[data-admin-theme='custom'] .backup-input-row,
+html[data-admin-theme='custom'] .backup-run-row,
+html[data-admin-theme='custom'] .library-bookmark-row,
+html[data-admin-theme='custom'] .library-trash-row,
+html[data-admin-theme='custom'] .library-folder-row,
+html[data-admin-theme='custom'] .password-row,
+html[data-admin-theme='custom'] .pairing-row,
+html[data-admin-theme='custom'] .account-identity-card,
+html[data-admin-theme='custom'] .storage-summary,
+html[data-admin-theme='custom'] .guide-step-card,
+html[data-admin-theme='custom'] .help-topics,
+html[data-admin-theme='custom'] .faq-item,
+html[data-admin-theme='custom'] .library-kind-switch,
+html[data-admin-theme='custom'] .panel-link,
+html[data-admin-theme='custom'] .about-hero,
+html[data-admin-theme='custom'] .about-note,
+html[data-admin-theme='custom'] .file-picker,
+html[data-admin-theme='custom'] .library-bookmark-folder,
+html[data-admin-theme='custom'] .category-management-page .organization-tree { border-color: rgb(255 255 255 / .4); color: var(--admin-theme-text-color); background-color: rgb(255 255 255 / var(--admin-theme-surface-opacity)); backdrop-filter: blur(10px); }
+html[data-admin-theme='custom'] .category-management-page .organization-folder-row { background-color: rgb(255 255 255 / var(--admin-theme-surface-opacity)); }
+html[data-admin-theme='custom'] .category-management-page .organization-tree { background-image: linear-gradient(rgb(255 255 255 / .12) 1px, transparent 1px), linear-gradient(90deg, rgb(255 255 255 / .12) 1px, transparent 1px); }
+html[data-admin-theme='custom'] .category-management-page .category-bookmarks-panel .category-bookmark-list,
+html[data-admin-theme='custom'] .category-management-page .category-tree-panel .organization-tree,
+html[data-admin-theme='custom'] .category-management-page .category-list-header,
+html[data-admin-theme='custom'] .category-management-page .category-bookmark-row,
+html[data-admin-theme='custom'] .category-management-page .explorer-card,
+html[data-admin-theme='custom'] .category-management-page .explorer-list-row,
+html[data-admin-theme='custom'] .category-management-page .explorer-folder-list { border-color: rgb(255 255 255 / .4) !important; color: var(--admin-theme-text-color) !important; background-color: rgb(255 255 255 / var(--admin-theme-surface-opacity)) !important; backdrop-filter: blur(10px); }
+html[data-admin-theme='custom'] .category-management-page .category-bookmark-list { background-image: none !important; }
+html[data-admin-theme='custom'] .category-management-page .category-bookmark-row:hover,
+html[data-admin-theme='custom'] .category-management-page .category-bookmark-row.selected,
+html[data-admin-theme='custom'] .category-management-page .explorer-card:hover,
+html[data-admin-theme='custom'] .category-management-page .explorer-list-row:hover,
+html[data-admin-theme='custom'] .category-management-page .explorer-card.selected,
+html[data-admin-theme='custom'] .category-management-page .explorer-list-row.selected { background-color: rgb(255 255 255 / .58) !important; }
+html[data-admin-theme='custom'] .category-management-page .explorer-list-head { border-color: rgb(255 255 255 / .4); color: var(--admin-theme-text-color); background: rgb(255 255 255 / .42); }
+html[data-admin-theme='custom'] .library-bookmark-row strong,
+html[data-admin-theme='custom'] .library-trash-row strong,
+html[data-admin-theme='custom'] .library-folder-row strong,
+html[data-admin-theme='custom'] .account-identity-card strong,
+html[data-admin-theme='custom'] .transfer-card h3,
+html[data-admin-theme='custom'] .architecture-list strong,
+html[data-admin-theme='custom'] .storage-summary-content > strong,
+html[data-admin-theme='custom'] .backup-toggle-row strong,
+html[data-admin-theme='custom'] .backup-input-row strong { color: var(--admin-theme-text-color); }
+html[data-admin-theme='custom'] .modal-backdrop,
+html[data-admin-theme='custom'] .explorer-modal-backdrop { background: rgb(20 24 32 / .56); }
+html[data-admin-theme='custom'] .admin-modal input,
+html[data-admin-theme='custom'] .explorer-context-menu { border-color: rgb(255 255 255 / .45); color: var(--admin-theme-text-color); background: rgb(255 255 255 / var(--admin-theme-surface-opacity)); }
+html[data-admin-theme='custom'] .secret-box,
+html[data-admin-theme='custom'] .account-notice,
+html[data-admin-theme='custom'] .category-bulk-bar { color: var(--admin-theme-text-color); background: rgb(255 255 255 / .48); }
+html[data-admin-theme='custom'] .account-identity-card,
+html[data-admin-theme='custom'] .storage-summary,
+html[data-admin-theme='custom'] .pairing-history-panel,
+html[data-admin-theme='custom'] .library-folder-list,
+html[data-admin-theme='custom'] .library-trash-list,
+html[data-admin-theme='custom'] .help-topics,
+html[data-admin-theme='custom'] .faq-list { background-color: transparent; }
+
+.admin-theme-settings {
+  display: grid;
+  gap: 14px;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--line);
+}
+.admin-theme-heading { display: flex; align-items: center; gap: 10px; }
+.admin-theme-heading > span { display: grid; width: 34px; height: 34px; place-items: center; border: 1px solid var(--primary-border); border-radius: var(--radius-md); color: var(--primary); background: var(--primary-soft); }
+.admin-theme-heading > div { display: grid; gap: 2px; }
+.admin-theme-heading strong { color: var(--ink); font-size: 14px; }
+.admin-theme-heading small, .admin-theme-option small, .admin-theme-background-row small { color: var(--muted); font-size: 11px; }
+.admin-theme-options { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.admin-theme-option { display: grid; min-width: 0; gap: 6px; padding: 8px; border: 1px solid var(--line); border-radius: var(--radius-md); color: var(--ink-secondary); background: var(--paper); text-align: left; }
+.admin-theme-option:hover { border-color: var(--primary-border); transform: translateY(-1px); }
+.admin-theme-option.is-active { border-color: var(--primary); box-shadow: 0 0 0 2px var(--primary-glow); }
+.admin-theme-preview { position: relative; display: grid; height: 46px; place-items: center; overflow: hidden; border: 1px solid #dfe4ec; border-radius: 5px; color: #315bea; background: linear-gradient(140deg, #fff 0 58%, #e9eef7 58%); background-position: center; background-size: cover; }
+.admin-theme-option--dark .admin-theme-preview { border-color: #2d333d; color: #e4e8ed; background: linear-gradient(140deg, #1b1e24 0 58%, #343b46 58%); }
+.admin-theme-option--warm .admin-theme-preview { border-color: #e5d9ca; color: #685c4d; background: linear-gradient(140deg, #fffaf2 0 58%, #eadbc8 58%); }
+.admin-theme-option--custom .admin-theme-preview { color: #44515c; background: linear-gradient(135deg, #c9d9e4, #f1d9c5 48%, #d2e1d1 49%); }
+.admin-theme-preview i { position: absolute; top: 4px; right: 4px; display: grid; width: 18px; height: 18px; place-items: center; border-radius: 50%; color: #fff; background: var(--primary); }
+.admin-theme-option > strong { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.admin-theme-option > small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.admin-theme-background-row { display: flex; align-items: center; gap: 8px; min-height: 48px; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-subtle); }
+.admin-theme-background-row > span { display: grid; flex: 1; gap: 2px; }
+.admin-theme-background-row strong { color: var(--ink-secondary); font-size: 12px; }
+.admin-theme-remove { display: grid; width: 30px; height: 30px; place-items: center; border: 1px solid var(--line); border-radius: var(--radius-sm); color: var(--muted); background: var(--paper); }
+.admin-theme-slider { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; color: var(--ink-secondary); font-size: 12px; font-weight: 600; }
+.admin-theme-slider output, .admin-theme-color output { color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.admin-theme-slider input { grid-column: 1 / -1; width: 100%; margin: 2px 0 0; accent-color: var(--primary); }
+.admin-theme-color { display: flex; align-items: center; gap: 10px; color: var(--ink-secondary); font-size: 12px; font-weight: 600; }
+.admin-theme-color > span { flex: 1; }
+.admin-theme-color input { width: 34px; height: 29px; padding: 2px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--paper); cursor: pointer; }
+.admin-theme-error { margin: 0; color: var(--danger); font-size: 12px; }
+
+html[data-admin-theme='dark'] .admin-theme-background-row,
+html[data-admin-theme='dark'] .admin-theme-remove,
+html[data-admin-theme='dark'] .admin-theme-option { border-color: var(--line); color: var(--ink-secondary); background-color: var(--paper); }
+html[data-admin-theme='warm'] .admin-theme-background-row,
+html[data-admin-theme='warm'] .admin-theme-remove,
+html[data-admin-theme='warm'] .admin-theme-option { border-color: var(--line); color: var(--ink-secondary); background-color: var(--paper); }
+html[data-admin-theme='custom'] .admin-theme-background-row,
+html[data-admin-theme='custom'] .admin-theme-remove,
+html[data-admin-theme='custom'] .admin-theme-option { border-color: rgb(255 255 255 / .48); color: var(--admin-theme-text-color); background-color: rgb(255 255 255 / var(--admin-theme-surface-opacity)); backdrop-filter: blur(8px); }
+
+@media (max-width: 680px) { .admin-theme-options { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

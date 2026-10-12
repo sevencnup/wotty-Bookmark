@@ -42,6 +42,25 @@ export type TranslationKey =
   | 'confirmDangerousActions'
   | 'confirmDangerousActionsDescription'
   | 'preferencesSecurityNote'
+  | 'themeBackground'
+  | 'themeSavedLocally'
+  | 'themeLight'
+  | 'themeLightDescription'
+  | 'themeDark'
+  | 'themeDarkDescription'
+  | 'themeWarm'
+  | 'themeWarmDescription'
+  | 'themeCustom'
+  | 'themeCustomDescription'
+  | 'themeBackgroundSet'
+  | 'themeBackgroundImage'
+  | 'themeUploadHint'
+  | 'themeProcessing'
+  | 'themeReplace'
+  | 'themeUpload'
+  | 'themeRemove'
+  | 'themeTransparency'
+  | 'themeTextColor'
   | 'loginTitle'
   | 'loginDescription'
   | 'emailOrUsername'
@@ -95,6 +114,25 @@ const zhCN: TranslationTable = {
   confirmDangerousActions: '危险操作始终确认',
   confirmDangerousActionsDescription: '永久删除、清空和撤销操作前显示确认弹窗。',
   preferencesSecurityNote: '不会在偏好设置中保存登录密码、应用密码、Floccus passphrase、书签明文或导入文件。',
+  themeBackground: '主题与背景',
+  themeSavedLocally: '只保存在当前设备',
+  themeLight: '白色',
+  themeLightDescription: '简洁明亮',
+  themeDark: '黑色',
+  themeDarkDescription: '低光阅读',
+  themeWarm: '暖色',
+  themeWarmDescription: '柔和纸感',
+  themeCustom: '自定义',
+  themeCustomDescription: '自己的背景',
+  themeBackgroundSet: '已设置背景',
+  themeBackgroundImage: '背景图片',
+  themeUploadHint: '上传后自动压缩，最大 20 MB',
+  themeProcessing: '正在处理…',
+  themeReplace: '替换',
+  themeUpload: '上传',
+  themeRemove: '移除背景图片',
+  themeTransparency: '内容透明度',
+  themeTextColor: '文字颜色',
   loginTitle: '管理你的同步服务',
   loginDescription: '登录后台生成侧边栏连接码，直接管理服务器书签；Floccus 兼容配置仍保留在隐藏页面。',
   emailOrUsername: '邮箱或用户名',
@@ -147,6 +185,25 @@ const en: TranslationTable = {
   confirmDangerousActions: 'Always confirm dangerous actions',
   confirmDangerousActionsDescription: 'Show a confirmation before permanently deleting, clearing, or revoking.',
   preferencesSecurityNote: 'Preferences never store your sign-in password, app password, Floccus passphrase, bookmark contents, or imported files.',
+  themeBackground: 'Themes & background',
+  themeSavedLocally: 'Saved on this device',
+  themeLight: 'White',
+  themeLightDescription: 'Clean and bright',
+  themeDark: 'Black',
+  themeDarkDescription: 'Comfortable in low light',
+  themeWarm: 'Warm',
+  themeWarmDescription: 'Soft paper tone',
+  themeCustom: 'Custom',
+  themeCustomDescription: 'Your own background',
+  themeBackgroundSet: 'Background set',
+  themeBackgroundImage: 'Background image',
+  themeUploadHint: 'Compressed automatically, up to 20 MB',
+  themeProcessing: 'Processing…',
+  themeReplace: 'Replace',
+  themeUpload: 'Upload',
+  themeRemove: 'Remove background image',
+  themeTransparency: 'Surface transparency',
+  themeTextColor: 'Text color',
   loginTitle: 'Manage your sync service',
   loginDescription: 'Sign in to create a sidebar connection code and manage your server bookmarks directly. Floccus compatibility remains available on its hidden page.',
   emailOrUsername: 'Email or username',

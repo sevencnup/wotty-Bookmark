@@ -46,7 +46,7 @@ import { LibraryManagementPage } from './LibraryManagementPage'
 import { copyText } from './clipboard'
 import * as api from './api'
 import { GlobalUiLocalization, translate, type Locale } from './i18n'
-import { confirmDangerousAction, loadActiveSection, loadPreferences, saveActiveSection, savePreferences, type Preferences } from './preferences'
+import { applyAdminTheme, confirmDangerousAction, loadActiveSection, loadPreferences, saveActiveSection, savePreferences, type Preferences } from './preferences'
 import { descendantFolderIds, flattenFolders, findFolder, folderHasChildren, resolveDraggedBookmarkIds, visibleFolders, type FlatBookmarkFolder } from './bookmark-tree'
 
 type AdminSection =
@@ -207,11 +207,10 @@ function persistSession(session: api.Session | null) {
 
 function App() {
   const validSections = allNavItems(getNavGroups('zh-CN')).map((item) => item.id)
+  const [preferences, setPreferences] = useState<Preferences>(() => loadPreferences())
   const [activeSection, setActiveSection] = useState<AdminSection>(() => {
-    const preferences = loadPreferences()
     return loadActiveSection(validSections, preferences.defaultSection, localStorage) as AdminSection
   })
-  const [preferences, setPreferences] = useState<Preferences>(() => loadPreferences())
   const [session, setSession] = useState<api.Session | null>(() => loadStoredSession())
   const languageVersionRef = useRef(0)
   const languageSaveQueueRef = useRef<Promise<void>>(Promise.resolve())
@@ -275,6 +274,7 @@ function App() {
 
   useEffect(() => {
     document.documentElement.dataset.density = preferences.density
+    applyAdminTheme(preferences)
     document.documentElement.classList.toggle('reduce-motion', preferences.reduceMotion)
     document.documentElement.lang = preferences.language
   }, [preferences])
@@ -292,7 +292,7 @@ function App() {
   const isStorageWorkspace = activeSection === 'storage'
   const isCategoryWorkspace = activeSection === 'categories'
 
-  return <GlobalUiLocalization locale={preferences.language}>(
+  return <GlobalUiLocalization locale={preferences.language}>
     <div className="app-shell">
       <aside className="sidebar">
         <div className="sidebar-brand">
