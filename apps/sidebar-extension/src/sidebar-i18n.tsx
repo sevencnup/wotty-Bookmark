@@ -106,13 +106,13 @@ export function shouldApplyLocalization(locale: SidebarLocale, hasSavedOriginals
 }
 
 function skipsText(element: Element | null): boolean {
-  return Boolean(element?.closest('[data-i18n-skip], textarea, code, img, svg, .site-favicon, .site-favicon-svg, option:not([data-i18n-force]), .bookmark-title, .bookmark-url, .result-copy, .quick-save-copy strong, .connection-status-card span, .delete-content strong'));
+  return Boolean(element?.closest('[data-i18n-skip], textarea, code, img, svg, .site-favicon, .site-favicon-svg, option:not([data-i18n-force]), .bookmark-title, .bookmark-url, .result-copy, .quick-save-copy strong, .quick-save-heading strong, .connection-status-card span, .delete-content strong'));
 }
 
 function skipsAttribute(element: Element): boolean {
   // Inputs carry user data in their value, not in the localizable attributes
   // below. Keep placeholders and accessible names translatable.
-  return Boolean(element.closest('[data-i18n-skip], code, img, svg, .site-favicon, .site-favicon-svg, .bookmark-title, .bookmark-url, .result-copy, .quick-save-copy strong, .connection-status-card span, .delete-content strong'));
+  return Boolean(element.closest('[data-i18n-skip], code, img, svg, .site-favicon, .site-favicon-svg, .bookmark-title, .bookmark-url, .result-copy, .quick-save-copy strong, .quick-save-heading strong, .connection-status-card span, .delete-content strong'));
 }
 
 function localizeText(node: Text, locale: SidebarLocale) {

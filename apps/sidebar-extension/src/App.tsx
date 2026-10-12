@@ -266,8 +266,7 @@ function App() {
         <div className="quick-save-summary">
           <div className="quick-save-icon"><Globe size={17} /></div>
           <div className="quick-save-copy">
-            <span className="eyebrow">收藏当前页 · {isBrowserSource ? 'browser' : 'server'}</span>
-            <strong {...(!activeTab ? { 'data-i18n-force': '' } : {})}>{activeTab?.title ?? '当前页面不可收藏'}</strong>
+            <div className="quick-save-heading"><span>收藏</span><strong title={activeTab?.title} {...(!activeTab ? { 'data-i18n-force': '' } : {})}>{activeTab?.title ?? '当前页面不可收藏'}</strong></div>
             <span>{activeTab ? hostname(activeTab.url) : '请在普通网页中打开侧边栏'}</span>
           </div>
         </div>
