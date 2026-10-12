@@ -90,6 +90,8 @@ function App() {
   const [scrollTop, setScrollTop] = useState(0);
   const [viewportHeight, setViewportHeight] = useState(600);
   const refreshInFlightRef = useRef(false);
+  const knownFoldersRef = useRef<Set<string>>(new Set());
+  const expandedFoldersInitializedRef = useRef(false);
   const workspaceRef = useRef<HTMLElement>(null);
 
   const handleScroll = useCallback(() => {
@@ -209,7 +211,21 @@ function App() {
   const visible = useMemo(() => flattenVisibleNodes(nodes, expanded), [nodes, expanded]);
   const results = useMemo(() => searchBookmarks(nodes, query), [nodes, query]);
   const currentSaved = Boolean(activeTab && tree?.bookmarks.some((item) => item.url === activeTab.url));
-  useEffect(() => { setExpanded((value) => new Set([...value, ...folders])); }, [folders]);
+  useEffect(() => {
+    const previouslyKnownFolders = knownFoldersRef.current;
+    const isInitialFolderLoad = !expandedFoldersInitializedRef.current;
+    setExpanded((current) => {
+      const next = isInitialFolderLoad
+        ? new Set<string>()
+        : new Set([...current].filter((folderId) => folders.has(folderId)));
+      for (const folderId of folders) {
+        if (isInitialFolderLoad || !previouslyKnownFolders.has(folderId)) next.add(folderId);
+      }
+      return next;
+    });
+    expandedFoldersInitializedRef.current = true;
+    knownFoldersRef.current = new Set(folders);
+  }, [folders]);
   useEffect(() => {
     if (quickSaveFolder && !folderOptions.some((folder) => folder.id === quickSaveFolder)) setQuickSaveFolder('');
   }, [folderOptions, quickSaveFolder]);
