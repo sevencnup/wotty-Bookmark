@@ -131,14 +131,18 @@ function App() {
   const refreshTab = useCallback(() => { void getActiveTab().then(setActiveTab).catch(() => setActiveTab(null)); }, []);
   useEffect(() => {
     void (async () => {
-      // Read the local fallback before the remote value so an older storage
-      // operation can never overwrite a freshly fetched account preference.
-      const localLocale = await loadSidebarLocale().catch(() => 'zh-CN' as SidebarLocale);
-      const localSourceMode = await loadSidebarSourceMode().catch(() => 'server' as SidebarSourceMode);
+      // Restore cached state and start the first library request before the
+      // account preference check returns. In the normal case both sources
+      // match, so the library becomes usable without waiting on a second API call.
+      const [localLocale, localSourceMode, value] = await Promise.all([
+        loadSidebarLocale().catch(() => 'zh-CN' as SidebarLocale),
+        loadSidebarSourceMode().catch(() => 'server' as SidebarSourceMode),
+        loadBackendConnection(),
+      ]);
       setLocale(localLocale);
       setSourceMode(localSourceMode);
-      const value = await loadBackendConnection();
       setConnection(value);
+      const initialLoad = refresh(value, {}, localSourceMode);
       let activeSourceMode = localSourceMode;
       if (value) {
         try {
@@ -150,7 +154,8 @@ function App() {
           // Keep the cached preference when the API is temporarily unavailable.
         }
       }
-      await refresh(value, {}, activeSourceMode);
+      await initialLoad;
+      if (activeSourceMode !== localSourceMode) await refresh(value, {}, activeSourceMode);
     })();
   }, []);
   useEffect(() => { document.documentElement.lang = locale; }, [locale]);

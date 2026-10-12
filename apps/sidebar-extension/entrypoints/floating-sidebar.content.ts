@@ -5,6 +5,10 @@ const HOST_ID = 'wotty-bookmark-floating-sidebar';
 const TOGGLE_FLOATING_SIDEBAR_MESSAGE = 'wotty-bookmark:toggle-floating-sidebar';
 const SIDEBAR_ACTIVITY_MESSAGE = 'wotty-bookmark:sidebar-activity';
 const AUTO_CLOSE_DELAY_MS = 5_000;
+const FLOATING_SIDEBAR_WIDTH_KEY = 'bookmark-vault.floating-sidebar-width.v1';
+const DEFAULT_SIDEBAR_WIDTH = 390;
+const MIN_SIDEBAR_WIDTH = 280;
+const SIDEBAR_EDGE_RESERVE = 44;
 
 const styles = `
 :host {
@@ -19,7 +23,7 @@ const styles = `
   padding: 0 !important;
   border: 0 !important;
   pointer-events: none !important;
-  --wotty-sidebar-width: min(390px, calc(100vw - 48px));
+  --wotty-sidebar-width: min(390px, calc(100vw - 44px));
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -58,20 +62,70 @@ const styles = `
   background: #f8fafc;
 }
 
+.resize-handle {
+  position: absolute;
+  top: 0;
+  right: calc(var(--wotty-sidebar-width) - 4px);
+  z-index: 1;
+  width: 8px;
+  height: 100vh;
+  height: 100dvh;
+  cursor: col-resize;
+  opacity: 0;
+  pointer-events: none;
+  touch-action: none;
+  transition: opacity 160ms ease;
+}
+
+.resize-handle::after {
+  position: absolute;
+  top: 50%;
+  left: 2px;
+  width: 3px;
+  height: 44px;
+  border-radius: 999px;
+  background: #cbd5e1;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.9), 0 1px 5px rgba(15, 23, 42, 0.16);
+  content: '';
+  transform: translateY(-50%);
+  transition: background 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+:host([data-open='true']) .resize-handle {
+  opacity: 0.6;
+  pointer-events: auto;
+}
+
+.resize-handle:hover,
+:host([data-resizing='true']) .resize-handle {
+  opacity: 1;
+}
+
+.resize-handle:hover::after,
+:host([data-resizing='true']) .resize-handle::after {
+  background: #2563eb;
+  box-shadow: 0 0 0 1px #ffffff, 0 2px 8px rgba(37, 99, 235, 0.38);
+  transform: translateY(-50%) scaleY(1.18);
+}
+
+.resize-handle:focus-visible::after {
+  background: #2563eb;
+  box-shadow: 0 0 0 3px #bfdbfe;
+}
+
 .edge-toggle {
   position: absolute;
   top: 50%;
-  right: 6px;
+  right: 5px;
   display: grid;
-  width: 42px;
-  height: 42px;
+  width: 34px;
+  height: 34px;
   place-items: center;
   padding: 0;
-  border: 2px solid #ffffff;
+  border: 1px solid #ffffff;
   border-radius: 50%;
-  color: #ffffff;
-  background: #2563eb;
-  box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.38), 0 5px 18px rgba(15, 23, 42, 0.3);
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.42), 0 4px 12px rgba(15, 23, 42, 0.26);
   backdrop-filter: blur(10px);
   cursor: pointer;
   pointer-events: auto;
@@ -80,9 +134,9 @@ const styles = `
 }
 
 .edge-toggle:hover {
-  background: #1d4ed8;
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.28), 0 7px 22px rgba(15, 23, 42, 0.34);
-  transform: translateY(-50%) scale(1.06);
+  background: #eff6ff;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2), 0 6px 16px rgba(15, 23, 42, 0.3);
+  transform: translateY(-50%) scale(1.08);
 }
 
 .edge-toggle:focus-visible {
@@ -91,25 +145,21 @@ const styles = `
 }
 
 :host([data-open='true']) .edge-toggle {
-  right: 6px;
-  border-color: #ffffff;
-  color: #1d4ed8;
-  background: #fff;
-  box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.3), 0 5px 16px rgba(15, 23, 42, 0.2);
+  right: 5px;
+  background: #eff6ff;
+  box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.46), 0 4px 12px rgba(15, 23, 42, 0.24);
 }
 
-.edge-toggle svg {
-  width: 21px;
-  height: 21px;
-  fill: none;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 2;
+.edge-toggle img {
+  display: block;
+  width: 25px;
+  height: 25px;
+  object-fit: contain;
+  pointer-events: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .panel, .edge-toggle { transition: none; }
+  .panel, .resize-handle, .resize-handle::after, .edge-toggle { transition: none; }
 }
 `;
 
@@ -136,7 +186,18 @@ export default defineContentScript({
     const frame = document.createElement('iframe');
     frame.title = '书签侧栏';
     frame.setAttribute('loading', 'eager');
+    frame.inert = true;
+    frame.src = browser.runtime.getURL('/sidebar-frame.html');
     panel.append(frame);
+
+    const resizeHandle = document.createElement('div');
+    resizeHandle.className = 'resize-handle';
+    resizeHandle.setAttribute('aria-hidden', 'true');
+    resizeHandle.setAttribute('aria-label', '调整书签侧栏宽度');
+    resizeHandle.setAttribute('aria-orientation', 'vertical');
+    resizeHandle.setAttribute('role', 'separator');
+    resizeHandle.tabIndex = -1;
+    resizeHandle.title = '拖动调整侧栏宽度；双击恢复默认宽度';
 
     const toggle = document.createElement('button');
     toggle.className = 'edge-toggle';
@@ -145,14 +206,50 @@ export default defineContentScript({
     toggle.setAttribute('aria-expanded', 'false');
     toggle.setAttribute('aria-label', '展开书签侧栏');
     toggle.title = '展开书签侧栏';
-    toggle.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7.5 3.75h9A1.75 1.75 0 0 1 18.25 5.5V21l-6.25-4-6.25 4V5.5A1.75 1.75 0 0 1 7.5 3.75Z" /></svg>';
+    const toggleIcon = document.createElement('img');
+    toggleIcon.alt = '';
+    toggleIcon.src = browser.runtime.getURL('/logo.webp');
+    toggle.append(toggleIcon);
 
-    shadow.append(style, panel, toggle);
+    shadow.append(style, panel, resizeHandle, toggle);
     document.documentElement.append(host);
 
     let isOpen = false;
-    let frameLoaded = false;
     let autoCloseTimer: number | undefined;
+    let preferredSidebarWidth = DEFAULT_SIDEBAR_WIDTH;
+    let resizePointerId: number | undefined;
+
+    const getSidebarWidthBounds = () => {
+      const max = Math.max(1, window.innerWidth - SIDEBAR_EDGE_RESERVE);
+      return { min: Math.min(MIN_SIDEBAR_WIDTH, max), max };
+    };
+    const constrainSidebarWidth = (value: number) => {
+      const { min, max } = getSidebarWidthBounds();
+      return Math.min(max, Math.max(min, Math.round(value)));
+    };
+    const applySidebarWidth = () => {
+      const width = constrainSidebarWidth(preferredSidebarWidth);
+      host.style.setProperty('--wotty-sidebar-width', `${width}px`);
+      const { min, max } = getSidebarWidthBounds();
+      resizeHandle.setAttribute('aria-valuemin', String(min));
+      resizeHandle.setAttribute('aria-valuemax', String(max));
+      resizeHandle.setAttribute('aria-valuenow', String(width));
+    };
+    const saveSidebarWidth = () => {
+      void browser.storage.local.set({ [FLOATING_SIDEBAR_WIDTH_KEY]: preferredSidebarWidth }).catch(() => undefined);
+    };
+    const setSidebarWidth = (width: number, persist = false) => {
+      preferredSidebarWidth = constrainSidebarWidth(width);
+      applySidebarWidth();
+      if (persist) saveSidebarWidth();
+    };
+
+    applySidebarWidth();
+    void browser.storage.local.get(FLOATING_SIDEBAR_WIDTH_KEY).then((values) => {
+      const savedWidth = values[FLOATING_SIDEBAR_WIDTH_KEY];
+      if (typeof savedWidth === 'number' && Number.isFinite(savedWidth)) preferredSidebarWidth = savedWidth;
+      applySidebarWidth();
+    }).catch(() => undefined);
 
     const resetAutoCloseTimer = () => {
       window.clearTimeout(autoCloseTimer);
@@ -169,11 +266,8 @@ export default defineContentScript({
       toggle.title = open ? '收起书签侧栏' : '展开书签侧栏';
       panel.setAttribute('aria-hidden', String(!open));
       frame.inert = !open;
-
-      if (open && !frameLoaded) {
-        frameLoaded = true;
-        frame.src = browser.runtime.getURL('/sidebar-frame.html');
-      }
+      resizeHandle.setAttribute('aria-hidden', String(!open));
+      resizeHandle.tabIndex = open ? 0 : -1;
 
       if (open) resetAutoCloseTimer();
       else if (returnFocus) toggle.focus({ preventScroll: true });
@@ -194,16 +288,64 @@ export default defineContentScript({
     const onPageActivity = (event: Event) => {
       if (event.composedPath().includes(host)) resetAutoCloseTimer();
     };
+    const onResizeStart = (event: PointerEvent) => {
+      if (!isOpen || event.button !== 0) return;
+      event.preventDefault();
+      resizePointerId = event.pointerId;
+      resizeHandle.setPointerCapture(event.pointerId);
+      host.dataset.resizing = 'true';
+      resetAutoCloseTimer();
+    };
+    const onResizeMove = (event: PointerEvent) => {
+      if (resizePointerId !== event.pointerId) return;
+      setSidebarWidth(window.innerWidth - event.clientX);
+      resetAutoCloseTimer();
+    };
+    const onResizeEnd = (event: PointerEvent) => {
+      if (resizePointerId !== event.pointerId) return;
+      if (resizeHandle.hasPointerCapture(event.pointerId)) resizeHandle.releasePointerCapture(event.pointerId);
+      resizePointerId = undefined;
+      delete host.dataset.resizing;
+      saveSidebarWidth();
+    };
+    const onResizeKeyDown = (event: KeyboardEvent) => {
+      const { min, max } = getSidebarWidthBounds();
+      let nextWidth: number | undefined;
+      if (event.key === 'ArrowLeft') nextWidth = preferredSidebarWidth + 20;
+      if (event.key === 'ArrowRight') nextWidth = preferredSidebarWidth - 20;
+      if (event.key === 'Home') nextWidth = min;
+      if (event.key === 'End') nextWidth = max;
+      if (nextWidth === undefined) return;
+      event.preventDefault();
+      setSidebarWidth(nextWidth, true);
+      resetAutoCloseTimer();
+    };
+    const onResizeDoubleClick = () => setSidebarWidth(DEFAULT_SIDEBAR_WIDTH, true);
+    const onViewportResize = () => applySidebarWidth();
     const activityEvents = ['pointerdown', 'pointermove', 'keydown', 'wheel', 'touchstart', 'input', 'change', 'scroll'] as const;
     activityEvents.forEach((type) => window.addEventListener(type, onPageActivity, { capture: true, passive: true }));
 
     toggle.addEventListener('click', toggleOpen);
+    resizeHandle.addEventListener('pointerdown', onResizeStart);
+    resizeHandle.addEventListener('pointermove', onResizeMove);
+    resizeHandle.addEventListener('pointerup', onResizeEnd);
+    resizeHandle.addEventListener('pointercancel', onResizeEnd);
+    resizeHandle.addEventListener('keydown', onResizeKeyDown);
+    resizeHandle.addEventListener('dblclick', onResizeDoubleClick);
     browser.runtime.onMessage.addListener(onRuntimeMessage);
     window.addEventListener('message', onSidebarActivity);
+    window.addEventListener('resize', onViewportResize);
     context.onInvalidated(() => {
       window.clearTimeout(autoCloseTimer);
       activityEvents.forEach((type) => window.removeEventListener(type, onPageActivity, true));
+      resizeHandle.removeEventListener('pointerdown', onResizeStart);
+      resizeHandle.removeEventListener('pointermove', onResizeMove);
+      resizeHandle.removeEventListener('pointerup', onResizeEnd);
+      resizeHandle.removeEventListener('pointercancel', onResizeEnd);
+      resizeHandle.removeEventListener('keydown', onResizeKeyDown);
+      resizeHandle.removeEventListener('dblclick', onResizeDoubleClick);
       window.removeEventListener('message', onSidebarActivity);
+      window.removeEventListener('resize', onViewportResize);
       browser.runtime.onMessage.removeListener(onRuntimeMessage);
       host.remove();
     });
