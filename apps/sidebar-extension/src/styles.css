@@ -1697,6 +1697,31 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   padding: 4px;
 }
 
+/* Keep the compact quick-save folder control readable in dark mode. */
+.app-theme--dark .folder-picker.is-compact .folder-picker-trigger {
+  border-color: #3b4350;
+  color: #c1c9d3;
+  background: #282e37;
+}
+
+.app-theme--dark .folder-picker.is-compact .folder-picker-trigger:hover:not(:disabled),
+.app-theme--dark .folder-picker.is-compact.is-open .folder-picker-trigger {
+  border-color: #566273;
+  color: #e3e7ec;
+  background: #303741;
+}
+
+.app-theme--dark .folder-picker.is-compact .folder-picker-trigger:disabled {
+  color: #a6afba;
+  background: #282e37;
+  opacity: 0.82;
+}
+
+.app-theme--dark .folder-picker.is-compact .folder-trigger-icon,
+.app-theme--dark .folder-picker.is-compact .folder-trigger-arrow {
+  color: #8db6ff;
+}
+
 .folder-picker.is-compact .folder-picker-list {
   max-height: 180px;
 }
