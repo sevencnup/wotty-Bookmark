@@ -655,64 +655,33 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   transition: background var(--duration) var(--ease);
 }
 
-.tree-guides {
-  position: absolute;
-  inset: -1px 0;
-  overflow: hidden;
-  pointer-events: none;
-}
-
-.tree-guide-vertical,
-.tree-guide-branch {
-  position: absolute;
-  background: #d7e0ec;
-}
-
-.tree-guide-vertical {
-  top: 0;
-  bottom: 0;
-  left: calc(12px + var(--guide-depth) * 14px);
-  width: 1px;
-}
-
-.tree-guide-branch {
-  top: 18px;
-  left: calc(12px + (var(--depth) - 1) * 14px);
-  width: 14px;
-  height: 1px;
-}
-
 .bookmark-row:hover {
-  background: #f1f5f9;
+  background: #edf2f8;
+}
+
+.bookmark-row.is-selected {
+  background: #e7efff;
+  box-shadow: inset 0 0 0 1px #c7d8fa;
 }
 
 .bookmark-folder-row {
-  height: 36px;
-  min-height: 36px;
+  height: 34px;
+  min-height: 34px;
   width: 100%;
-  margin: 0 0 2px 0;
+  margin: 0;
   border: 0;
   border-radius: var(--radius-sm);
-  background: #f3f7fc;
+  background: transparent;
   box-shadow: none;
 }
 
-.bookmark-folder-row.depth-0 {
-  background: #edf4ff;
-  box-shadow: inset 2px 0 #8ab5f8;
-}
-
-.bookmark-folder-row.depth-2 {
-  background: rgba(255, 255, 255, 0.62);
-}
-
 .bookmark-folder-row:hover {
-  background: #e8f0fb;
+  background: #edf2f8;
 }
 
 .bookmark-item-row {
-  height: 36px;
-  min-height: 36px;
+  height: 34px;
+  min-height: 34px;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -746,14 +715,14 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   display: flex;
   align-items: center;
   gap: 7px;
-  height: 36px;
-  min-height: 36px;
-  padding: 0 8px 0 calc(4px + var(--depth) * 14px);
+  height: 34px;
+  min-height: 34px;
+  padding: 0 8px 0 calc(4px + var(--depth) * 16px);
 }
 
 .bookmark-folder-row .bookmark-row-main {
-  height: 36px;
-  min-height: 36px;
+  height: 34px;
+  min-height: 34px;
 }
 
 .drag-handle {
@@ -818,8 +787,8 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 
 .bookmark-folder-row .bookmark-title {
   color: var(--ink);
-  font-size: 13px;
-  font-weight: 650;
+  font-size: 12.5px;
+  font-weight: 600;
 }
 
 .folder-count-badge {

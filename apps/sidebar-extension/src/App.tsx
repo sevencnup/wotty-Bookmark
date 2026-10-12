@@ -23,8 +23,8 @@ type Editor = { kind: 'bookmark' | 'folder'; title: string; url: string; parentI
 type RefreshOptions = { silent?: boolean };
 const AUTO_REFRESH_INTERVAL_MS = 10_000;
 const LANGUAGE_REFRESH_INTERVAL_MS = 10 * 60_000;
-const FOLDER_ROW_HEIGHT = 36;
-const BOOKMARK_ROW_HEIGHT = 36;
+const FOLDER_ROW_HEIGHT = 34;
+const BOOKMARK_ROW_HEIGHT = 34;
 const SEARCH_ROW_HEIGHT = 44;
 
 function toNodes(tree: LibraryTree): BookmarkNode[] {
@@ -84,6 +84,7 @@ function App() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [activeTab, setActiveTab] = useState<{ title: string; url: string } | null>(null);
   const [quickSaveFolder, setQuickSaveFolder] = useState('');
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
   const [compactToolbar, setCompactToolbar] = useState(false);
   const [scrollTop, setScrollTop] = useState(0);
@@ -286,7 +287,7 @@ function App() {
       </div>
       <div className="section-heading"><div><h1>我的{sourceLabel}书签</h1></div><div className="heading-actions"><button className="new-bookmark-button" disabled={needsServerConnection} onClick={() => setModal({ type: 'create', kind: 'folder' })} type="button"><Folder size={15} />文件夹</button><button className="new-bookmark-button primary" disabled={needsServerConnection} onClick={() => setModal({ type: 'create', kind: 'bookmark' })} type="button"><Plus size={15} />新增</button></div></div>
       <div className={`library-meta ${compactToolbar ? 'is-compact-meta' : ''}`}><span>{countBookmarks(nodes)} 个书签</span><span className="meta-separator">·</span><span>{countFolders(nodes)} 个文件夹</span><span className="sync-time" title={isBrowserSource ? '当前读取浏览器原生书签' : '侧边栏每 10 秒自动同步一次，重新聚焦时会立即同步'}>{isBrowserSource ? '浏览器书签' : formatSyncTime(lastSyncedAt)}</span><span className="meta-spacer" /><button className="refresh-button" disabled={needsServerConnection || loading} onClick={() => void refresh()} type="button"><RefreshCw className={loading ? 'spin' : ''} size={13} />刷新</button></div>
-      {needsServerConnection ? <Disconnected onConnect={() => setModal({ type: 'connect' })} /> : error && !tree ? <Failure message={error} onRetry={() => void refresh()} /> : loading ? <Loading sourceMode={sourceMode} /> : query.trim() ? <VirtualSearchList onDelete={(nodeId) => setModal({ type: 'delete', nodeId })} onEdit={(nodeId) => setModal({ type: 'edit', nodeId })} onMove={(nodeId) => setModal({ type: 'move', nodeId })} results={results} scrollTop={scrollTop} sourceMode={sourceMode} viewportHeight={viewportHeight} /> : visible.length ? <VirtualBookmarkList expanded={expanded} onDelete={(nodeId) => setModal({ type: 'delete', nodeId })} onEdit={(nodeId) => setModal({ type: 'edit', nodeId })} onMove={(nodeId) => setModal({ type: 'move', nodeId })} onToggle={(nodeId) => setExpanded((current) => { const next = new Set(current); if (next.has(nodeId)) next.delete(nodeId); else next.add(nodeId); return next; })} scrollTop={scrollTop} viewportHeight={viewportHeight} visible={visible} /> : <Empty onCreate={() => setModal({ type: 'create', kind: 'bookmark' })} sourceMode={sourceMode} />}{error && tree && <p className="inline-error">{error}</p>}
+      {needsServerConnection ? <Disconnected onConnect={() => setModal({ type: 'connect' })} /> : error && !tree ? <Failure message={error} onRetry={() => void refresh()} /> : loading ? <Loading sourceMode={sourceMode} /> : query.trim() ? <VirtualSearchList onDelete={(nodeId) => setModal({ type: 'delete', nodeId })} onEdit={(nodeId) => setModal({ type: 'edit', nodeId })} onMove={(nodeId) => setModal({ type: 'move', nodeId })} results={results} scrollTop={scrollTop} sourceMode={sourceMode} viewportHeight={viewportHeight} /> : visible.length ? <VirtualBookmarkList expanded={expanded} onDelete={(nodeId) => setModal({ type: 'delete', nodeId })} onEdit={(nodeId) => setModal({ type: 'edit', nodeId })} onMove={(nodeId) => setModal({ type: 'move', nodeId })} onSelect={setSelectedNodeId} onToggle={(nodeId) => setExpanded((current) => { const next = new Set(current); if (next.has(nodeId)) next.delete(nodeId); else next.add(nodeId); return next; })} scrollTop={scrollTop} selectedNodeId={selectedNodeId} viewportHeight={viewportHeight} visible={visible} /> : <Empty onCreate={() => setModal({ type: 'create', kind: 'bookmark' })} sourceMode={sourceMode} />}{error && tree && <p className="inline-error">{error}</p>}
     </section>
     <button aria-label="回到顶部" className="back-to-top-button" onClick={() => scrollToTop(workspaceRef.current)} title="回到顶部" type="button"><ArrowUp size={16} /></button>
     <footer className="app-footer" />
@@ -298,7 +299,7 @@ function App() {
   </main></SidebarUiLocalization>;
 }
 
-function VirtualBookmarkList({ visible, expanded, scrollTop, viewportHeight, onToggle, onEdit, onMove, onDelete }: { visible: FlatBookmarkNode[]; expanded: Set<string>; scrollTop: number; viewportHeight: number; onToggle: (nodeId: string) => void; onEdit: (nodeId: string) => void; onMove: (nodeId: string) => void; onDelete: (nodeId: string) => void }) {
+function VirtualBookmarkList({ visible, expanded, selectedNodeId, scrollTop, viewportHeight, onToggle, onSelect, onEdit, onMove, onDelete }: { visible: FlatBookmarkNode[]; expanded: Set<string>; selectedNodeId: string | null; scrollTop: number; viewportHeight: number; onToggle: (nodeId: string) => void; onSelect: (nodeId: string) => void; onEdit: (nodeId: string) => void; onMove: (nodeId: string) => void; onDelete: (nodeId: string) => void }) {
   const itemHeights = useMemo(() => visible.map((node) => (isFolder(node) ? FOLDER_ROW_HEIGHT : BOOKMARK_ROW_HEIGHT)), [visible]);
   const win = getVariableVirtualWindow(itemHeights, scrollTop, viewportHeight, 8);
   const slice = visible.slice(win.start, win.end);
@@ -312,6 +313,8 @@ function VirtualBookmarkList({ visible, expanded, scrollTop, viewportHeight, onT
           expanded={expanded.has(node.id)}
           key={node.id}
           node={node}
+          onSelect={() => onSelect(node.id)}
+          selected={selectedNodeId === node.id}
           onDelete={() => onDelete(node.id)}
           onEdit={() => onEdit(node.id)}
           onMove={() => onMove(node.id)}
@@ -354,7 +357,7 @@ function VirtualSearchList({ results, scrollTop, viewportHeight, onEdit, onMove,
   );
 }
 
-function NodeRow({ node, expanded, onToggle, onOpen, onEdit, onMove, onDelete }: { node: FlatBookmarkNode; expanded: boolean; onToggle: () => void; onOpen: () => void; onEdit: () => void; onMove: () => void; onDelete: () => void }) {
+function NodeRow({ node, expanded, selected, onSelect, onToggle, onOpen, onEdit, onMove, onDelete }: { node: FlatBookmarkNode; expanded: boolean; selected: boolean; onSelect: () => void; onToggle: () => void; onOpen: () => void; onEdit: () => void; onMove: () => void; onDelete: () => void }) {
   const folder = isFolder(node);
   const depth = node.depth;
   const bookmarkCount = folder ? countBookmarks(node.children ?? []) : 0;
@@ -362,18 +365,12 @@ function NodeRow({ node, expanded, onToggle, onOpen, onEdit, onMove, onDelete }:
 
   return (
     <div
-      className={`bookmark-row ${folder ? `bookmark-folder-row depth-${Math.min(depth, 2)}` : 'bookmark-item-row'}`}
+      className={`bookmark-row ${folder ? 'bookmark-folder-row' : 'bookmark-item-row'} ${selected ? 'is-selected' : ''}`}
       style={{ '--depth': depth } as React.CSSProperties}
     >
-      <span aria-hidden="true" className="tree-guides">
-        {node.continuationDepths.map((guideDepth) => (
-          <span className="tree-guide-vertical" key={guideDepth} style={{ '--guide-depth': guideDepth } as React.CSSProperties} />
-        ))}
-        {depth > 0 && <span className="tree-guide-branch" />}
-      </span>
       <div className="bookmark-row-main" title={tooltip}>
         {folder ? (
-          <button className="folder-toggle" onClick={onToggle} type="button">
+          <button aria-expanded={expanded} aria-label={`${expanded ? '收起' : '展开'}文件夹 ${node.title}`} className="folder-toggle" onClick={() => { onSelect(); onToggle(); }} type="button">
             {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
           </button>
         ) : (
@@ -390,7 +387,7 @@ function NodeRow({ node, expanded, onToggle, onOpen, onEdit, onMove, onDelete }:
         </span>
         <button
           className="bookmark-title"
-          onClick={folder ? onToggle : onOpen}
+          onClick={() => { onSelect(); if (folder) onToggle(); else onOpen(); }}
           type="button"
         >
           {node.title || '未命名'}
