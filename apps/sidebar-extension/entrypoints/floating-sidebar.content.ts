@@ -161,7 +161,7 @@ export default defineContentScript({
     const resetAutoCloseTimer = () => {
       window.clearTimeout(autoCloseTimer);
       if (!isOpen) return;
-      autoCloseTimer = window.setTimeout(() => setOpen(false), AUTO_CLOSE_DELAY_MS);
+      autoCloseTimer = window.setTimeout(() => setOpen(false, document.activeElement === host), AUTO_CLOSE_DELAY_MS);
     };
 
     const setOpen = (open: boolean, returnFocus = true) => {
