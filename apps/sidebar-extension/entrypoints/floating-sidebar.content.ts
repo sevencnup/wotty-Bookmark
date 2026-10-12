@@ -6,9 +6,14 @@ const TOGGLE_FLOATING_SIDEBAR_MESSAGE = 'wotty-bookmark:toggle-floating-sidebar'
 const SIDEBAR_ACTIVITY_MESSAGE = 'wotty-bookmark:sidebar-activity';
 const AUTO_CLOSE_DELAY_MS = 5_000;
 const FLOATING_SIDEBAR_WIDTH_KEY = 'bookmark-vault.floating-sidebar-width.v1';
+const FLOATING_TOGGLE_POSITION_KEY = 'bookmark-vault.floating-sidebar-toggle-position.v1';
 const DEFAULT_SIDEBAR_WIDTH = 390;
 const MIN_SIDEBAR_WIDTH = 280;
 const SIDEBAR_EDGE_RESERVE = 44;
+const DEFAULT_TOGGLE_POSITION = 0.5;
+const TOGGLE_HEIGHT = 34;
+const TOGGLE_EDGE_INSET = 8;
+const TOGGLE_DRAG_THRESHOLD = 4;
 
 const styles = `
 :host {
@@ -24,6 +29,7 @@ const styles = `
   border: 0 !important;
   pointer-events: none !important;
   --wotty-sidebar-width: min(390px, calc(100vw - 44px));
+  --wotty-toggle-top: 50%;
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -115,7 +121,7 @@ const styles = `
 
 .edge-toggle {
   position: absolute;
-  top: 50%;
+  top: var(--wotty-toggle-top);
   right: 5px;
   display: grid;
   width: 34px;
@@ -129,6 +135,8 @@ const styles = `
   backdrop-filter: blur(10px);
   cursor: pointer;
   pointer-events: auto;
+  touch-action: none;
+  user-select: none;
   transform: translateY(-50%);
   transition: right 220ms cubic-bezier(0.16, 1, 0.3, 1), transform 160ms ease, background 160ms ease, box-shadow 160ms ease;
 }
@@ -148,6 +156,12 @@ const styles = `
   right: 5px;
   background: #eff6ff;
   box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.46), 0 4px 12px rgba(15, 23, 42, 0.24);
+}
+
+:host([data-positioning='true']) .edge-toggle {
+  cursor: grabbing;
+  transform: translateY(-50%);
+  transition: none;
 }
 
 .edge-toggle img {
@@ -204,8 +218,8 @@ export default defineContentScript({
     toggle.type = 'button';
     toggle.setAttribute('aria-controls', panel.id);
     toggle.setAttribute('aria-expanded', 'false');
-    toggle.setAttribute('aria-label', '展开书签侧栏');
-    toggle.title = '展开书签侧栏';
+    toggle.setAttribute('aria-label', '展开书签侧栏；可上下拖动调整位置');
+    toggle.title = '展开书签侧栏；可上下拖动调整位置';
     const toggleIcon = document.createElement('img');
     toggleIcon.alt = '';
     toggleIcon.src = browser.runtime.getURL('/logo.webp');
@@ -218,6 +232,11 @@ export default defineContentScript({
     let autoCloseTimer: number | undefined;
     let preferredSidebarWidth = DEFAULT_SIDEBAR_WIDTH;
     let resizePointerId: number | undefined;
+    let preferredTogglePosition = DEFAULT_TOGGLE_POSITION;
+    let togglePointerId: number | undefined;
+    let toggleStartClientY = 0;
+    let isPositioningToggle = false;
+    let suppressToggleClick = false;
 
     const getSidebarWidthBounds = () => {
       const max = Math.max(1, window.innerWidth - SIDEBAR_EDGE_RESERVE);
@@ -243,12 +262,37 @@ export default defineContentScript({
       applySidebarWidth();
       if (persist) saveSidebarWidth();
     };
+    const getTogglePositionBounds = () => {
+      const halfHeight = TOGGLE_HEIGHT / 2;
+      const minY = Math.min(window.innerHeight / 2, halfHeight + TOGGLE_EDGE_INSET);
+      const maxY = Math.max(minY, window.innerHeight - halfHeight - TOGGLE_EDGE_INSET);
+      return { min: minY / Math.max(1, window.innerHeight), max: maxY / Math.max(1, window.innerHeight) };
+    };
+    const constrainTogglePosition = (value: number) => {
+      const { min, max } = getTogglePositionBounds();
+      return Math.min(max, Math.max(min, value));
+    };
+    const applyTogglePosition = () => {
+      const position = constrainTogglePosition(preferredTogglePosition);
+      host.style.setProperty('--wotty-toggle-top', `${position * 100}%`);
+    };
+    const setTogglePosition = (position: number, persist = false) => {
+      preferredTogglePosition = constrainTogglePosition(position);
+      applyTogglePosition();
+      if (persist) void browser.storage.local.set({ [FLOATING_TOGGLE_POSITION_KEY]: preferredTogglePosition }).catch(() => undefined);
+    };
 
     applySidebarWidth();
     void browser.storage.local.get(FLOATING_SIDEBAR_WIDTH_KEY).then((values) => {
       const savedWidth = values[FLOATING_SIDEBAR_WIDTH_KEY];
       if (typeof savedWidth === 'number' && Number.isFinite(savedWidth)) preferredSidebarWidth = savedWidth;
       applySidebarWidth();
+    }).catch(() => undefined);
+    applyTogglePosition();
+    void browser.storage.local.get(FLOATING_TOGGLE_POSITION_KEY).then((values) => {
+      const savedPosition = values[FLOATING_TOGGLE_POSITION_KEY];
+      if (typeof savedPosition === 'number' && Number.isFinite(savedPosition)) preferredTogglePosition = savedPosition;
+      applyTogglePosition();
     }).catch(() => undefined);
 
     const resetAutoCloseTimer = () => {
@@ -262,8 +306,8 @@ export default defineContentScript({
       window.clearTimeout(autoCloseTimer);
       host.dataset.open = String(open);
       toggle.setAttribute('aria-expanded', String(open));
-      toggle.setAttribute('aria-label', open ? '收起书签侧栏' : '展开书签侧栏');
-      toggle.title = open ? '收起书签侧栏' : '展开书签侧栏';
+      toggle.setAttribute('aria-label', open ? '收起书签侧栏；可上下拖动调整位置' : '展开书签侧栏；可上下拖动调整位置');
+      toggle.title = open ? '收起书签侧栏；可上下拖动调整位置' : '展开书签侧栏；可上下拖动调整位置';
       panel.setAttribute('aria-hidden', String(!open));
       frame.inert = !open;
       resizeHandle.setAttribute('aria-hidden', String(!open));
@@ -321,11 +365,56 @@ export default defineContentScript({
       resetAutoCloseTimer();
     };
     const onResizeDoubleClick = () => setSidebarWidth(DEFAULT_SIDEBAR_WIDTH, true);
-    const onViewportResize = () => applySidebarWidth();
+    const onTogglePointerDown = (event: PointerEvent) => {
+      if (event.button !== 0) return;
+      event.preventDefault();
+      togglePointerId = event.pointerId;
+      toggleStartClientY = event.clientY;
+      isPositioningToggle = false;
+      toggle.setPointerCapture(event.pointerId);
+      resetAutoCloseTimer();
+    };
+    const onTogglePointerMove = (event: PointerEvent) => {
+      if (togglePointerId !== event.pointerId) return;
+      if (!isPositioningToggle && Math.abs(event.clientY - toggleStartClientY) < TOGGLE_DRAG_THRESHOLD) return;
+      isPositioningToggle = true;
+      host.dataset.positioning = 'true';
+      setTogglePosition(event.clientY / Math.max(1, window.innerHeight));
+      resetAutoCloseTimer();
+    };
+    const onTogglePointerEnd = (event: PointerEvent) => {
+      if (togglePointerId !== event.pointerId) return;
+      if (toggle.hasPointerCapture(event.pointerId)) toggle.releasePointerCapture(event.pointerId);
+      togglePointerId = undefined;
+      if (isPositioningToggle) {
+        setTogglePosition(preferredTogglePosition, true);
+        suppressToggleClick = true;
+        window.setTimeout(() => { suppressToggleClick = false; }, 0);
+      }
+      isPositioningToggle = false;
+      delete host.dataset.positioning;
+    };
+    const onToggleClick = (event: MouseEvent) => {
+      if (suppressToggleClick) {
+        event.preventDefault();
+        event.stopPropagation();
+        suppressToggleClick = false;
+        return;
+      }
+      toggleOpen();
+    };
+    const onViewportResize = () => {
+      applySidebarWidth();
+      applyTogglePosition();
+    };
     const activityEvents = ['pointerdown', 'pointermove', 'keydown', 'wheel', 'touchstart', 'input', 'change', 'scroll'] as const;
     activityEvents.forEach((type) => window.addEventListener(type, onPageActivity, { capture: true, passive: true }));
 
-    toggle.addEventListener('click', toggleOpen);
+    toggle.addEventListener('pointerdown', onTogglePointerDown);
+    toggle.addEventListener('pointermove', onTogglePointerMove);
+    toggle.addEventListener('pointerup', onTogglePointerEnd);
+    toggle.addEventListener('pointercancel', onTogglePointerEnd);
+    toggle.addEventListener('click', onToggleClick);
     resizeHandle.addEventListener('pointerdown', onResizeStart);
     resizeHandle.addEventListener('pointermove', onResizeMove);
     resizeHandle.addEventListener('pointerup', onResizeEnd);
@@ -338,6 +427,11 @@ export default defineContentScript({
     context.onInvalidated(() => {
       window.clearTimeout(autoCloseTimer);
       activityEvents.forEach((type) => window.removeEventListener(type, onPageActivity, true));
+      toggle.removeEventListener('pointerdown', onTogglePointerDown);
+      toggle.removeEventListener('pointermove', onTogglePointerMove);
+      toggle.removeEventListener('pointerup', onTogglePointerEnd);
+      toggle.removeEventListener('pointercancel', onTogglePointerEnd);
+      toggle.removeEventListener('click', onToggleClick);
       resizeHandle.removeEventListener('pointerdown', onResizeStart);
       resizeHandle.removeEventListener('pointermove', onResizeMove);
       resizeHandle.removeEventListener('pointerup', onResizeEnd);
