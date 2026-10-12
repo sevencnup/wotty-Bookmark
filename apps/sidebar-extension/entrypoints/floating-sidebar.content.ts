@@ -2,6 +2,7 @@ import { browser } from 'wxt/browser';
 import { defineContentScript } from 'wxt/utils/define-content-script';
 
 const HOST_ID = 'wotty-bookmark-floating-sidebar';
+const HOST_BUILD = '0.1.61';
 const TOGGLE_FLOATING_SIDEBAR_MESSAGE = 'wotty-bookmark:toggle-floating-sidebar';
 const SIDEBAR_ACTIVITY_MESSAGE = 'wotty-bookmark:sidebar-activity';
 const SIDEBAR_READY_MESSAGE = 'wotty-bookmark:sidebar-ready';
@@ -231,10 +232,15 @@ export default defineContentScript({
   matches: ['http://*/*', 'https://*/*'],
   runAt: 'document_idle',
   main(context) {
-    if (document.getElementById(HOST_ID)) return;
+    const existingHost = document.getElementById(HOST_ID);
+    if (existingHost?.dataset.build === HOST_BUILD) return;
+    const wasOpen = existingHost?.dataset.open === 'true' || document.documentElement.getAttribute('data-wotty-sidebar-restore-open') === 'true';
+    document.documentElement.removeAttribute('data-wotty-sidebar-restore-open');
+    existingHost?.remove();
 
     const host = document.createElement('wotty-bookmark-floating-sidebar');
     host.id = HOST_ID;
+    host.dataset.build = HOST_BUILD;
     host.style.cssText = 'all:initial!important;position:fixed!important;inset:0!important;z-index:2147483647!important;display:block!important;width:100vw!important;height:100vh!important;margin:0!important;padding:0!important;border:0!important;pointer-events:none!important;';
     const shadow = host.attachShadow({ mode: 'closed' });
     const style = document.createElement('style');
@@ -487,6 +493,7 @@ export default defineContentScript({
       applySidebarWidth();
       applyTogglePosition();
     };
+    if (wasOpen) setOpen(true, false);
     const activityEvents = ['pointerdown', 'pointermove', 'keydown', 'wheel', 'touchstart', 'input', 'change', 'scroll'] as const;
     activityEvents.forEach((type) => window.addEventListener(type, onPageActivity, { capture: true, passive: true }));
 

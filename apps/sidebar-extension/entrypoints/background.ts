@@ -19,8 +19,7 @@ async function toggleFloatingSidebar(tabId: number | undefined) {
     await browser.tabs.sendMessage(tabId, { type: TOGGLE_FLOATING_SIDEBAR_MESSAGE });
   } catch {
     try {
-      // Pages that were already open when the extension was installed have not
-      // received the declarative script yet. Inject it on demand, then toggle.
+      // A tab opened before extension installation may lack a content script.
       await injectFloatingSidebar(tabId);
       await browser.tabs.sendMessage(tabId, { type: TOGGLE_FLOATING_SIDEBAR_MESSAGE });
     } catch {
@@ -29,7 +28,28 @@ async function toggleFloatingSidebar(tabId: number | undefined) {
   }
 }
 
+async function replaceFloatingSidebar(tabId: number) {
+  await browser.scripting.executeScript({
+    target: { tabId },
+    func: () => {
+      const host = document.getElementById('wotty-bookmark-floating-sidebar');
+      if (!host) return;
+      const isOpen = host.getAttribute('data-open') === 'true';
+      host.remove();
+      if (isOpen) document.documentElement.setAttribute('data-wotty-sidebar-restore-open', 'true');
+    },
+  });
+  await injectFloatingSidebar(tabId);
+}
+
 export default defineBackground(() => {
+  browser.runtime.onInstalled.addListener(() => {
+    void browser.tabs.query({}).then((tabs) => Promise.allSettled(
+      tabs.filter((tab) => /^https?:\/\//.test(tab.url ?? '') && tab.id != null)
+        .map((tab) => replaceFloatingSidebar(tab.id!)),
+    )).catch(() => undefined);
+  });
+
   browser.action.onClicked.addListener((tab) => {
     void toggleFloatingSidebar(tab.id);
   });
