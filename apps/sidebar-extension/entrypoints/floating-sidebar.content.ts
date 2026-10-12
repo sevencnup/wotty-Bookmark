@@ -2,7 +2,7 @@ import { browser } from 'wxt/browser';
 import { defineContentScript } from 'wxt/utils/define-content-script';
 
 const HOST_ID = 'wotty-bookmark-floating-sidebar';
-const HOST_BUILD = '0.1.61';
+const HOST_BUILD = '0.1.62';
 const TOGGLE_FLOATING_SIDEBAR_MESSAGE = 'wotty-bookmark:toggle-floating-sidebar';
 const SIDEBAR_ACTIVITY_MESSAGE = 'wotty-bookmark:sidebar-activity';
 const SIDEBAR_READY_MESSAGE = 'wotty-bookmark:sidebar-ready';
@@ -47,18 +47,14 @@ const styles = `
   border-left: 1px solid #dbe4f0;
   background: #f8fafc;
   box-shadow: -14px 0 36px rgba(15, 23, 42, 0.2);
-  opacity: 1;
   pointer-events: none;
-  transform: translateX(100%);
-  visibility: hidden;
-  transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1), visibility 0s linear 220ms;
+  transform: translateX(calc(100% + 40px));
+  transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 :host([data-open='true']) .panel {
   pointer-events: auto;
   transform: translateX(0);
-  visibility: visible;
-  transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1), visibility 0s;
 }
 
 .panel iframe {
@@ -256,7 +252,7 @@ export default defineContentScript({
     const frame = document.createElement('iframe');
     frame.title = '书签侧栏';
     frame.setAttribute('loading', 'eager');
-    frame.inert = true;
+    frame.tabIndex = -1;
     panel.append(frame);
 
     const framePlaceholder = document.createElement('div');
@@ -374,7 +370,7 @@ export default defineContentScript({
       toggle.setAttribute('aria-label', open ? '收起书签侧栏；可上下拖动调整位置' : '展开书签侧栏；可上下拖动调整位置');
       toggle.title = open ? '收起书签侧栏；可上下拖动调整位置' : '展开书签侧栏；可上下拖动调整位置';
       panel.setAttribute('aria-hidden', String(!open));
-      frame.inert = !open;
+      frame.tabIndex = open ? 0 : -1;
       resizeHandle.setAttribute('aria-hidden', String(!open));
       resizeHandle.tabIndex = open ? 0 : -1;
 
