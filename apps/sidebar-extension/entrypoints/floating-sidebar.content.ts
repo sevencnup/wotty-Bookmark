@@ -4,6 +4,7 @@ import { defineContentScript } from 'wxt/utils/define-content-script';
 const HOST_ID = 'wotty-bookmark-floating-sidebar';
 const TOGGLE_FLOATING_SIDEBAR_MESSAGE = 'wotty-bookmark:toggle-floating-sidebar';
 const SIDEBAR_ACTIVITY_MESSAGE = 'wotty-bookmark:sidebar-activity';
+const SIDEBAR_READY_MESSAGE = 'wotty-bookmark:sidebar-ready';
 const AUTO_CLOSE_DELAY_MS = 5_000;
 const FLOATING_SIDEBAR_WIDTH_KEY = 'bookmark-vault.floating-sidebar-width.v1';
 const FLOATING_TOGGLE_POSITION_KEY = 'bookmark-vault.floating-sidebar-toggle-position.v1';
@@ -228,6 +229,8 @@ export default defineContentScript({
     document.documentElement.append(host);
 
     let isOpen = false;
+    let frameReady = false;
+    let pendingOpen = false;
     let autoCloseTimer: number | undefined;
     let preferredSidebarWidth = DEFAULT_SIDEBAR_WIDTH;
     let resizePointerId: number | undefined;
@@ -316,7 +319,14 @@ export default defineContentScript({
       else if (returnFocus) toggle.focus({ preventScroll: true });
     };
 
-    const toggleOpen = () => setOpen(!isOpen);
+    const toggleOpen = () => {
+      if (!isOpen && !frameReady) {
+        pendingOpen = !pendingOpen;
+        toggle.setAttribute('aria-expanded', String(pendingOpen));
+        return;
+      }
+      setOpen(!isOpen);
+    };
     const onRuntimeMessage = (message: unknown) => {
       if (typeof message === 'object' && message !== null && 'type' in message && message.type === TOGGLE_FLOATING_SIDEBAR_MESSAGE) {
         toggleOpen();
@@ -324,7 +334,16 @@ export default defineContentScript({
     };
     const onSidebarActivity = (event: MessageEvent<unknown>) => {
       if (event.source !== frame.contentWindow) return;
-      if (typeof event.data === 'object' && event.data !== null && 'type' in event.data && event.data.type === SIDEBAR_ACTIVITY_MESSAGE) {
+      if (typeof event.data !== 'object' || event.data === null || !('type' in event.data)) return;
+      if (event.data.type === SIDEBAR_READY_MESSAGE) {
+        frameReady = true;
+        if (pendingOpen) {
+          pendingOpen = false;
+          setOpen(true);
+        }
+        return;
+      }
+      if (event.data.type === SIDEBAR_ACTIVITY_MESSAGE) {
         resetAutoCloseTimer();
       }
     };
