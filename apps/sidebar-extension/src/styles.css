@@ -337,7 +337,8 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 
 .is-compact-toolbar .section-kicker,
 .is-compact-toolbar .heading-actions,
-.is-compact-toolbar .library-meta > :not(.refresh-button) {
+.is-compact-toolbar .library-meta .sync-time,
+.is-compact-toolbar .library-meta .meta-separator {
   display: none;
 }
 
