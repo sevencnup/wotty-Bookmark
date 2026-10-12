@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowUp, Bookmark, Check, ChevronDown, ChevronRight, Cloud, Folder, FolderOpen, Globe, Laptop, LayoutPanelTop, LoaderCircle, LogIn, PanelTopOpen, Pencil, Plus, RefreshCw, Search, Server, Trash2, X } from 'lucide-react';
+import { ArrowUp, Bookmark, Check, ChevronDown, ChevronRight, Cloud, Folder, FolderOpen, Globe, Laptop, LayoutPanelTop, LoaderCircle, LogIn, PanelTopOpen, Pencil, Plus, RefreshCw, Search, Server, Settings2, Trash2, X } from 'lucide-react';
 import { getActiveTab, getTabsApi, openBookmark } from './lib/browser-api';
 import type { BookmarkNode } from './lib/browser-api';
 import { createBrowserBookmark, createBrowserFolder, deleteBrowserNode, getBrowserLibrary, moveBrowserNode, updateBrowserNode } from './lib/browser-library';
@@ -14,10 +14,13 @@ import { loadSiteFavicon } from './lib/site-favicon';
 import { loadSidebarLocale, loadSidebarSourceMode, loadSidebarSourceModeOverride, refreshSidebarPreferences, saveSidebarSourceModeOverride } from './lib/preferences';
 import type { SidebarLocale, SidebarSourceMode } from './lib/preferences';
 import { loadCompactToolbar, saveCompactToolbar } from './lib/layout-preferences';
+import { DEFAULT_SIDEBAR_THEME_PREFERENCES, loadSidebarThemePreferences, saveSidebarThemePreferences } from './lib/theme-preferences';
+import type { SidebarThemePreferences } from './lib/theme-preferences';
 import { getVariableVirtualWindow, getVirtualWindow } from './lib/virtual-list';
 import { FolderPickerDropdown } from './components/FolderPickerDropdown';
 import type { FolderOption } from './components/FolderPickerDropdown';
 import { SidebarUiLocalization } from './sidebar-i18n';
+import { ThemeSettingsPanel } from './components/ThemeSettingsPanel';
 
 type Modal = { type: 'connect' } | { type: 'create'; kind: 'bookmark' | 'folder'; parentId?: string } | { type: 'edit' | 'move' | 'delete'; nodeId: string } | null;
 type Editor = { kind: 'bookmark' | 'folder'; title: string; url: string; parentId: string };
@@ -89,6 +92,9 @@ function App() {
   const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
   const [isShowingCachedLibrary, setIsShowingCachedLibrary] = useState(false);
   const [isCachedLibraryReadOnly, setIsCachedLibraryReadOnly] = useState(false);
+  const [themePreferences, setThemePreferences] = useState<SidebarThemePreferences>(DEFAULT_SIDEBAR_THEME_PREFERENCES);
+  const [themePreferencesLoaded, setThemePreferencesLoaded] = useState(false);
+  const [isThemeSettingsOpen, setIsThemeSettingsOpen] = useState(false);
   const [compactToolbar, setCompactToolbar] = useState(false);
   const [scrollTop, setScrollTop] = useState(0);
   const [viewportHeight, setViewportHeight] = useState(600);
@@ -105,7 +111,22 @@ function App() {
       setViewportHeight(el.clientHeight || 600);
     }
   }, []);
-  useEffect(() => { void loadCompactToolbar().then(setCompactToolbar).catch(() => undefined); }, []);
+  useEffect(() => {
+    void loadCompactToolbar().then(setCompactToolbar).catch(() => undefined);
+    void loadSidebarThemePreferences().then((preferences) => {
+      setThemePreferences(preferences);
+      setThemePreferencesLoaded(true);
+    }).catch(() => setThemePreferencesLoaded(true));
+  }, []);
+
+  useEffect(() => {
+    if (!themePreferencesLoaded) return;
+    void saveSidebarThemePreferences(themePreferences).catch(() => setError('主题设置保存失败'));
+  }, [themePreferences, themePreferencesLoaded]);
+
+  const updateThemePreferences = useCallback((patch: Partial<SidebarThemePreferences>) => {
+    setThemePreferences((current) => ({ ...current, ...patch }));
+  }, []);
 
   useEffect(() => {
     const el = workspaceRef.current;
@@ -360,8 +381,8 @@ function App() {
   const needsServerConnection = !isBrowserSource && !connection;
   const sourceLabel = isBrowserSource ? '浏览器' : '服务器';
 
-  return <SidebarUiLocalization locale={locale}><main className={`app-shell self-hosted-library ${compactToolbar ? 'is-compact-toolbar' : ''}`}>
-    <header className="topbar"><div className="brand-lockup"><div className="brand-mark"><img alt="WOTTY BOOKMARK" className="brand-logo-img" src="/logo.webp" /></div><div><div className="brand-title">书签库</div><div className="brand-subtitle">wotty · bookmark library</div></div></div><div className="topbar-actions"><div aria-label="书签来源" className="source-mode-switch" role="group"><button aria-pressed={isBrowserSource} className={`source-mode-option ${isBrowserSource ? 'is-active' : ''}`} disabled={loading || busy} onClick={() => void selectSourceMode('browser')} title="切换到本地书签" type="button"><Laptop size={13} /><span>本地</span></button><button aria-pressed={!isBrowserSource} className={`source-mode-option ${!isBrowserSource ? 'is-active' : ''} ${connection ? 'has-connection' : ''}`} disabled={loading || busy} onClick={() => void selectSourceMode('server')} title={connection ? '云端书签设置' : '切换到云端书签'} type="button"><Cloud size={13} /><span>云端</span>{connection && <i aria-label="已连接" className="source-mode-status-dot" />}</button></div><button aria-label={compactToolbar ? '展开工具区' : '收起工具区'} aria-pressed={compactToolbar} className="compact-toolbar-button" onClick={toggleCompactToolbar} title={compactToolbar ? '展开工具区' : '收起工具区'} type="button">{compactToolbar ? <PanelTopOpen size={15} /> : <LayoutPanelTop size={15} />}</button></div></header>
+  return <SidebarUiLocalization locale={locale}><main className={`app-shell self-hosted-library app-theme--${themePreferences.theme} ${compactToolbar ? 'is-compact-toolbar' : ''}`} style={{ '--sidebar-theme-text-color': themePreferences.customTextColor, '--sidebar-theme-background-image': themePreferences.backgroundImage ? `url("${themePreferences.backgroundImage}")` : 'none', '--sidebar-theme-surface-opacity': (100 - themePreferences.customBackgroundTransparency) / 100 } as React.CSSProperties}>
+    <header className="topbar"><div className="brand-lockup"><div className="brand-mark"><img alt="WOTTY BOOKMARK" className="brand-logo-img" src="/logo.webp" /></div><div><div className="brand-title">书签库</div><div className="brand-subtitle">wotty · bookmark library</div></div></div><div className="topbar-actions"><div aria-label="书签来源" className="source-mode-switch" role="group"><button aria-pressed={isBrowserSource} className={`source-mode-option ${isBrowserSource ? 'is-active' : ''}`} disabled={loading || busy} onClick={() => void selectSourceMode('browser')} title="切换到本地书签" type="button"><Laptop size={13} /><span>本地</span></button><button aria-pressed={!isBrowserSource} className={`source-mode-option ${!isBrowserSource ? 'is-active' : ''} ${connection ? 'has-connection' : ''}`} disabled={loading || busy} onClick={() => void selectSourceMode('server')} title={connection ? '云端书签设置' : '切换到云端书签'} type="button"><Cloud size={13} /><span>云端</span>{connection && <i aria-label="已连接" className="source-mode-status-dot" />}</button></div><button aria-expanded={isThemeSettingsOpen} aria-haspopup="dialog" aria-label="主题设置" className={`theme-settings-button ${isThemeSettingsOpen ? 'is-active' : ''}`} onClick={() => setIsThemeSettingsOpen((open) => !open)} title="主题设置" type="button"><Settings2 size={15} /></button><button aria-label={compactToolbar ? '展开工具区' : '收起工具区'} aria-pressed={compactToolbar} className="compact-toolbar-button" onClick={toggleCompactToolbar} title={compactToolbar ? '展开工具区' : '收起工具区'} type="button">{compactToolbar ? <PanelTopOpen size={15} /> : <LayoutPanelTop size={15} />}</button></div></header>
     <section className="workspace" ref={workspaceRef}>
       <div className="auxiliary-toolbar">
       <div className="search-shell"><Search size={16} /><input aria-label={`搜索${sourceLabel}书签`} disabled={needsServerConnection} onChange={(event) => setQuery(event.target.value)} placeholder={`搜索${sourceLabel}书签或网址`} type="search" value={query} />{query && <button className="icon-button" onClick={() => setQuery('')} type="button"><X size={14} /></button>}</div>
@@ -391,6 +412,7 @@ function App() {
     </section>
     <button aria-label="回到顶部" className="back-to-top-button" onClick={() => scrollToTop(workspaceRef.current)} title="回到顶部" type="button"><ArrowUp size={16} /></button>
     <footer className="app-footer" />
+    {isThemeSettingsOpen && <ThemeSettingsPanel onChange={updateThemePreferences} onClose={() => setIsThemeSettingsOpen(false)} preferences={themePreferences} />}
     {modal?.type === 'connect' && <ConnectionModal busy={busy} connection={connection} onClose={() => setModal(null)} onConnect={(serverUrl, code) => { setBusy(true); setError(null); void connectToBackend(serverUrl, code).then(async (next) => { setConnection(next); let nextMode = sourceMode; try { const preferences = await refreshSidebarPreferences(next); setLocale(preferences.language); const override = await loadSidebarSourceModeOverride(); nextMode = override ?? preferences.sourceMode; setSourceMode(nextMode); } catch { /* 使用当前缓存模式，连接仍可继续 */ } const cachedLibraryRestored = nextMode === 'server' ? await restoreCachedServerLibrary(next) : false; await refresh(next, { silent: cachedLibraryRestored }, nextMode); setModal(null); }).catch((reason: unknown) => setError(reason instanceof Error ? reason.message : '连接失败')).finally(() => setBusy(false)); }} onDisconnect={() => { setBusy(true); void clearBackendConnection().then(() => { setConnection(null); setTree(null); setIsShowingCachedLibrary(false); setIsCachedLibraryReadOnly(false); setLastSyncedAt(null); setModal(null); }).finally(() => setBusy(false)); }} />}
     {modal?.type === 'create' && <EditorModal busy={busy} initial={{ kind: modal.kind, parentId: modal.parentId ?? '' }} nodes={nodes} onClose={() => setModal(null)} onSubmit={submitEditor} sourceMode={sourceMode} />}
     {modal?.type === 'edit' && <EditorModal busy={busy} node={findNode(nodes, modal.nodeId)} nodes={nodes} onClose={() => setModal(null)} onSubmit={submitEditor} sourceMode={sourceMode} />}
