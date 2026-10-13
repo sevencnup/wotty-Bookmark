@@ -1520,36 +1520,36 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 .app-theme--dark .state-icon.warning { color: #f3c477; background: #393225; }
 .app-theme--dark .delete-icon { color: var(--danger); background: var(--danger-soft); }
 
-.app-theme--custom { --ink: var(--sidebar-theme-text-color); --ink-secondary: var(--sidebar-theme-text-color); color: var(--sidebar-theme-text-color); background-color: #a7b0b9; background-image: linear-gradient(rgb(255 255 255 / .12), rgb(255 255 255 / .12)), var(--sidebar-theme-background-image); background-position: center; background-size: cover; }
-.app-theme--custom .topbar, .app-theme--custom .workspace { color: var(--sidebar-theme-text-color); background-color: rgb(255 255 255 / var(--sidebar-theme-surface-opacity)); backdrop-filter: blur(14px); }
-.app-theme--custom .app-footer, .app-theme--custom .theme-settings-panel, .app-theme--custom .theme-settings-header, .app-theme--custom .topbar-actions > button { background-color: rgb(255 255 255 / var(--sidebar-theme-surface-opacity)); backdrop-filter: blur(14px); }
+.app-theme--custom { --ink: var(--sidebar-theme-text-color); --ink-secondary: var(--sidebar-theme-text-color); --sidebar-theme-blur: calc(var(--sidebar-theme-surface-opacity) * 14px); color: var(--sidebar-theme-text-color); background-color: #a7b0b9; background-image: var(--sidebar-theme-background-image); background-position: center; background-size: cover; }
+.app-theme--custom .topbar, .app-theme--custom .workspace { color: var(--sidebar-theme-text-color); background-color: rgb(255 255 255 / var(--sidebar-theme-surface-opacity)); backdrop-filter: blur(var(--sidebar-theme-blur)); }
+.app-theme--custom .app-footer, .app-theme--custom .theme-settings-panel, .app-theme--custom .theme-settings-header, .app-theme--custom .topbar-actions > button { background-color: rgb(255 255 255 / var(--sidebar-theme-surface-opacity)); backdrop-filter: blur(var(--sidebar-theme-blur)); }
 .app-theme--custom .topbar-actions > button { color: var(--sidebar-theme-text-color); }
 .app-theme--custom .theme-settings-header { border-bottom-color: #ffffff80; }
 .app-theme--custom .theme-settings-panel { color: var(--sidebar-theme-text-color); }
 .app-theme--custom .theme-settings-mark, .app-theme--custom .theme-option-preview i { color: #fff; }
-.app-theme--custom .theme-background-row, .app-theme--custom .theme-option, .app-theme--custom .theme-upload-button, .app-theme--custom .theme-remove-button { background-color: rgb(255 255 255 / var(--sidebar-theme-surface-opacity)); backdrop-filter: blur(8px); }
+.app-theme--custom .theme-background-row, .app-theme--custom .theme-option, .app-theme--custom .theme-upload-button, .app-theme--custom .theme-remove-button { background-color: rgb(255 255 255 / var(--sidebar-theme-surface-opacity)); backdrop-filter: blur(calc(var(--sidebar-theme-blur) * .57)); }
 .app-theme--custom .theme-settings-close { color: var(--sidebar-theme-text-color); background: rgb(255 255 255 / var(--sidebar-theme-surface-opacity)); }
-.app-theme--custom .quick-access-module { color: var(--sidebar-theme-text-color); background: rgb(255 255 255 / var(--sidebar-theme-surface-opacity)); backdrop-filter: blur(10px); }
+.app-theme--custom .quick-access-module { color: var(--sidebar-theme-text-color); background: rgb(255 255 255 / var(--sidebar-theme-surface-opacity)); backdrop-filter: blur(calc(var(--sidebar-theme-blur) * .71)); }
 .app-theme--custom .search-shell, .app-theme--custom .loading-state, .app-theme--custom .empty-state, .app-theme--custom .no-results, .app-theme--custom .error-state { color: var(--sidebar-theme-text-color); background: transparent; }
 .app-theme--custom .search-shell input, .app-theme--custom .empty-state strong, .app-theme--custom .no-results strong, .app-theme--custom .error-state strong { color: var(--sidebar-theme-text-color); }
 .app-theme--custom .new-bookmark-button.primary, .app-theme--custom .primary-button, .app-theme--custom .save-current-button { color: #fff; }
-.app-theme--custom .source-mode-switch { background: rgb(255 255 255 / var(--sidebar-theme-surface-opacity)); backdrop-filter: blur(8px); }
+.app-theme--custom .source-mode-switch { background: rgb(255 255 255 / var(--sidebar-theme-surface-opacity)); backdrop-filter: blur(calc(var(--sidebar-theme-blur) * .57)); }
 .app-theme--custom .source-mode-option { color: var(--sidebar-theme-text-color); }
-.app-theme--custom .source-mode-option.is-active { color: var(--brand-primary); background: rgb(255 255 255 / .8); }
+.app-theme--custom .source-mode-option.is-active { color: var(--brand-primary); background: rgb(255 255 255 / calc(var(--sidebar-theme-surface-opacity) * .8)); }
 .app-theme--custom .new-bookmark-button, .app-theme--custom .secondary-button, .app-theme--custom .modal-close { color: var(--sidebar-theme-text-color); background: rgb(255 255 255 / var(--sidebar-theme-surface-opacity)); }
-.app-theme--custom .field-label input, .app-theme--custom .folder-picker-dropdown, .app-theme--custom .connection-status-card, .app-theme--custom .modal-card { color: var(--sidebar-theme-text-color); background: rgb(255 255 255 / var(--sidebar-theme-surface-opacity)); backdrop-filter: blur(14px); }
+.app-theme--custom .field-label input, .app-theme--custom .folder-picker-dropdown, .app-theme--custom .connection-status-card, .app-theme--custom .modal-card { color: var(--sidebar-theme-text-color); background: rgb(255 255 255 / var(--sidebar-theme-surface-opacity)); backdrop-filter: blur(var(--sidebar-theme-blur)); }
 .app-theme--custom .modal-header, .app-theme--custom .folder-picker-search { background: rgb(255 255 255 / var(--sidebar-theme-surface-opacity)); }
-.app-theme--custom .bookmark-item-row .bookmark-row-actions, .app-theme--custom .bookmark-folder-row .folder-row-actions { color: var(--sidebar-theme-text-color); background: rgb(255 255 255 / .8); }
-.app-theme--custom .folder-count-badge { color: var(--sidebar-theme-text-color); background: rgb(255 255 255 / .55); }
+.app-theme--custom .bookmark-item-row .bookmark-row-actions, .app-theme--custom .bookmark-folder-row .folder-row-actions { color: var(--sidebar-theme-text-color); background: rgb(255 255 255 / calc(var(--sidebar-theme-surface-opacity) * .8)); }
+.app-theme--custom .folder-count-badge { color: var(--sidebar-theme-text-color); background: rgb(255 255 255 / calc(var(--sidebar-theme-surface-opacity) * .55)); }
 .app-theme--custom .node-icon.folder-color, .app-theme--custom .folder-icon-card { color: #9a6a36; }
 .app-theme--custom .quick-save-host, .app-theme--custom .sync-time, .app-theme--custom .library-meta, .app-theme--custom .bookmark-url, .app-theme--custom .folder-count-badge { color: var(--sidebar-theme-text-color); }
-.app-theme--custom .folder-picker-item:hover { background: rgb(255 255 255 / .35); }
+.app-theme--custom .folder-picker-item:hover { background: rgb(255 255 255 / calc(var(--sidebar-theme-surface-opacity) * .35)); }
 .app-theme--custom .theme-option-preview i { background: #2563eb; }
 .app-theme--custom .theme-settings-mark { color: #2563eb; background: #eff6ff; }
 .app-theme--custom :is(.brand-title, .bookmark-title, .section-heading h1, .result-copy strong) { color: var(--sidebar-theme-text-color); }
 .app-theme--custom .quick-save-card { border-top-color: #ffffff80; background: transparent; }
 .app-theme--custom .theme-settings-panel { color: var(--ink); }
-.app-theme--custom .back-to-top-button { color: var(--sidebar-theme-text-color); background: rgb(255 255 255 / var(--sidebar-theme-surface-opacity)); backdrop-filter: blur(8px); }
+.app-theme--custom .back-to-top-button { color: var(--sidebar-theme-text-color); background: rgb(255 255 255 / var(--sidebar-theme-surface-opacity)); backdrop-filter: blur(calc(var(--sidebar-theme-blur) * .57)); }
 .app-theme--custom .operation-toast { color: var(--danger); background: rgb(255 255 255 / .92); }
 
 @media (prefers-reduced-motion: reduce) { .theme-settings-panel, .theme-option { animation: none; transition: none; } }
