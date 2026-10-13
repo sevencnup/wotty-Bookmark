@@ -2,7 +2,7 @@ import { browser } from 'wxt/browser';
 import { defineContentScript } from 'wxt/utils/define-content-script';
 
 const HOST_ID = 'wotty-bookmark-floating-sidebar';
-const HOST_BUILD = '0.1.67';
+const HOST_BUILD = '0.1.67-motion-1';
 const TOGGLE_FLOATING_SIDEBAR_MESSAGE = 'wotty-bookmark:toggle-floating-sidebar';
 const SIDEBAR_ACTIVITY_MESSAGE = 'wotty-bookmark:sidebar-activity';
 const SIDEBAR_READY_MESSAGE = 'wotty-bookmark:sidebar-ready';
@@ -31,6 +31,7 @@ const styles = `
   padding: 0 !important;
   border: 0 !important;
   pointer-events: none !important;
+  overflow: clip !important;
   --wotty-sidebar-width: min(390px, calc(100vw - 44px));
   --wotty-toggle-top: 50%;
   --wotty-scrollbar-width: 0px;
@@ -49,15 +50,15 @@ const styles = `
   border-left: 1px solid #dbe4f0;
   background: #f8fafc;
   box-shadow: -14px 0 36px rgba(15, 23, 42, 0.2);
-  clip-path: inset(0 0 0 calc(100% - 1px));
   pointer-events: none;
-  transform: translateZ(0);
-  transition: clip-path 220ms cubic-bezier(0.16, 1, 0.3, 1);
-  will-change: clip-path;
+  transform: translate3d(calc(100% + 48px), 0, 0);
+  transition: transform 210ms cubic-bezier(0.25, 1, 0.5, 1);
+  will-change: transform;
 }
 
 :host([data-open='true']) .panel {
-  clip-path: inset(0);
+  transform: translate3d(0, 0, 0);
+  transition-duration: 280ms;
   pointer-events: auto;
 }
 
@@ -67,8 +68,6 @@ const styles = `
   height: 100%;
   border: 0;
   background: #f8fafc;
-  transform: translateZ(0);
-  will-change: transform;
 }
 
 .frame-placeholder {
@@ -133,7 +132,8 @@ const styles = `
   opacity: 0;
   pointer-events: none;
   touch-action: none;
-  transition: opacity 160ms ease;
+  transform: translate3d(calc(var(--wotty-sidebar-width) + 48px), 0, 0);
+  transition: transform 210ms cubic-bezier(0.25, 1, 0.5, 1), opacity 160ms ease;
 }
 
 .resize-handle::after {
@@ -151,6 +151,8 @@ const styles = `
 }
 
 :host([data-open='true']) .resize-handle {
+  transform: translate3d(0, 0, 0);
+  transition-duration: 280ms, 160ms;
   opacity: 0.6;
   pointer-events: auto;
 }
@@ -185,7 +187,6 @@ const styles = `
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.98);
   box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.42), 0 4px 12px rgba(15, 23, 42, 0.26);
-  backdrop-filter: blur(10px);
   cursor: pointer;
   opacity: 0;
   pointer-events: auto;
