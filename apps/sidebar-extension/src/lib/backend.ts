@@ -36,7 +36,9 @@ export async function requestBackendApi(serverUrl: string, path: string, init?: 
     throw new Error('无法连接扩展后台，请重新加载插件后重试');
   }
   if (result?.error) throw new Error(result.error);
-  return new Response(result?.body ?? '', { status: result?.status ?? 502 });
+  const status = result?.status ?? 502;
+  const body = status === 204 || status === 205 || status === 304 ? null : result?.body ?? '';
+  return new Response(body, { status });
 }
 
 export async function connectToBackend(serverUrlValue: string, deviceCodeValue: string): Promise<BackendConnection> {
