@@ -1,4 +1,4 @@
-import { browser } from 'wxt/browser';
+import { browser } from './extension-api';
 import type { BackendConnection } from './backend';
 import { requestBackendApi } from './backend';
 

@@ -36,8 +36,7 @@ function getGlobals(): BrowserGlobals {
 }
 
 export async function getActiveTab(): Promise<{ title: string; url: string } | null> {
-  const globals = getGlobals();
-  const tabs = globals.browser?.tabs ?? globals.chrome?.tabs;
+  const tabs = browser.tabs;
 
   if (!tabs) {
     return null;
@@ -55,8 +54,7 @@ export async function getActiveTab(): Promise<{ title: string; url: string } | n
 }
 
 export async function openBookmark(url: string): Promise<void> {
-  const globals = getGlobals();
-  const tabs = globals.browser?.tabs ?? globals.chrome?.tabs;
+  const tabs = browser.tabs;
   if (!tabs) {
     throw new Error('Tabs API is not available in this browser context.');
   }
@@ -64,11 +62,10 @@ export async function openBookmark(url: string): Promise<void> {
 }
 
 export function getTabsApi(): TabsApi | undefined {
-  const globals = getGlobals();
-  return globals.browser?.tabs ?? globals.chrome?.tabs;
+  return browser.tabs;
 }
 
 export function getBookmarksApi(): BrowserBookmarkApi | undefined {
-  const globals = getGlobals();
-  return globals.browser?.bookmarks ?? globals.chrome?.bookmarks;
+  return browser.bookmarks as BrowserBookmarkApi;
 }
+import { browser } from './extension-api';

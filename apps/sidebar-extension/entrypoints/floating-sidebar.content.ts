@@ -2,10 +2,12 @@ import { browser } from 'wxt/browser';
 import { defineContentScript } from 'wxt/utils/define-content-script';
 
 const HOST_ID = 'wotty-bookmark-floating-sidebar';
-const HOST_BUILD = '0.1.67-open-2';
+const HOST_BUILD = '0.1.67-frame-api-3';
 const TOGGLE_FLOATING_SIDEBAR_MESSAGE = 'wotty-bookmark:toggle-floating-sidebar';
 const SIDEBAR_ACTIVITY_MESSAGE = 'wotty-bookmark:sidebar-activity';
 const SIDEBAR_READY_MESSAGE = 'wotty-bookmark:sidebar-ready';
+const FRAME_API_REQUEST = 'wotty-bookmark:frame-api-request';
+const FRAME_API_RESPONSE = 'wotty-bookmark:frame-api-response';
 const AUTO_CLOSE_DELAY_MS = 5_000;
 const FLOATING_SIDEBAR_WIDTH_KEY = 'bookmark-vault.floating-sidebar-width.v1';
 const FLOATING_TOGGLE_POSITION_KEY = 'bookmark-vault.floating-sidebar-toggle-position.v1';
@@ -304,6 +306,7 @@ export default defineContentScript({
     let frameReadyTimer: number | undefined;
     let frameLoadAttempt = 0;
     const frameUrl = browser.runtime.getURL('/sidebar-frame.html');
+    const frameOrigin = new URL(frameUrl).origin;
     let autoCloseTimer: number | undefined;
     let preferredSidebarWidth = DEFAULT_SIDEBAR_WIDTH;
     let resizePointerId: number | undefined;
@@ -418,8 +421,17 @@ export default defineContentScript({
       }
     };
     const onSidebarActivity = (event: MessageEvent<unknown>) => {
-      if (event.source !== frame.contentWindow) return;
+      if (event.source !== frame.contentWindow || event.origin !== frameOrigin) return;
       if (typeof event.data !== 'object' || event.data === null || !('type' in event.data)) return;
+      if (event.data.type === FRAME_API_REQUEST) {
+        const request = event.data as { type: string; id?: number; operation?: string; args?: unknown[] };
+        if (!Number.isSafeInteger(request.id) || !Array.isArray(request.args)) return;
+        void browser.runtime.sendMessage(request).then(
+          (value) => frame.contentWindow?.postMessage({ type: FRAME_API_RESPONSE, id: request.id, value }, '*'),
+          (error: unknown) => frame.contentWindow?.postMessage({ type: FRAME_API_RESPONSE, id: request.id, error: error instanceof Error ? error.message : '扩展请求失败' }, '*'),
+        );
+        return;
+      }
       if (event.data.type === SIDEBAR_READY_MESSAGE) {
         frameReady = true;
         window.clearTimeout(frameReadyTimer);

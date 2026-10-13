@@ -1,4 +1,4 @@
-import { browser } from 'wxt/browser';
+import { browser } from './extension-api';
 import type { SidebarSourceMode } from './preferences';
 
 export type FolderExpansionSnapshot = {

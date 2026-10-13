@@ -1,4 +1,4 @@
-import { browser } from 'wxt/browser';
+import { browser } from './extension-api';
 
 export type SidebarTheme = 'light' | 'dark' | 'warm' | 'custom';
 

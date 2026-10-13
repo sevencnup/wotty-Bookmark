@@ -1,4 +1,4 @@
-import { browser } from 'wxt/browser';
+import { browser } from './extension-api';
 
 const COMPACT_TOOLBAR_KEY = 'bookmark-vault.compact-toolbar.v1';
 

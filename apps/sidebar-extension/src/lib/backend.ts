@@ -1,4 +1,4 @@
-import { browser } from 'wxt/browser';
+import { browser } from './extension-api';
 import { resolvePairingRequest } from './backend-connection';
 
 const CONNECTION_KEY = 'bookmark-vault.sidebar-connection';
@@ -31,7 +31,7 @@ export async function clearBackendConnection(): Promise<void> {
 export async function requestBackendApi(serverUrl: string, path: string, init?: RequestInit): Promise<Response> {
   let result: { status?: number; body?: string; error?: string };
   try {
-    result = await browser.runtime.sendMessage({ type: 'wotty-bookmark:api-request', url: `${serverUrl}${path}`, init });
+    result = await browser.runtime.sendMessage({ type: 'wotty-bookmark:api-request', url: `${serverUrl}${path}`, init }) as typeof result;
   } catch {
     throw new Error('无法连接扩展后台，请重新加载插件后重试');
   }
