@@ -1,5 +1,6 @@
 import { browser } from 'wxt/browser';
 import type { BackendConnection } from './backend';
+import { requestBackendApi } from './backend';
 
 export type SidebarLocale = 'zh-CN' | 'en';
 export type SidebarSourceMode = 'browser' | 'server';
@@ -49,7 +50,7 @@ async function saveSidebarSourceMode(sourceMode: SidebarSourceMode): Promise<voi
 }
 
 export async function refreshSidebarPreferences(connection: BackendConnection): Promise<{ language: SidebarLocale; sourceMode: SidebarSourceMode }> {
-  const response = await fetch(`${connection.serverUrl}/api/v1/preferences`, {
+  const response = await requestBackendApi(connection.serverUrl, '/api/v1/preferences', {
     headers: { authorization: `Bearer ${connection.token}` },
   });
   const payload = await response.json().catch(() => null) as { language?: unknown; sourceMode?: unknown; message?: string } | null;

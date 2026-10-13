@@ -28,9 +28,20 @@ export async function clearBackendConnection(): Promise<void> {
   await browser.storage.local.remove(CONNECTION_KEY);
 }
 
+export async function requestBackendApi(serverUrl: string, path: string, init?: RequestInit): Promise<Response> {
+  let result: { status?: number; body?: string; error?: string };
+  try {
+    result = await browser.runtime.sendMessage({ type: 'wotty-bookmark:api-request', url: `${serverUrl}${path}`, init });
+  } catch {
+    throw new Error('无法连接扩展后台，请重新加载插件后重试');
+  }
+  if (result?.error) throw new Error(result.error);
+  return new Response(result?.body ?? '', { status: result?.status ?? 502 });
+}
+
 export async function connectToBackend(serverUrlValue: string, deviceCodeValue: string): Promise<BackendConnection> {
   const { serverUrl, code } = resolvePairingRequest(serverUrlValue, deviceCodeValue);
-  const response = await fetch(`${serverUrl}/api/v1/sidebar/exchange`, {
+  const response = await requestBackendApi(serverUrl, '/api/v1/sidebar/exchange', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ code }),

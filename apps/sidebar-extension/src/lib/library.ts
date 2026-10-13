@@ -1,4 +1,5 @@
 import type { BackendConnection } from './backend';
+import { requestBackendApi } from './backend';
 
 export type LibraryFolder = {
   id: string;
@@ -23,7 +24,7 @@ export type LibraryTree = {
 type ErrorPayload = { message?: string };
 
 async function request<T>(connection: BackendConnection, path: string, init: RequestInit = {}): Promise<T> {
-  const response = await fetch(`${connection.serverUrl}${path}`, {
+  const response = await requestBackendApi(connection.serverUrl, path, {
     ...init,
     headers: { authorization: `Bearer ${connection.token}`, 'content-type': 'application/json', ...init.headers },
   });
