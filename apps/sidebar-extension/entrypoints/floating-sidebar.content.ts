@@ -2,7 +2,7 @@ import { browser } from 'wxt/browser';
 import { defineContentScript } from 'wxt/utils/define-content-script';
 
 const HOST_ID = 'wotty-bookmark-floating-sidebar';
-const HOST_BUILD = '0.1.67-motion-1';
+const HOST_BUILD = '0.1.67-open-2';
 const TOGGLE_FLOATING_SIDEBAR_MESSAGE = 'wotty-bookmark:toggle-floating-sidebar';
 const SIDEBAR_ACTIVITY_MESSAGE = 'wotty-bookmark:sidebar-activity';
 const SIDEBAR_READY_MESSAGE = 'wotty-bookmark:sidebar-ready';
@@ -301,10 +301,6 @@ export default defineContentScript({
 
     let isOpen = false;
     let frameReady = false;
-    let pendingOpen = false;
-    let hasOpenedOnce = false;
-    let openPreparationFrame: number | undefined;
-    let isPreparingOpen = false;
     let frameReadyTimer: number | undefined;
     let frameLoadAttempt = 0;
     const frameUrl = browser.runtime.getURL('/sidebar-frame.html');
@@ -413,50 +409,8 @@ export default defineContentScript({
       else if (returnFocus) toggle.focus({ preventScroll: true });
     };
 
-    const cancelOpenPreparation = () => {
-      if (openPreparationFrame !== undefined) window.cancelAnimationFrame(openPreparationFrame);
-      openPreparationFrame = undefined;
-      isPreparingOpen = false;
-      delete host.dataset.preparingOpen;
-    };
-
-    const openAfterPrepaint = () => {
-      if (hasOpenedOnce) {
-        setOpen(true);
-        return;
-      }
-      if (isPreparingOpen) return;
-      isPreparingOpen = true;
-      host.dataset.preparingOpen = 'true';
-      openPreparationFrame = window.requestAnimationFrame(() => {
-        openPreparationFrame = window.requestAnimationFrame(() => {
-          openPreparationFrame = undefined;
-          isPreparingOpen = false;
-          delete host.dataset.preparingOpen;
-          hasOpenedOnce = true;
-          setOpen(true);
-        });
-      });
-    };
-
     const toggleOpen = () => {
-      if (isOpen) {
-        pendingOpen = false;
-        setOpen(false);
-        return;
-      }
-      if (isPreparingOpen) {
-        cancelOpenPreparation();
-        return;
-      }
-      if (!frameReady) {
-        pendingOpen = !pendingOpen;
-        toggle.setAttribute('aria-expanded', 'false');
-        toggle.setAttribute('aria-label', pendingOpen ? '正在准备书签侧栏；再次点击取消' : '展开书签侧栏；可上下拖动调整位置');
-        toggle.title = pendingOpen ? '正在准备书签侧栏；再次点击取消' : '展开书签侧栏；可上下拖动调整位置';
-        return;
-      }
-      openAfterPrepaint();
+      setOpen(!isOpen);
     };
     const onRuntimeMessage = (message: unknown) => {
       if (typeof message === 'object' && message !== null && 'type' in message && message.type === TOGGLE_FLOATING_SIDEBAR_MESSAGE) {
@@ -471,10 +425,6 @@ export default defineContentScript({
         window.clearTimeout(frameReadyTimer);
         panel.dataset.frameReady = 'true';
         delete panel.dataset.frameError;
-        if (pendingOpen) {
-          pendingOpen = false;
-          openAfterPrepaint();
-        }
         return;
       }
       if (event.data.type === SIDEBAR_ACTIVITY_MESSAGE) {
@@ -489,10 +439,6 @@ export default defineContentScript({
       frameReadyTimer = window.setTimeout(() => {
         if (!frameReady) {
           panel.dataset.frameError = 'true';
-          if (pendingOpen) {
-            pendingOpen = false;
-            setOpen(true);
-          }
         }
       }, 8_000);
       frame.src = `${frameUrl}?load=${++frameLoadAttempt}`;
@@ -588,7 +534,6 @@ export default defineContentScript({
       ? undefined
       : new MutationObserver(scheduleScrollbarInset);
     if (document.body) scrollbarMutationObserver?.observe(document.body, { childList: true, subtree: true });
-    if (wasOpen) pendingOpen = true;
     const activityEvents = ['pointerdown', 'pointermove', 'keydown', 'wheel', 'touchstart', 'input', 'change', 'scroll'] as const;
     activityEvents.forEach((type) => window.addEventListener(type, onPageActivity, { capture: true, passive: true }));
 
@@ -606,11 +551,11 @@ export default defineContentScript({
     browser.runtime.onMessage.addListener(onRuntimeMessage);
     window.addEventListener('message', onSidebarActivity);
     startFrameLoad();
+    if (wasOpen) setOpen(true);
     window.addEventListener('resize', onViewportResize);
     context.onInvalidated(() => {
       window.clearTimeout(autoCloseTimer);
       window.clearTimeout(frameReadyTimer);
-      cancelOpenPreparation();
       activityEvents.forEach((type) => window.removeEventListener(type, onPageActivity, true));
       toggle.removeEventListener('pointerdown', onTogglePointerDown);
       toggle.removeEventListener('pointermove', onTogglePointerMove);
